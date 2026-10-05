@@ -3,7 +3,9 @@ import { Maximize, Minus, Plus, Star } from 'lucide-react'
 import { layerStateAt } from '@shared/anim'
 import { buildBanner } from '@shared/build'
 import type { Composition, Layer, Project } from '@shared/types'
+import { applyLibrary } from '../lib/actions'
 import { assetUrl, currentComp, setLayerValue, updateLayer, useStore } from '../store'
+import { DRAG_TYPE } from './Library'
 
 /**
  * De echte banner-HTML (zelfde builder als de export) in een iframe. Twee iframes
@@ -263,6 +265,25 @@ function SingleViewer() {
             onPointerMove={onMove}
             onPointerUp={() => (drag.current = null)}
             onPointerLeave={() => setHover(null)}
+            onDragOver={(e) => {
+              if (!e.dataTransfer.types.includes(DRAG_TYPE)) return
+              e.preventDefault()
+              e.dataTransfer.dropEffect = 'copy'
+              const r = e.currentTarget.getBoundingClientRect()
+              setHover(hitTest((e.clientX - r.left) / zoom, (e.clientY - r.top) / zoom)?.id ?? null)
+            }}
+            onDragLeave={() => setHover(null)}
+            onDrop={(e) => {
+              const id = e.dataTransfer.getData(DRAG_TYPE)
+              if (!id) return
+              e.preventDefault()
+              const r = e.currentTarget.getBoundingClientRect()
+              const hit = hitTest((e.clientX - r.left) / zoom, (e.clientY - r.top) / zoom)
+              setHover(null)
+              const targets = hit ? [hit.id] : selection
+              if (targets.length) applyLibrary(id, targets)
+              else useStore.getState().setStatus('Laat de animatie los op een laag.', 'error')
+            }}
           >
             {hovered && box(hovered, 'hover', false)}
             {selected.map((l) => box(l, '', selected.length === 1 && !l.locked))}

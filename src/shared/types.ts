@@ -107,6 +107,19 @@ export interface Motion {
   reveal: boolean
 }
 
+export type EmphasisType = 'pulse' | 'heartbeat' | 'shake' | 'wiggle' | 'jump' | 'flash'
+
+/** Accent-animatie halverwege (bijv. een pulserende CTA), rond de rustpositie. */
+export interface Emphasis {
+  type: EmphasisType
+  start: number
+  /** Totale duur van alle herhalingen samen. */
+  duration: number
+  repeat: number
+  /** 1 = normaal, 2 = twee keer zo sterk. */
+  strength: number
+}
+
 export interface Layer {
   id: string
   /**
@@ -134,6 +147,13 @@ export interface Layer {
   tracks: Tracks
   intro?: Motion | null
   outro?: Motion | null
+  emphasis?: Emphasis | null
+  /**
+   * Alleen in afgeleide formaten: eigenschappen die in dit formaat bewust anders
+   * zijn gezet dan in de basis (bijv. "x", "text.size", "intro"). Die worden niet
+   * meer overschreven als je de basis aanpast.
+   */
+  overrides?: string[]
   text?: TextProps
   image?: ImageProps
   shape?: ShapeProps
@@ -153,6 +173,8 @@ export interface Composition {
   border: { color: string; width: number } | null
   /** Lagen van boven (index 0) naar onder. */
   layers: Layer[]
+  /** Alleen afgeleide formaten: compositie-instellingen die afwijken van de basis. */
+  overrides?: string[]
 }
 
 export interface FontAsset {

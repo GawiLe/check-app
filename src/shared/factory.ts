@@ -1,4 +1,5 @@
 import { round } from './anim'
+import { scaleMotion } from './motion'
 import { BASE_SIZE } from './specs'
 import type { Composition, Layer, LayerType, Motion, Project } from './types'
 import { PROJECT_VERSION } from './types'
@@ -167,6 +168,7 @@ export function mapLayerToFormat(l: Layer, src: { width: number; height: number 
   const sy = height / src.height
   const copy: Layer = structuredClone(l)
   copy.id = newId('l')
+  delete copy.overrides
   if (l.x <= 0 && l.y <= 0 && l.width >= src.width && l.height >= src.height) {
     copy.width = width
     copy.height = height
@@ -185,6 +187,8 @@ export function mapLayerToFormat(l: Layer, src: { width: number; height: number 
   copy.y = mapY(l.y)
   if (copy.tracks.x) copy.tracks.x = copy.tracks.x.map((k) => ({ ...k, v: mapX(k.v) }))
   if (copy.tracks.y) copy.tracks.y = copy.tracks.y.map((k) => ({ ...k, v: mapY(k.v) }))
+  copy.intro = scaleMotion(l.intro, s)
+  copy.outro = scaleMotion(l.outro, s)
   if (copy.text) copy.text.size = round(copy.text.size * s, 1)
   if (copy.writeon) copy.writeon.size = round(copy.writeon.size * s, 1)
   if (copy.shape) copy.shape.radius = round(copy.shape.radius * s, 1)

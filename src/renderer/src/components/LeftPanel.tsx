@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { ImagePlus, Type, X } from 'lucide-react'
+import { Library } from './Library'
 import { addImageLayer, importFonts, importImages } from '../lib/actions'
 import { assetUrl, useStore } from '../store'
 import { Section } from './ui'
@@ -8,9 +10,22 @@ export function LeftPanel() {
   const assets = useStore((s) => s.assets)
   const rev = useStore((s) => s.assetsRev)
   const s = useStore.getState
+  const [tab, setTab] = useState<'library' | 'assets'>('library')
 
   return (
     <div className="panel left">
+      <div className="left-tabs">
+        <button className={tab === 'library' ? 'on' : ''} onClick={() => setTab('library')}>
+          Animaties
+        </button>
+        <button className={tab === 'assets' ? 'on' : ''} onClick={() => setTab('assets')}>
+          Assets & fonts
+        </button>
+      </div>
+      {tab === 'library' ? (
+        <Library />
+      ) : (
+        <>
       <Section
         title="Assets"
         actions={
@@ -71,6 +86,8 @@ export function LeftPanel() {
           ))}
         </div>
       </Section>
+        </>
+      )}
     </div>
   )
 }

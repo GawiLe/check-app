@@ -1,6 +1,7 @@
 import { createLayer, deriveComposition, newId } from '@shared/factory'
-import { defaultIntro, INTRO_PRESETS } from '@shared/motion'
+import { applyLibraryItem, LIBRARY } from '@shared/library'
 import { mergeTracks, PRESETS } from '@shared/presets'
+import { resetCompOverrides, resetOverrides } from '@shared/sync'
 import type { ExportTarget, Layer, LayerType } from '@shared/types'
 import { assetUrl, currentComp, findComp, findLayer, updateLayer, useStore } from '../store'
 
@@ -289,22 +290,59 @@ export async function saveAsBoilerplate(name: string) {
 }
 
 /** Geeft meerdere lagen dezelfde binnenkomst, na elkaar (van boven naar onder in beeld). */
-export function staggerIntros(presetId: string, gap: number) {
+export function staggerIntros(libraryId: string, gap: number) {
   const { selection, compId } = S()
-  const preset = INTRO_PRESETS[presetId]
-  if (!preset) return
+  const item = LIBRARY.find((i) => i.id === libraryId)
+  if (!item) return
   S().update((p) => {
     const comp = findComp(p, compId)
     const targets = comp.layers
       .filter((l) => l.visible && (selection.length > 1 ? selection.includes(l.id) : !l.locked))
       .sort((a, b) => a.y - b.y || a.x - b.x)
     targets.forEach((l, i) => {
-      const base = defaultIntro(l)
-      l.intro = { ...base, ...preset.spec, reveal: base.reveal, start: Math.round((0.2 + i * gap) * 100) / 100 }
-      if (base.reveal) l.intro.fade = false
+      const at = Math.round((0.2 + i * gap) * 100) / 100
+      // Write-on lagen schrijven zich in; de rest krijgt de gekozen animatie.
+      if (l.type === 'writeon') applyLibraryItem(l, LIBRARY.find((x) => x.id === 'writeOn')!, comp, at)
+      else applyLibraryItem(l, item, comp, at)
     })
     const last = targets.length ? 0.2 + (targets.length - 1) * gap + 1.2 : 0
     comp.duration = Math.max(comp.duration, Math.ceil(last + 2))
   })
   S().setStatus('Binnenkomst toegepast. Per laag bij te stellen in de tab Animatie.')
+}
+
+/** Bibliotheek-animatie toepassen op lagen (na slepen of klikken). `at` = starttijd. */
+export function applyLibrary(itemId: string, layerIds: string[], at?: number) {
+  const { compId } = S()
+  const item = LIBRARY.find((i) => i.id === itemId)
+  if (!item || !layerIds.length) return
+  S().update((p) => {
+    const comp = findComp(p, compId)
+    for (const id of layerIds) {
+      const l = comp.layers.find((x) => x.id === id)
+      if (l) applyLibraryItem(l, item, comp, at)
+    }
+    // Duur verlengen als de animatie er buiten valt
+    const ends = comp.layers.flatMap((l) => [
+      l.intro ? l.intro.start + l.intro.duration : 0,
+      l.emphasis ? l.emphasis.start + l.emphasis.duration : 0
+    ])
+    comp.duration = Math.max(comp.duration, Math.ceil(Math.max(...ends) + 1))
+  })
+  S().select(layerIds)
+  S().setTab('motion')
+  S().setStatus(`${item.label} toegepast. Pas tijd, duur en afstand aan in de tab Animatie.`)
+}
+
+export function resetLayerOverrides(layerId: string, keys?: string[]) {
+  const { compId } = S()
+  if (!compId) return
+  // Herstellen is zelf geen nieuwe override, dus zonder sync.
+  S().update((p) => resetOverrides(p, compId, layerId, keys), undefined, true)
+}
+
+export function resetCompositionOverrides(keys?: string[]) {
+  const { compId } = S()
+  if (!compId) return
+  S().update((p) => resetCompOverrides(p, compId, keys), undefined, true)
 }

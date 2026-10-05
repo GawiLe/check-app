@@ -1,12 +1,22 @@
 import { useState } from 'react'
-import { Image as ImageIcon, PenLine, Sparkles, Square, Timer, Trash2, Type, Wand2 } from 'lucide-react'
+import { Image as ImageIcon, PenLine, RotateCcw, Sparkles, Square, Timer, Trash2, Type, Wand2, X } from 'lucide-react'
 import { layerStateAt } from '@shared/anim'
-import { defaultIntro, defaultOutro, INTRO_PRESETS } from '@shared/motion'
+import { applyLibraryItem, LIBRARY, matchLibraryItem } from '@shared/library'
+import { defaultIntro, defaultOutro } from '@shared/motion'
+import { baseComp, isLinkedToBase, overrideLabel } from '@shared/sync'
 import { PRESETS } from '@shared/presets'
 import { TARGET_IDS, TARGETS } from '@shared/specs'
-import type { AnimProp, EaseName, Layer, Motion, RevealMode } from '@shared/types'
+import type { AnimProp, EaseName, Emphasis, EmphasisType, Layer, Motion, RevealMode } from '@shared/types'
 import { EASES } from '@shared/types'
-import { aiAnimate, applyPreset, deleteComposition, regenerateWriteOn, staggerIntros } from '../lib/actions'
+import {
+  aiAnimate,
+  applyPreset,
+  deleteComposition,
+  regenerateWriteOn,
+  resetCompositionOverrides,
+  resetLayerOverrides,
+  staggerIntros
+} from '../lib/actions'
 import { currentComp, setLayerValue, toggleStopwatch, updateComp, updateLayer, useStore } from '../store'
 import { Num, Row, Scrub, Section, Switch, TextInput } from './ui'
 
@@ -44,11 +54,56 @@ export function Inspector() {
         </button>
       </div>
       <div className="scroll">
+        <FormatNotice />
         {tab === 'design' && (layer ? <LayerDesign layer={layer} /> : selection.length > 1 ? <Multi n={selection.length} /> : <CompDesign />)}
         {tab === 'motion' && (layer ? <LayerMotion layer={layer} /> : <CompMotion />)}
         {tab === 'ai' && <AiPanel />}
       </div>
     </div>
+  )
+}
+
+/** In een afgeleid formaat: uitleg dat wijzigingen hier alleen voor dit formaat gelden. */
+function FormatNotice() {
+  const project = useStore((s) => s.project)!
+  const comp = useStore(currentComp)!
+  if (!project.syncFormats || comp.id === project.baseCompositionId) return null
+  const base = baseComp(project)
+  return (
+    <div className="notice">
+      <b style={{ color: 'var(--text)' }}>Afgeleid van {base ? `${base.width}×${base.height}` : 'de basis'}.</b> Wat je hier aanpast geldt alleen voor{' '}
+      {comp.width}×{comp.height} en wordt niet meer overschreven door de basis. Herstellen kan per eigenschap.
+    </div>
+  )
+}
+
+/** Lijst van eigenschappen die in dit formaat afwijken van de basis, met herstelknoppen. */
+function Overrides(props: { keys: string[] | undefined; onReset: (keys?: string[]) => void; title?: string }) {
+  if (!props.keys?.length) return null
+  return (
+    <Section
+      title={
+        <>
+          <span className="override-dot" /> {props.title ?? 'Afwijkend van basis'}
+        </>
+      }
+      actions={
+        <button className="ghost sm" onClick={() => props.onReset()} title="Alles terug naar de basis">
+          <RotateCcw size={12} /> Alles
+        </button>
+      }
+    >
+      <div className="override-list">
+        {props.keys.map((k) => (
+          <span key={k} className="chip">
+            {overrideLabel(k)}
+            <button className="icon sm" title="Herstel naar basis" onClick={() => props.onReset([k])}>
+              <X size={11} />
+            </button>
+          </span>
+        ))}
+      </div>
+    </Section>
   )
 }
 
@@ -69,6 +124,7 @@ function CompDesign() {
   const isBase = comp.id === project.baseCompositionId
   return (
     <>
+      <Overrides keys={comp.overrides} onReset={resetCompositionOverrides} title="Formaat wijkt af van basis" />
       <Section
         title={
           <>
@@ -169,9 +225,13 @@ function LayerDesign({ layer }: { layer: Layer }) {
   const anim = (p: AnimProp) => !!layer.tracks[p]?.length
   const set = (p: AnimProp) => (v: number, co: boolean) => setLayerValue(layer.id, p, v, co ? `p-${p}` : undefined)
   const fonts = project.fonts
+  const derived = project.syncFormats && useStore.getState().compId !== project.baseCompositionId
+  const own = derived && !isLinkedToBase(project, layer)
 
   return (
     <>
+      {derived && <Overrides keys={layer.overrides} onReset={(keys) => resetLayerOverrides(layer.id, keys)} />}
+      {own && <div className="notice">Eigen laag: bestaat alleen in dit formaat.</div>}
       <Section title={<Icon size={14} />} actions={<span className="faint">{{ text: 'Tekst', image: 'Afbeelding', shape: 'Vorm', writeon: 'Write-on' }[layer.type]}</span>}>
         <TextInput value={layer.name} onCommit={(v) => up((l) => void (l.name = v))} />
       </Section>
@@ -336,7 +396,7 @@ function LayerDesign({ layer }: { layer: Layer }) {
 
 function CompMotion() {
   const comp = useStore(currentComp)!
-  const [preset, setPreset] = useState('up')
+  const [preset, setPreset] = useState('slideUp')
   const selection = useStore((s) => s.selection)
   const [gap, setGap] = useState(0.2)
   return (
@@ -346,9 +406,9 @@ function CompMotion() {
         na elkaar.
       </div>
       <div className="chips">
-        {Object.entries(INTRO_PRESETS).map(([id, p]) => (
-          <button key={id} className={preset === id ? 'on' : ''} onClick={() => setPreset(id)}>
-            {p.label}
+        {LIBRARY.filter((i) => i.kind === 'intro' && !i.reveal).map((i) => (
+          <button key={i.id} className={preset === i.id ? 'on' : ''} onClick={() => setPreset(i.id)}>
+            {i.label}
           </button>
         ))}
       </div>
@@ -372,6 +432,10 @@ function LayerMotion({ layer }: { layer: Layer }) {
 
   const setMotion = (kind: 'intro' | 'outro', m: Motion | null, co?: string) =>
     updateLayer(layer.id, (l) => void (l[kind] = m), co)
+  const pick = (id: string) => {
+    const item = LIBRARY.find((i) => i.id === id)!
+    updateLayer(layer.id, (l) => applyLibraryItem(l, item, comp))
+  }
 
   return (
     <>
@@ -382,7 +446,10 @@ function LayerMotion({ layer }: { layer: Layer }) {
         canReveal={canReveal}
         onToggle={(on) => setMotion('intro', on ? defaultIntro(layer) : null)}
         onChange={(m, co) => setMotion('intro', m, co)}
+        onPick={pick}
+        active={matchLibraryItem(layer, 'intro')}
       />
+      <EmphasisCard layer={layer} onPick={pick} />
       <MotionCard
         kind="outro"
         title="Uitgang"
@@ -390,6 +457,8 @@ function LayerMotion({ layer }: { layer: Layer }) {
         canReveal={canReveal}
         onToggle={(on) => setMotion('outro', on ? defaultOutro(comp) : null)}
         onChange={(m, co) => setMotion('outro', m, co)}
+        onPick={pick}
+        active={matchLibraryItem(layer, 'outro')}
       />
       {layer.outro && (
         <div className="hint-text" style={{ padding: '0 12px 8px' }}>
@@ -478,14 +547,12 @@ function MotionCard(props: {
   canReveal: boolean
   onToggle: (on: boolean) => void
   onChange: (m: Motion, coalesce?: string) => void
+  onPick: (libraryId: string) => void
+  active: string | null
 }) {
   const { kind, motion: m, canReveal } = props
   const set = (patch: Partial<Motion>, co?: string) => m && props.onChange({ ...m, ...patch }, co)
-  const activePreset = m
-    ? Object.entries(INTRO_PRESETS).find(([, p]) =>
-        Object.entries(p.spec).every(([k, v]) => k === 'ease' || (m as unknown as Record<string, unknown>)[k] === (kind === 'outro' && (k === 'dx' || k === 'dy') ? -(v as number) : v))
-      )?.[0]
-    : undefined
+  const active = props.active
 
   return (
     <div className="section">
@@ -499,29 +566,11 @@ function MotionCard(props: {
         {m && (
           <>
             <div className="chips">
-              {Object.entries(INTRO_PRESETS).map(([id, p]) => (
-                <button
-                  key={id}
-                  className={activePreset === id ? 'on' : ''}
-                  onClick={() => {
-                    const spec = { ...p.spec }
-                    // Uitgang: dezelfde richting als de naam ("Omhoog" = naar boven weg)
-                    if (kind === 'outro') {
-                      spec.dx = -(spec.dx ?? 0)
-                      spec.dy = -(spec.dy ?? 0)
-                      if (spec.ease === 'backOut') spec.ease = 'easeIn'
-                    }
-                    set({ ...spec, reveal: false })
-                  }}
-                >
-                  {p.label}
+              {LIBRARY.filter((i) => i.kind === kind && (!i.reveal || canReveal || i.reveal !== 'writeon')).map((i) => (
+                <button key={i.id} className={active === i.id ? 'on' : ''} onClick={() => props.onPick(i.id)}>
+                  {i.label}
                 </button>
               ))}
-              {canReveal && (
-                <button className={m.reveal ? 'on' : ''} onClick={() => set({ reveal: !m.reveal })}>
-                  {kind === 'intro' ? 'Write-on / wipe' : 'Wis uit'}
-                </button>
-              )}
             </div>
             <div className="grid2">
               <Num label="Start" value={m.start} step={0.05} min={0} max={30} decimals={2} suffix="s" onChange={(v, co) => set({ start: v }, co ? `${kind}-s` : undefined)} />
@@ -545,6 +594,50 @@ function MotionCard(props: {
             <Row label="Fade">
               <Switch checked={m.fade} onChange={(v) => set({ fade: v })} />
             </Row>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function EmphasisCard({ layer, onPick }: { layer: Layer; onPick: (id: string) => void }) {
+  const em = layer.emphasis
+  const comp = useStore(currentComp)!
+  const set = (patch: Partial<Emphasis>, co?: string) => em && updateLayer(layer.id, (l) => void (l.emphasis = { ...em, ...patch }), co)
+  return (
+    <div className="section">
+      <div className="motion-card emphasis">
+        <div className="row" style={{ marginBottom: em ? 10 : 0 }}>
+          <span className="grow" style={{ fontWeight: 600 }}>
+            Accent
+          </span>
+          <Switch
+            checked={!!em}
+            onChange={(on) =>
+              updateLayer(layer.id, (l) => {
+                l.emphasis = on ? { type: 'pulse', start: Math.min(3, Math.max(0, comp.duration - 2)), duration: 1, repeat: 2, strength: 1 } : null
+              })
+            }
+          />
+        </div>
+        {em && (
+          <>
+            <div className="chips">
+              {LIBRARY.filter((i) => i.kind === 'emphasis').map((i) => (
+                <button key={i.id} className={em.type === (i.emphasis as EmphasisType) ? 'on' : ''} onClick={() => onPick(i.id)}>
+                  {i.label}
+                </button>
+              ))}
+            </div>
+            <div className="grid2">
+              <Num label="Start" value={em.start} step={0.05} min={0} max={30} decimals={2} suffix="s" onChange={(v, co) => set({ start: v }, co ? 'em-s' : undefined)} />
+              <Num label="Duur" value={em.duration} step={0.05} min={0.1} max={10} decimals={2} suffix="s" onChange={(v, co) => set({ duration: v }, co ? 'em-d' : undefined)} />
+            </div>
+            <div className="grid2">
+              <Num label="×" title="Herhalingen" value={em.repeat} min={1} max={10} onChange={(v, co) => set({ repeat: Math.round(v) }, co ? 'em-r' : undefined)} />
+              <Num label="Kracht" value={em.strength} step={0.1} min={0.1} max={5} decimals={1} onChange={(v, co) => set({ strength: v }, co ? 'em-k' : undefined)} />
+            </div>
           </>
         )}
       </div>

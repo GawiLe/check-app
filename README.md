@@ -46,18 +46,44 @@ mijn-campagne/
 5. **Exporteren**: kies formaten en platform(s). Elke banner wordt gebouwd, gezipt, voorzien van een backup-JPG en gevalideerd.
 6. **Opslaan als boilerplate** (bladwijzer-icoon): het hele project (formaten, animaties, assets, fonts) wordt een startpunt voor volgende campagnes.
 
-### Meerdere formaten in één werkbestand
+### Meerdere formaten: de basis is leidend
 
-- Alle formaten zitten in één project. Met **Alle** zie je ze naast elkaar, synchroon afspelend. Klik op een formaat om het te bewerken.
-- Met het **koppel-icoon** (standaard aan) zijn de formaten gekoppeld:
-  - Wat je wijzigt (tekst, font, kleuren, afbeelding, binnenkomst/uitgang, timing, duur, achtergrond, rand) geldt voor alle formaten.
-  - Nieuwe en verwijderde lagen gaan ook mee.
-- **Positie en maat** blijven per formaat. Zo zet je de layout per formaat goed, en pas je de tekst daarna maar één keer aan.
-- Een nieuw formaat wordt automatisch afgeleid. Bij een sterk afwijkende verhouding (zoals 728×90 van 300×600) moet je de layout zelf bijstellen.
+- Alle formaten zitten in één project. De **basis** (300×600, gemarkeerd met ●) is leidend.
+- Met **Alle** zie je de formaten naast elkaar, synchroon afspelend. Klik op een formaat om het te bewerken.
+- **Wijzig je iets in de basis**, dan gaat het mee naar alle andere formaten. Dat geldt voor:
+  - tekst, font, kleuren, afbeelding en animaties;
+  - positie en maat, omgerekend naar dat formaat;
+  - nieuwe en verwijderde lagen, en de volgorde.
+- **Wijzig je iets in een afgeleid formaat**, dan geldt dat alleen daar. Die eigenschap wordt onthouden als *afwijkend van basis*, en latere wijzigingen in de basis overschrijven hem niet meer.
+  - In de inspector zie je welke eigenschappen afwijken (oranje labels). Met × herstel je één eigenschap naar de basis, met *Alles* de hele laag.
+  - In de tijdlijn hebben afwijkende lagen een oranje stip.
+  - Lagen die je alleen in een afgeleid formaat toevoegt, zijn *eigen lagen* van dat formaat.
+- Hetzelfde geldt voor de formaatinstellingen (duur, loops, achtergrond, rand).
+- Met het **koppel-icoon** zet je dit uit. Dan zijn alle formaten los.
+- Een nieuw formaat wordt automatisch afgeleid. Bij een sterk afwijkende verhouding (zoals 728×90 van 300×600) moet je de layout daar zelf bijstellen; dat blijft daarna staan.
+
+### Animatiebibliotheek
+
+Links staat onder **Animaties** een bibliotheek. Beweeg over een tegel voor een voorbeeld en sleep hem op een laag:
+
+- **op het canvas**: de animatie gaat op die laag;
+- **in de tijdlijn op een spoor**: de animatie begint waar je hem loslaat;
+- **of klik** op een tegel om hem op de geselecteerde lagen te zetten.
+
+| Binnenkomst | Accent | Uitgang |
+|---|---|---|
+| Fade in, Slide up/down, Slide in links/rechts, **Bounce in**, Pop in, Elastic in, Zoom in/uit, Draai in, Write-on, Wipe links/omhoog | Pulse, Heartbeat, Shake, Wiebel, Spring, Flash | Fade out, Slide out omhoog/omlaag/links, Zoom out, Pop out |
+
+Daarna pas je alles aan in de tab **Animatie**:
+
+- binnenkomst en uitgang: start, duur, easing, afstand, schaal, rotatie en fade;
+- accent: start, duur, aantal herhalingen en kracht.
+
+In de tijdlijn staan ze als groene (IN), gele (ACCENT) en oranje (UIT) blokken, die je kunt slepen en verlengen.
 
 ### Animeren
 
-- **Binnenkomst en uitgang** (makkelijkste manier): zet per laag *Binnenkomst* aan en kies bijvoorbeeld Fade, Omhoog, Van links, Zoom in, Pop of Draai.
+- **Binnenkomst, accent en uitgang** (makkelijkste manier): sleep een animatie uit de bibliotheek, of zet ze per laag aan in de tab *Animatie*.
   - Daarna stel je start, duur, easing, verschuiving, schaal, rotatie en fade bij.
   - De laag beweegt naar zijn eigen positie. Verplaats je de laag, dan beweegt de animatie mee; je hoeft geen keyframes te zetten.
   - In de tijdlijn staan ze als groene (IN) en oranje (UIT) blokken. Die sleep je om te verschuiven, en met de rechterrand verander je de duur.

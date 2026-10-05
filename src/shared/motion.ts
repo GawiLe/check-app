@@ -1,21 +1,9 @@
 import { round } from './anim'
-import type { AnimProp, Composition, Keyframe, Layer, Motion } from './types'
+import type { AnimProp, Composition, EaseName, Emphasis, EmphasisType, Keyframe, Layer, Motion } from './types'
 
 // Binnenkomst en uitgang worden bij het bouwen omgezet naar keyframes rond de
 // rustpositie (de basiswaarden van de laag). Handmatige keyframes op een eigenschap
 // gaan altijd voor: dan wordt die eigenschap door intro/outro niet aangeraakt.
-
-export const INTRO_PRESETS: Record<string, { label: string; spec: Partial<Motion> }> = {
-  fade: { label: 'Fade', spec: { fade: true, dx: 0, dy: 0, scale: 1, rotation: 0 } },
-  up: { label: 'Omhoog', spec: { fade: true, dx: 0, dy: 30, scale: 1, rotation: 0 } },
-  down: { label: 'Omlaag', spec: { fade: true, dx: 0, dy: -30, scale: 1, rotation: 0 } },
-  left: { label: 'Van links', spec: { fade: true, dx: -60, dy: 0, scale: 1, rotation: 0 } },
-  right: { label: 'Van rechts', spec: { fade: true, dx: 60, dy: 0, scale: 1, rotation: 0 } },
-  zoomIn: { label: 'Zoom in', spec: { fade: true, dx: 0, dy: 0, scale: 0.6, rotation: 0 } },
-  zoomOut: { label: 'Zoom uit', spec: { fade: true, dx: 0, dy: 0, scale: 1.4, rotation: 0 } },
-  pop: { label: 'Pop', spec: { fade: true, dx: 0, dy: 0, scale: 0, rotation: 0, ease: 'backOut' } },
-  spin: { label: 'Draai', spec: { fade: true, dx: 0, dy: 0, scale: 0.5, rotation: -90 } }
-}
 
 export function defaultIntro(l: Layer): Motion {
   const reveal = l.type === 'writeon' || l.revealMode !== 'none'
@@ -66,20 +54,63 @@ function awayValue(l: Layer, m: Motion, p: AnimProp): number | null {
 
 const PROPS: AnimProp[] = ['x', 'y', 'scale', 'rotation', 'opacity', 'reveal']
 
-/** Laag met intro/outro omgezet naar keyframes. Gebruikt door editor, preview en export. */
+/** Keyframes van een accent-animatie (rond de rustwaarde), per eigenschap. */
+export function emphasisKeyframes(l: Layer, em: Emphasis): Partial<Record<AnimProp, Keyframe[]>> {
+  const n = Math.max(1, Math.round(em.repeat))
+  const d = em.duration / n
+  const k = em.strength
+  const out: Partial<Record<AnimProp, Keyframe[]>> = {}
+  // Per cyclus: [fractie van de cyclus, verschil t.o.v. rust, easing]
+  const shapes: Record<EmphasisType, { prop: AnimProp; steps: [number, number, EaseName][]; mul?: boolean }> = {
+    pulse: { prop: 'scale', mul: true, steps: [[0, 0, 'easeInOut'], [0.5, 0.08, 'easeInOut'], [1, 0, 'linear']] },
+    heartbeat: {
+      prop: 'scale',
+      mul: true,
+      steps: [[0, 0, 'easeOut'], [0.15, 0.12, 'easeIn'], [0.3, 0, 'easeOut'], [0.45, 0.08, 'easeIn'], [0.7, 0, 'linear'], [1, 0, 'linear']]
+    },
+    shake: {
+      prop: 'x',
+      steps: [[0, 0, 'easeInOut'], [0.15, 6, 'easeInOut'], [0.35, -6, 'easeInOut'], [0.55, 4, 'easeInOut'], [0.75, -4, 'easeInOut'], [1, 0, 'linear']]
+    },
+    wiggle: {
+      prop: 'rotation',
+      steps: [[0, 0, 'easeInOut'], [0.2, 5, 'easeInOut'], [0.45, -5, 'easeInOut'], [0.7, 3, 'easeInOut'], [1, 0, 'linear']]
+    },
+    jump: { prop: 'y', steps: [[0, 0, 'easeOut'], [0.35, -14, 'bounceOut'], [1, 0, 'linear']] },
+    flash: { prop: 'opacity', mul: true, steps: [[0, 0, 'easeInOut'], [0.5, -0.65, 'easeInOut'], [1, 0, 'linear']] }
+  }
+  const shape = shapes[em.type]
+  const rest = shape.prop === 'reveal' ? 1 : l[shape.prop]
+  const kfs: Keyframe[] = []
+  for (let i = 0; i < n; i++)
+    for (const [f, delta, e] of shape.steps) {
+      if (i > 0 && f === 0) continue
+      const v = shape.mul ? rest * (1 + delta * k) : rest + delta * k
+      kfs.push({ t: round(em.start + (i + f) * d), v: round(v, 3), e })
+    }
+  out[shape.prop] = kfs
+  return out
+}
+
+/** Laag met binnenkomst, accent en uitgang omgezet naar keyframes. Gebruikt door editor, preview en export. */
 export function effectiveLayer(l: Layer): Layer {
-  if (!l.intro && !l.outro) return l
+  if (!l.intro && !l.outro && !l.emphasis) return l
   const tracks = { ...l.tracks }
+  const emph = l.emphasis ? emphasisKeyframes(l, l.emphasis) : {}
   for (const p of PROPS) {
     if (l.tracks[p]?.length) continue
-    const kfs: Keyframe[] = []
+    let kfs: Keyframe[] = []
     const restV = p === 'reveal' ? 1 : l[p]
     const inAway = l.intro ? awayValue(l, l.intro, p) : null
     const outAway = l.outro ? awayValue(l, l.outro, p) : null
-    if (inAway == null && outAway == null) continue
+    if (inAway == null && outAway == null && !emph[p]) continue
     if (l.intro && inAway != null) {
       kfs.push({ t: round(l.intro.start), v: inAway, e: l.intro.ease })
       kfs.push({ t: round(l.intro.start + l.intro.duration), v: restV, e: 'linear' })
+    }
+    if (emph[p]) {
+      const after = kfs.length ? kfs[kfs.length - 1].t : -1
+      kfs = kfs.concat(emph[p]!.filter((k) => k.t > after + 1e-3))
     }
     if (l.outro && outAway != null) {
       const s = Math.max(l.outro.start, kfs.length ? kfs[kfs.length - 1].t : 0)

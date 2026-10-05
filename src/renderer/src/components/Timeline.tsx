@@ -18,9 +18,11 @@ import {
 } from 'lucide-react'
 import { round, sortKeyframes } from '@shared/anim'
 import { effectiveLayer, endFrameTime } from '@shared/motion'
+import { overrideLabel } from '@shared/sync'
 import type { AnimProp, EaseName, Layer } from '@shared/types'
 import { ANIM_PROPS, EASES } from '@shared/types'
-import { moveLayer } from '../lib/actions'
+import { applyLibrary, moveLayer } from '../lib/actions'
+import { DRAG_TYPE } from './Library'
 import { currentComp, updateComp, updateLayer, useStore } from '../store'
 import { EASE_LABEL } from './Inspector'
 import { formatTime } from './ui'
@@ -132,12 +134,14 @@ export function Timeline() {
           const minT = Math.min(
             ...Object.values(orig.tracks).flatMap((k) => (k ?? []).map((kf) => kf.t)),
             orig.intro?.start ?? Infinity,
-            orig.outro?.start ?? Infinity
+            orig.outro?.start ?? Infinity,
+            orig.emphasis?.start ?? Infinity
           )
           const d = Math.max(dt, -minT)
           for (const p of ANIM_PROPS) if (orig.tracks[p]) x.tracks[p] = orig.tracks[p]!.map((k) => ({ ...k, t: round(k.t + d) }))
           if (orig.intro && x.intro) x.intro.start = round(orig.intro.start + d)
           if (orig.outro && x.outro) x.outro.start = round(orig.outro.start + d)
+          if (orig.emphasis && x.emphasis) x.emphasis.start = round(orig.emphasis.start + d)
         },
         'shift'
       )
@@ -165,6 +169,60 @@ export function Timeline() {
           className="edge"
           onPointerDown={(e) =>
             drag(e, (dt) => updateLayer(l.id, (x) => void (x[kind] && (x[kind]!.duration = Math.max(0.05, round(orig.duration + dt)))), `edge-${kind}`))
+          }
+        />
+      </div>
+    )
+  }
+
+  // Animaties uit de bibliotheek op een laag laten vallen. Op het spoor: start waar je loslaat.
+  const [dropOn, setDropOn] = useState<string | null>(null)
+  const [dropAt, setDropAt] = useState<number | null>(null)
+  const dropProps = (layerId: string, onTrack: boolean) => ({
+    onDragOver: (e: React.DragEvent) => {
+      if (!e.dataTransfer.types.includes(DRAG_TYPE)) return
+      e.preventDefault()
+      setDropOn(layerId)
+      if (onTrack) {
+        const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+        setDropAt(snap(tOf(e.clientX - r.left)))
+      } else setDropAt(null)
+    },
+    onDragLeave: () => {
+      setDropOn(null)
+      setDropAt(null)
+    },
+    onDrop: (e: React.DragEvent) => {
+      const id = e.dataTransfer.getData(DRAG_TYPE)
+      if (!id) return
+      e.preventDefault()
+      const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+      applyLibrary(id, [layerId], onTrack ? snap(tOf(e.clientX - r.left)) : undefined)
+      setDropOn(null)
+      setDropAt(null)
+    }
+  })
+
+  const emphasisSegment = (l: Layer) => {
+    const em = l.emphasis
+    if (!em) return null
+    const orig = { ...em }
+    return (
+      <div
+        className="seg-motion emphasis"
+        style={{ left: xOf(em.start), width: Math.max(6, em.duration * pps) }}
+        title={`Accent ${em.start.toFixed(2)}s – ${(em.start + em.duration).toFixed(2)}s · sleep om te verschuiven`}
+        onPointerDown={(e) => {
+          s().select([l.id])
+          s().setTab('motion')
+          drag(e, (dt) => updateLayer(l.id, (x) => void (x.emphasis && (x.emphasis.start = Math.max(0, round(orig.start + dt)))), 'seg-em'))
+        }}
+      >
+        {em.duration * pps > 50 && 'ACCENT'}
+        <div
+          className="edge"
+          onPointerDown={(e) =>
+            drag(e, (dt) => updateLayer(l.id, (x) => void (x.emphasis && (x.emphasis.duration = Math.max(0.1, round(orig.duration + dt)))), 'edge-em'))
           }
         />
       </div>
@@ -204,6 +262,9 @@ export function Timeline() {
       )
     })
 
+  const project = useStore((st) => st.project)!
+  const derived = project.syncFormats && comp.id !== project.baseCompositionId
+  const baseLinks = new Set(project.compositions.find((c) => c.id === project.baseCompositionId)?.layers.map((x) => x.linkId))
   const rows: React.ReactNode[] = []
   comp.layers.forEach((l) => {
     const animated = ANIM_PROPS.filter((p) => l.tracks[p]?.length)
@@ -215,7 +276,12 @@ export function Timeline() {
     const select = (e: React.MouseEvent) =>
       s().select(e.shiftKey ? (active ? selection.filter((x) => x !== l.id) : [...selection, l.id]) : [l.id])
     rows.push(
-      <div key={l.id + 'n'} className={`tl-name${active ? ' active' : ''}${l.visible ? '' : ' hidden'}`} onClick={select}>
+      <div
+        key={l.id + 'n'}
+        className={`tl-name${active ? ' active' : ''}${l.visible ? '' : ' hidden'}${dropOn === l.id ? ' drop-hint' : ''}`}
+        onClick={select}
+        {...dropProps(l.id, false)}
+      >
         <button
           className="icon sm"
           style={{ width: 16, visibility: animated.length ? 'visible' : 'hidden' }}
@@ -230,6 +296,10 @@ export function Timeline() {
         <span className="grow" title={l.name}>
           {l.name}
         </span>
+        {derived && l.overrides?.length ? (
+          <span className="override-dot" title={`Wijkt af van basis: ${l.overrides.map(overrideLabel).join(', ')}`} />
+        ) : null}
+        {derived && !baseLinks.has(l.linkId) && <span className="faint" style={{ fontSize: 10 }}>eigen</span>}
         <span className="tools" onClick={(e) => e.stopPropagation()}>
           <button title="Naar voren" onClick={() => moveLayer(l.id, -1)}>
             <ChevronUp size={13} />
@@ -245,7 +315,8 @@ export function Timeline() {
           </button>
         </span>
       </div>,
-      <div key={l.id + 't'} className="tl-track">
+      <div key={l.id + 't'} className={`tl-track${dropOn === l.id ? ' drop-hint' : ''}`} {...dropProps(l.id, true)}>
+        {dropOn === l.id && dropAt != null && <div className="endframe" style={{ left: xOf(dropAt), borderColor: 'var(--accent)' }} />}
         <div
           className={`tl-bar${active ? ' active' : ''}`}
           style={{ left: xOf(Math.min(barStart, comp.duration)), width: Math.max(0, (comp.duration - Math.min(barStart, comp.duration)) * pps) }}
@@ -253,6 +324,7 @@ export function Timeline() {
           onPointerDown={(e) => shiftLayer(e, l)}
         />
         {motionSegment(l, 'intro')}
+        {emphasisSegment(l)}
         {motionSegment(l, 'outro')}
         {!expanded[l.id] && animated.map((p) => diamonds(l, p, true))}
       </div>

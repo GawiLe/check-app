@@ -1066,3 +1066,131 @@ input[type='range'] {
   height: 34px;
   padding: 0 14px;
 }
+
+/* ---------- Animatiebibliotheek ---------- */
+
+.left-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+  z-index: 2;
+}
+.left-tabs button {
+  flex: 1;
+  color: var(--muted);
+}
+.left-tabs button.on {
+  background: var(--panel-2);
+  color: var(--text);
+}
+.lib-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.lib-tile {
+  background: var(--panel-2);
+  border-radius: 8px;
+  padding: 6px 6px 7px;
+  cursor: grab;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px solid transparent;
+}
+.lib-tile:hover {
+  border-color: var(--line-2);
+  color: var(--text);
+}
+.lib-tile:active {
+  cursor: grabbing;
+}
+.lib-preview {
+  height: 34px;
+  border-radius: 5px;
+  background: #121215;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.lib-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: var(--intro);
+}
+.lib-tile.emphasis .lib-dot {
+  background: var(--key);
+}
+.lib-tile.outro .lib-dot {
+  background: var(--outro);
+}
+.lib-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  display: inline-block;
+  background: var(--intro);
+}
+.lib-swatch.emphasis {
+  background: var(--key);
+}
+.lib-swatch.outro {
+  background: var(--outro);
+}
+.drop-hint {
+  outline: 2px dashed var(--accent) !important;
+  outline-offset: -2px;
+}
+.seg-motion.emphasis {
+  background: var(--key);
+}
+.override-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--outro);
+  display: inline-block;
+  flex: 0 0 auto;
+}
+.override-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.override-list .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 4px 0 8px;
+  border-radius: 11px;
+  background: rgba(224, 121, 90, 0.14);
+  color: #f0a58e;
+  font-size: 11px;
+}
+.override-list .chip button {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  color: inherit;
+}
+.notice {
+  background: var(--panel-2);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+  margin: 10px 12px 0;
+}
+.motion-card.emphasis {
+  box-shadow: inset 3px 0 0 var(--key);
+}

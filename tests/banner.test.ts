@@ -201,3 +201,105 @@ describe('binnenkomst en uitgang', () => {
     expect(build(p).html).toContain(' src="a.png"')
   })
 })
+
+describe('basis is leidend, met overrides per formaat', () => {
+  const setup = async () => {
+    const sync = await import('../src/shared/sync')
+    const p = createStarterProject()
+    const base = p.compositions[0]
+    p.compositions.push(deriveComposition(base, 300, 250))
+    const other = p.compositions[1]
+    const edit = (compId: string, fn: () => void) => {
+      const prev = structuredClone(p)
+      fn()
+      sync.syncFormats(prev, p, compId)
+    }
+    const head = () => base.layers.find((l) => l.name === 'Headline')!
+    const headOther = () => other.layers.find((l) => l.linkId === head().linkId)!
+    return { sync, p, base, other, edit, head, headOther }
+  }
+
+  it('aanpassing in de basis gaat mee, ook positie (omgerekend)', async () => {
+    const { base, edit, head, headOther } = await setup()
+    const x0 = headOther().x
+    edit(base.id, () => {
+      head().text!.content = 'Nieuw'
+      head().x += 30
+    })
+    expect(headOther().text!.content).toBe('Nieuw')
+    expect(headOther().x).not.toBe(x0)
+  })
+
+  it('wat je in een formaat anders zet, blijft staan als de basis verandert', async () => {
+    const { base, other, edit, head, headOther } = await setup()
+    edit(other.id, () => {
+      headOther().text!.size = 40
+      headOther().y = 7
+    })
+    expect(headOther().overrides).toEqual(expect.arrayContaining(['text.size', 'y']))
+    edit(base.id, () => {
+      head().text!.size = 12
+      head().y = 300
+      head().text!.color = '#00ff00'
+    })
+    expect(headOther().text!.size).toBe(40)
+    expect(headOther().y).toBe(7)
+    expect(headOther().text!.color).toBe('#00ff00')
+  })
+
+  it('wijziging in een afgeleid formaat gaat niet terug naar de basis', async () => {
+    const { base, other, edit, head, headOther } = await setup()
+    edit(other.id, () => void (headOther().text!.content = 'Alleen hier'))
+    expect(head().text!.content).not.toBe('Alleen hier')
+    expect(base.layers.length).toBe(other.layers.length)
+  })
+
+  it('herstellen haalt de waarde weer uit de basis', async () => {
+    const { sync, p, other, edit, head, headOther } = await setup()
+    edit(other.id, () => void (headOther().text!.content = 'Afwijkend'))
+    sync.resetOverrides(p, other.id, headOther().id)
+    expect(headOther().text!.content).toBe(head().text!.content)
+    expect(headOther().overrides).toBeUndefined()
+  })
+
+  it('compositie-instellingen: basis leidend, override per formaat', async () => {
+    const { base, other, edit } = await setup()
+    edit(base.id, () => void (base.duration = 12))
+    expect(other.duration).toBe(12)
+    edit(other.id, () => void (other.background = '#000000'))
+    edit(base.id, () => void (base.background = '#ff0000'))
+    expect(other.background).toBe('#000000')
+  })
+})
+
+describe('animatiebibliotheek', () => {
+  it('elk item geeft een geldige animatie die de laag eindigt in rust', async () => {
+    const { LIBRARY, applyLibraryItem } = await import('../src/shared/library')
+    const { effectiveLayer } = await import('../src/shared/motion')
+    const comp = createStarterProject().compositions[0]
+    for (const item of LIBRARY) {
+      const l = createLayer(item.reveal === 'writeon' ? 'writeon' : 'shape', comp)
+      l.x = 50
+      l.y = 100
+      applyLibraryItem(l, item, comp, 1)
+      const e = effectiveLayer(l)
+      expect(Object.keys(e.tracks).length, item.id).toBeGreaterThan(0)
+      if (item.kind !== 'outro') {
+        const st = layerStateAt(l, 1 + 5)
+        expect(st.x, item.id).toBeCloseTo(50)
+        expect(st.y, item.id).toBeCloseTo(100)
+        expect(st.scale, item.id).toBeCloseTo(1)
+      }
+    }
+  })
+
+  it('bounce in komt van boven en stuitert naar de rustpositie', async () => {
+    const { LIBRARY, applyLibraryItem } = await import('../src/shared/library')
+    const comp = createStarterProject().compositions[0]
+    const l = createLayer('shape', comp)
+    l.y = 100
+    applyLibraryItem(l, LIBRARY.find((i) => i.id === 'bounceIn')!, comp, 0)
+    expect(layerStateAt(l, 0).y).toBeLessThan(100)
+    expect(layerStateAt(l, 0.9).y).toBeCloseTo(100)
+  })
+})

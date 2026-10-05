@@ -38,7 +38,7 @@ interface State {
 
   openProject(dir: string, project: Project): void
   /** Wijzig het project. Met `coalesce` worden snelle opeenvolgende wijzigingen één undo-stap. */
-  update(fn: (p: Project) => void, coalesce?: string): void
+  update(fn: (p: Project) => void, coalesce?: string, skipSync?: boolean): void
   undo(): void
   redo(): void
   markSaved(): void
@@ -99,13 +99,13 @@ export const useStore = create<State>((set, get) => ({
       exportResults: null
     }),
 
-  update: (fn, coalesce) => {
+  update: (fn, coalesce, skipSync) => {
     const { project, past, lastCoalesce } = get()
     if (!project) return
     const next = structuredClone(project)
     fn(next)
     const { compId } = get()
-    if (compId) syncFormats(project, next, compId)
+    if (compId && !skipSync) syncFormats(project, next, compId)
     const now = Date.now()
     const merge = coalesce && lastCoalesce && lastCoalesce.key === coalesce && now - lastCoalesce.at < 1000
     set({
