@@ -7,7 +7,7 @@ import type { ExportRequest } from '@shared/api'
 import { buildBanner, charsPerFont } from '@shared/build'
 import { TARGETS } from '@shared/specs'
 import type { Composition, ExportResult, ExportTarget, Project } from '@shared/types'
-import { validateBanner } from '@shared/validate'
+import { initialLoad, validateBanner } from '@shared/validate'
 import { subsetToWoff2 } from './fonts'
 
 const slug = (s: string) =>
@@ -106,7 +106,7 @@ async function exportOne(
   }
 
   const fileList = Object.entries(files).map(([n, d]) => ({ name: n, bytes: d.byteLength }))
-  const issues = validateBanner({ target, comp, html: built.html, files: fileList, zipBytes: zip.byteLength, backupBytes })
+  const issues = validateBanner({ target, comp, html: built.html, files: fileList, zipBytes: zip.byteLength, backupBytes, politeLoad: project.politeLoad })
 
   return {
     target,
@@ -114,7 +114,7 @@ async function exportOne(
     folder: outDir,
     zip: zipPath,
     zipBytes: zip.byteLength,
-    initialLoadBytes: fileList.reduce((s, f) => s + f.bytes, 0),
+    initialLoadBytes: initialLoad(fileList, project.politeLoad),
     files: fileList,
     backup,
     issues
@@ -133,7 +133,7 @@ export async function renderBackup(indexHtml: string, comp: Composition, outFile
   try {
     await win.loadURL(pathToFileURL(indexHtml).href)
     await win.webContents.executeJavaScript(`new Promise(function(res){
-      var n=0;(function w(){ if(document.body.className.indexOf('r')>=0||n++>100){ if(window.BS)BS.seek(${comp.duration}); requestAnimationFrame(function(){requestAnimationFrame(res)}) } else setTimeout(w,30) })()
+      var n=0;(function w(){ if(document.body.className.indexOf('r')>=0||n++>100){ if(window.BS)BS.seek(BS.end); requestAnimationFrame(function(){requestAnimationFrame(res)}) } else setTimeout(w,30) })()
     })`)
     const img = await win.webContents.capturePage({ x: 0, y: 0, width: comp.width, height: comp.height })
     let q = 85

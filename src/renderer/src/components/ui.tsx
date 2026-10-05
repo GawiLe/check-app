@@ -87,31 +87,56 @@ export function TextInput(props: { value: string; onCommit: (v: string) => void;
   )
 }
 
-export function Field(props: { label: string; children: ReactNode; stopwatch?: ReactNode }) {
-  if (props.stopwatch === undefined)
-    return (
-      <div className="field nosw">
-        <label title={props.label}>{props.label}</label>
-        <div className="row">{props.children}</div>
-      </div>
-    )
+/** Getal met een kort label erin ("X", "B", "°"), zoals in Figma. */
+export function Num(props: Parameters<typeof Scrub>[0] & { label: string; title?: string }) {
+  const { label, title, ...rest } = props
   return (
-    <div className="field">
-      {props.stopwatch}
-      <label title={props.label}>{props.label}</label>
-      <div className="row">{props.children}</div>
+    <div className={`num${label.length > 2 ? ' wide-lbl' : ''}`} title={title}>
+      <span className="lbl">{label}</span>
+      <Scrub {...rest} />
     </div>
   )
 }
 
-export function Section(props: { title: string; actions?: ReactNode; children: ReactNode }) {
+export function Row(props: { label?: string; children: ReactNode }) {
   return (
-    <div className="section">
-      <h3>
-        <span>{props.title}</span>
-        {props.actions && <span>{props.actions}</span>}
-      </h3>
-      {props.children}
+    <div className="row">
+      {props.label && <span className="label">{props.label}</span>}
+      <div className="grow" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        {props.children}
+      </div>
+    </div>
+  )
+}
+
+export function Switch(props: { checked: boolean; onChange: (v: boolean) => void; label?: string }) {
+  return (
+    <label className="switch">
+      <input type="checkbox" checked={props.checked} onChange={(e) => props.onChange(e.target.checked)} />
+      {props.label}
+    </label>
+  )
+}
+
+export function Section(props: {
+  title: ReactNode
+  actions?: ReactNode
+  children: ReactNode
+  /** Inklapbaar; undefined = altijd open. */
+  defaultOpen?: boolean
+}) {
+  const collapsible = props.defaultOpen !== undefined
+  const [open, setOpen] = useState(props.defaultOpen ?? true)
+  return (
+    <div className={`section${collapsible ? ' collapsible' : ''}${open ? ' open' : ''}`}>
+      <div className="section-head" onClick={collapsible ? () => setOpen(!open) : undefined}>
+        <span className="title">
+          {collapsible && <span className="faint">{open ? '▾' : '▸'}</span>}
+          {props.title}
+        </span>
+        {props.actions && <span onClick={(e) => e.stopPropagation()}>{props.actions}</span>}
+      </div>
+      {open && props.children}
     </div>
   )
 }

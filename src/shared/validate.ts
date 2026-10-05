@@ -8,6 +8,14 @@ export interface ValidationInput {
   files: { name: string; bytes: number }[]
   zipBytes: number
   backupBytes: number | null
+  politeLoad?: boolean
+}
+
+const IMAGE_EXT = /\.(png|jpe?g|gif|svg|webp)$/i
+
+/** Initial load: bij polite loading tellen afbeeldingen niet mee (die laden na window.load). */
+export function initialLoad(files: { name: string; bytes: number }[], politeLoad = false): number {
+  return files.filter((f) => !politeLoad || !IMAGE_EXT.test(f.name)).reduce((s, f) => s + f.bytes, 0)
 }
 
 const kb = (b: number) => `${(b / 1024).toFixed(1)}KB`
@@ -39,11 +47,17 @@ export function validateBanner(input: ValidationInput): ValidationIssue[] {
   if (external) add('error', 'extern', `Externe bronnen gevonden: ${external.slice(0, 3).join(', ')}`)
 
   // Gewicht
-  const initial = files.reduce((s, f) => s + f.bytes, 0)
+  const initial = initialLoad(files, input.politeLoad)
   if (input.zipBytes > spec.maxZipBytes)
     add('error', 'gewicht', `ZIP is ${kb(input.zipBytes)}; maximum voor ${spec.label} is ${kb(spec.maxZipBytes)}.`)
   if (initial > spec.initialLoadBytes)
-    add('warning', 'gewicht', `Initial load ${kb(initial)} is meer dan de IAB-richtlijn van ${kb(spec.initialLoadBytes)}.`)
+    add(
+      'warning',
+      'gewicht',
+      `Initial load ${kb(initial)} is meer dan de IAB-richtlijn van ${kb(spec.initialLoadBytes)}.` +
+        (input.politeLoad ? '' : ' Zet polite loading aan.')
+    )
+  if (input.politeLoad && !/img\[data-src\]/.test(html)) add('error', 'polite', 'Polite loading staat aan, maar de runtime ontbreekt.')
 
   // Bestanden
   if (files.length > spec.maxFiles) add('error', 'bestanden', `${files.length} bestanden; maximum is ${spec.maxFiles}.`)
@@ -73,7 +87,11 @@ export function validateBanner(input: ValidationInput): ValidationIssue[] {
   }
 
   if (!issues.some((i) => i.level === 'error'))
-    add('info', 'ok', `Klaar voor ${spec.label}: ${kb(input.zipBytes)} ZIP, ${files.length} bestanden.`)
+    add(
+      'info',
+      'ok',
+      `Klaar voor ${spec.label}: ${kb(input.zipBytes)} ZIP, initial load ${kb(initial)}${input.politeLoad ? ' (polite)' : ''}, ${files.length} bestanden.`
+    )
   return issues
 }
 

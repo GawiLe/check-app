@@ -40,17 +40,41 @@ mijn-campagne/
 ## Workflow
 
 1. **Nieuw project** vanuit een boilerplate. De ingebouwde starter is **300×600**: achtergrond, headline, subline, packshot-plek en CTA, al geanimeerd.
-2. **Lagen**: tekst, vorm, afbeelding (klik een asset aan) en write-on.
-3. **Animeren zoals in AE**:
-   - Klik de stopwatch ⏱ bij een eigenschap. Elke wijziging zet dan een keyframe op de huidige tijd.
-   - Sleep keyframes in de tijdlijn.
-   - Kies een easing per keyframe.
-   - Getallen wijzig je door te slepen (Shift = 10×).
-4. **Effecten**: presets (fade, inschuiven, pop, pulse, wipe, write-on) op de huidige tijd.
-5. **AI-animatie**: beschrijf wat je wilt ("laat de headline inschrijven en de CTA na 3s pulseren"). Claude levert keyframes binnen het animatiemodel van de app, dus nooit losse code in je banner. Je kunt het altijd ongedaan maken.
-6. **Formaten**: "+ Formaat" leidt een IAB- of eigen formaat af van de basis 300×600. Posities gaan relatief mee en maten schalen; daarna stel je het formaat zelf bij.
-7. **Opslaan als boilerplate**: het hele project (formaten, animaties, assets, fonts) wordt een startpunt voor volgende campagnes.
-8. **Exporteren**: kies formaten en platform(s). Elke banner wordt gebouwd, gezipt, voorzien van een backup-JPG en gevalideerd.
+2. **Lagen** voeg je toe via *+ Laag*: tekst, vorm, write-on of een afbeelding. Een asset links aanklikken maakt er ook een laag van.
+3. **Formaten** staan als tabs bovenin. Met *+* voeg je een IAB- of eigen formaat toe; dat wordt afgeleid van de basis 300×600.
+4. **Animeren** in de tab *Animatie* (zie hieronder).
+5. **Exporteren**: kies formaten en platform(s). Elke banner wordt gebouwd, gezipt, voorzien van een backup-JPG en gevalideerd.
+6. **Opslaan als boilerplate** (bladwijzer-icoon): het hele project (formaten, animaties, assets, fonts) wordt een startpunt voor volgende campagnes.
+
+### Meerdere formaten in één werkbestand
+
+- Alle formaten zitten in één project. Met **Alle** zie je ze naast elkaar, synchroon afspelend. Klik op een formaat om het te bewerken.
+- Met het **koppel-icoon** (standaard aan) zijn de formaten gekoppeld:
+  - Wat je wijzigt (tekst, font, kleuren, afbeelding, binnenkomst/uitgang, timing, duur, achtergrond, rand) geldt voor alle formaten.
+  - Nieuwe en verwijderde lagen gaan ook mee.
+- **Positie en maat** blijven per formaat. Zo zet je de layout per formaat goed, en pas je de tekst daarna maar één keer aan.
+- Een nieuw formaat wordt automatisch afgeleid. Bij een sterk afwijkende verhouding (zoals 728×90 van 300×600) moet je de layout zelf bijstellen.
+
+### Animeren
+
+- **Binnenkomst en uitgang** (makkelijkste manier): zet per laag *Binnenkomst* aan en kies bijvoorbeeld Fade, Omhoog, Van links, Zoom in, Pop of Draai.
+  - Daarna stel je start, duur, easing, verschuiving, schaal, rotatie en fade bij.
+  - De laag beweegt naar zijn eigen positie. Verplaats je de laag, dan beweegt de animatie mee; je hoeft geen keyframes te zetten.
+  - In de tijdlijn staan ze als groene (IN) en oranje (UIT) blokken. Die sleep je om te verschuiven, en met de rechterrand verander je de duur.
+- **Alles laten binnenkomen**: zonder selectie (of met meerdere lagen geselecteerd) geeft de tab *Animatie* alle lagen dezelfde binnenkomst, van boven naar onder na elkaar.
+- **Keyframes** voor eigen bewegingen:
+  - Klik ◆ bij een eigenschap, of zet **Auto-key** (de rode stip in de tijdlijn) aan. Dan zet elke wijziging in positie, schaal, rotatie of dekking een keyframe op de huidige tijd.
+  - Sleep keyframes, en kies een easing per keyframe.
+- **Hele laag verschuiven**: sleep de balk van een laag in de tijdlijn. Alle keyframes en de binnenkomst/uitgang gaan mee.
+- Het **eindframe** ligt vóór de eerste uitgang. De laatste loop stopt daar, zodat het eindbeeld en de backup-afbeelding alles tonen.
+
+### Rand en polite loading
+
+- **Rand**: per formaat aan/uit, met kleur en dikte (standaard 1px #ccc). Hij wordt als aparte laag bovenop de banner geëxporteerd.
+- **Polite loading** (standaard aan):
+  - Direct zichtbaar zijn alleen de achtergrond en de rand.
+  - Afbeeldingen laden pas na het `load`-event van de pagina. De animatie start pas als alle afbeeldingen en fonts binnen zijn.
+  - In het validatierapport telt de *initial load* daardoor alleen de HTML en de fonts mee.
 
 ### Write-on
 
@@ -103,6 +127,8 @@ src/preload/  veilige brug naar de renderer (window.bs)
 src/renderer/ React-editor: viewer, tijdlijn, inspector, dialogen
 ```
 
+- **Formaten koppelen** gebeurt in `src/shared/sync.ts`: na elke wijziging worden inhoud en timing doorgezet naar lagen met hetzelfde `linkId`.
+- **Binnenkomst/uitgang** (`src/shared/motion.ts`) worden bij het bouwen omgezet naar gewone keyframes, dus de runtime blijft klein.
 - **Wat je ziet is wat je exporteert.** De preview in de editor is dezelfde HTML als de export, met dezelfde runtime, in een iframe. Een test controleert dat runtime en editor op elk tijdstip identieke waarden geven.
 - De runtime (`src/shared/runtime.ts`) gebruikt geen libraries. Hij speelt af na `load` en `document.fonts.ready` (geen FOUT) en stopt op het eindframe.
 

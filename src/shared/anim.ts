@@ -1,5 +1,6 @@
 import type { AnimProp, EaseName, Keyframe, Layer } from './types'
 import { EASES } from './types'
+import { effectiveLayer } from './motion'
 
 // Let op: deze functies zijn de TypeScript-tegenhanger van de banner-runtime in
 // runtime.ts. Houd ze gelijk, anders wijkt de editor af van de export.
@@ -47,7 +48,8 @@ export function baseValue(layer: Layer, prop: AnimProp): number {
   return layer[prop]
 }
 
-export function layerStateAt(layer: Layer, t: number): LayerState {
+export function layerStateAt(input: Layer, t: number): LayerState {
+  const layer = effectiveLayer(input)
   return {
     x: sampleTrack(layer.tracks.x, t, layer.x),
     y: sampleTrack(layer.tracks.y, t, layer.y),

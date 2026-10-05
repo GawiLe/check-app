@@ -8,6 +8,8 @@ import { Viewer } from './components/Viewer'
 import { confirmDiscard, deleteSelection, duplicateSelection, openProject, refreshAssets, save } from './lib/actions'
 import { currentComp, setLayerValue, useStore } from './store'
 import { layerStateAt } from '@shared/anim'
+import { endFrameTime } from '@shared/motion'
+import { FilePlus2, FolderOpen } from 'lucide-react'
 
 const isTyping = () => {
   const el = document.activeElement
@@ -84,7 +86,7 @@ export function App() {
           s.setTime(0)
           break
         case 'End':
-          s.setTime(comp.duration)
+          s.setTime(endFrameTime(comp))
           break
         case 'PageDown':
           s.setTime(Math.min(comp.duration, s.time + (e.shiftKey ? 10 * frame : frame)))
@@ -140,28 +142,16 @@ export function App() {
       <Viewer />
       <Inspector />
       <Timeline />
-      <StatusBar />
+      <Toast />
       <Dialogs />
     </div>
   )
 }
 
-function StatusBar() {
+function Toast() {
   const status = useStore((s) => s.status)
-  const dir = useStore((s) => s.dir)
-  const comp = useStore(currentComp)
-  return (
-    <div className="statusbar">
-      <span>{dir}</span>
-      {comp && (
-        <span>
-          {comp.width}×{comp.height} · {comp.layers.length} lagen
-        </span>
-      )}
-      <span style={{ flex: 1 }} />
-      {status && <span className={status.kind === 'error' ? 'err' : ''}>{status.text}</span>}
-    </div>
-  )
+  if (!status) return null
+  return <div className={`toast${status.kind === 'error' ? ' err' : ''}`}>{status.text}</div>
 }
 
 function Welcome() {
@@ -172,23 +162,31 @@ function Welcome() {
   return (
     <div className="welcome">
       <div className="card">
-        <h1>Banner Studio</h1>
-        <p>Lichte, gevalideerde HTML5-banners voor CM360, Google Ads en Ad Manager.</p>
+        <div className="brand">
+          <div className="logo" /> Banner Studio
+        </div>
+        <p>Lichte HTML5-banners voor CM360, Google Ads en Ad Manager. Eén werkbestand, alle formaten.</p>
         <div className="buttons">
           <button className="primary" onClick={() => useStore.getState().setDialog('new')}>
-            Nieuw project…
+            <FilePlus2 size={15} /> Nieuw project
           </button>
-          <button onClick={() => openProject()}>Open projectmap…</button>
+          <button className="ghost" onClick={() => openProject()}>
+            <FolderOpen size={15} /> Open map
+          </button>
         </div>
         {recent.length > 0 && (
           <>
-            <div className="muted" style={{ marginBottom: 6 }}>
-              Recent
+            <div className="faint" style={{ marginBottom: 6, fontSize: 11 }}>
+              RECENT
             </div>
             <div className="list">
               {recent.map((r) => (
                 <div key={r} className="list-item" onClick={() => openProject(r)}>
-                  <span className="grow">{r}</span>
+                  <FolderOpen size={14} className="faint" />
+                  <span className="grow">{r.split(/[\\/]/).pop()}</span>
+                  <span className="meta" style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {r}
+                  </span>
                 </div>
               ))}
             </div>

@@ -1,45 +1,28 @@
-import { addImageLayer, deleteComposition, importFonts, importImages } from '../lib/actions'
+import { ImagePlus, Type, X } from 'lucide-react'
+import { addImageLayer, importFonts, importImages } from '../lib/actions'
 import { assetUrl, useStore } from '../store'
 import { Section } from './ui'
 
 export function LeftPanel() {
   const project = useStore((s) => s.project)!
-  const compId = useStore((s) => s.compId)
   const assets = useStore((s) => s.assets)
   const rev = useStore((s) => s.assetsRev)
   const s = useStore.getState
 
   return (
     <div className="panel left">
-      <Section title="Formaten" actions={<button onClick={() => s().setDialog('addFormat')}>+ Formaat</button>}>
+      <Section
+        title="Assets"
+        actions={
+          <button className="icon sm" title="Afbeeldingen importeren" onClick={importImages}>
+            <ImagePlus size={14} />
+          </button>
+        }
+      >
         <div className="list">
-          {project.compositions.map((c) => (
-            <div key={c.id} className={`list-item${c.id === compId ? ' active' : ''}`} onClick={() => s().setComp(c.id)}>
-              <span className="grow">{c.name}</span>
-              <span className="meta">
-                {c.width}×{c.height}
-                {c.id === project.baseCompositionId ? ' · basis' : ''}
-              </span>
-              {c.id !== project.baseCompositionId && (
-                <button
-                  className="icon"
-                  title="Verwijderen"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    deleteComposition(c.id)
-                  }}
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      <Section title="Assets" actions={<button onClick={importImages}>Importeer</button>}>
-        <div className="list">
-          {assets.length === 0 && <div className="muted">Zet afbeeldingen in de map assets/ of klik Importeer.</div>}
+          {assets.length === 0 && (
+            <div className="empty">Sleep afbeeldingen in de map assets/ of klik op + om te importeren.</div>
+          )}
           {assets.map((a) => (
             <div key={a} className="list-item" title="Klik om als laag toe te voegen" onClick={() => addImageLayer(a)}>
               <img className="thumb" src={assetUrl(a, rev)} alt="" />
@@ -49,9 +32,18 @@ export function LeftPanel() {
         </div>
       </Section>
 
-      <Section title="Fonts" actions={<button onClick={importFonts}>Importeer</button>}>
+      <Section
+        title="Fonts"
+        actions={
+          <button className="icon sm" title="Fonts importeren (woff, woff2, ttf, otf)" onClick={importFonts}>
+            <Type size={14} />
+          </button>
+        }
+      >
         <div className="list">
-          {project.fonts.length === 0 && <div className="muted">WOFF, WOFF2, TTF of OTF. Bij export automatisch gesubset naar WOFF2.</div>}
+          {project.fonts.length === 0 && (
+            <div className="empty">Importeer WOFF, WOFF2, TTF of OTF. Bij export automatisch verkleind tot de gebruikte tekens.</div>
+          )}
           {project.fonts.map((f) => (
             <div key={f.id} className="list-item" title={f.file}>
               <span className="grow">{f.family}</span>
@@ -60,7 +52,7 @@ export function LeftPanel() {
                 {f.style === 'italic' ? ' i' : ''}
               </span>
               <button
-                className="icon"
+                className="icon sm show-hover"
                 title="Uit project halen"
                 onClick={() =>
                   s().update((p) => {
@@ -73,7 +65,7 @@ export function LeftPanel() {
                   })
                 }
               >
-                ×
+                <X size={12} />
               </button>
             </div>
           ))}

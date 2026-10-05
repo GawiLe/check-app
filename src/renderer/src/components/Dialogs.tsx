@@ -4,7 +4,7 @@ import { IAB_SIZES, TARGET_IDS, TARGETS } from '@shared/specs'
 import type { ExportTarget } from '@shared/types'
 import { addFormat, newProject, runExport, saveAsBoilerplate } from '../lib/actions'
 import { useStore } from '../store'
-import { Field, Modal } from './ui'
+import { Modal, Row } from './ui'
 
 const kb = (b: number) => `${(b / 1024).toFixed(1)} KB`
 
@@ -68,12 +68,12 @@ function NewProjectDialog({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState('Nieuwe campagne')
   return (
     <Modal title="Nieuw project" onClose={onClose}>
-      <Field label="Projectnaam">
+      <Row label="Projectnaam">
         <input value={name} onChange={(e) => setName(e.target.value)} />
-      </Field>
-      <div className="hint">Kies een boilerplate als startpunt. De basis is 300×600; andere formaten leid je daarvan af.</div>
+      </Row>
+      <div className="hint-text">Kies een boilerplate als startpunt. De basis is 300×600; andere formaten leid je daarvan af.</div>
       <BoilerplatePicker value={bp} onChange={setBp} />
-      <div className="hint">Je kiest hierna een (lege) map. Daarin komen project.bsproj, assets/, fonts/ en export/.</div>
+      <div className="hint-text">Je kiest hierna een (lege) map. Daarin komen project.bsproj, assets/, fonts/ en export/.</div>
       <div className="actions">
         <button onClick={onClose}>Annuleren</button>
         <button className="primary" onClick={() => newProject(bp, name)}>
@@ -91,7 +91,7 @@ function AddFormatDialog({ onClose }: { onClose: () => void }) {
   const [h, setH] = useState(250)
   return (
     <Modal title="Formaat toevoegen" onClose={onClose}>
-      <div className="hint">
+      <div className="hint-text">
         Het nieuwe formaat wordt afgeleid van de basis (posities relatief, maten geschaald). Daarna kun je het per formaat bijstellen.
       </div>
       <div className="list" style={{ marginBottom: 12 }}>
@@ -105,14 +105,14 @@ function AddFormatDialog({ onClose }: { onClose: () => void }) {
           )
         })}
       </div>
-      <Field label="Eigen formaat">
+      <Row label="Eigen formaat">
         <input type="number" value={w} onChange={(e) => setW(+e.target.value)} />
         <span className="muted" style={{ flex: '0 0 auto' }}>×</span>
         <input type="number" value={h} onChange={(e) => setH(+e.target.value)} />
         <button className="primary" disabled={w < 10 || h < 10} onClick={() => addFormat(w, h)}>
           Toevoegen
         </button>
-      </Field>
+      </Row>
     </Modal>
   )
 }
@@ -129,7 +129,7 @@ function ExportDialog({ onClose }: { onClose: () => void }) {
     <Modal title="Exporteren" wide onClose={onClose}>
       <div className="cols">
         <div>
-          <div className="muted">Formaten</div>
+          <div className="sub">Formaten</div>
           {project.compositions.map((c) => (
             <label key={c.id} className="check">
               <input type="checkbox" checked={comps.includes(c.id)} onChange={(e) => setComps(toggle(comps, c.id, e.target.checked))} />
@@ -138,14 +138,15 @@ function ExportDialog({ onClose }: { onClose: () => void }) {
           ))}
         </div>
         <div>
-          <div className="muted">Platform</div>
+          <div className="sub">Platform</div>
           {TARGET_IDS.map((t) => (
             <label key={t} className="check" title={TARGETS[t].notes}>
               <input type="checkbox" checked={targets.includes(t)} onChange={(e) => setTargets(toggle(targets, t, e.target.checked))} />
               {TARGETS[t].label}
             </label>
           ))}
-          <div className="hint">clickTag: {project.clickTag}</div>
+          <div className="hint-text">clickTag: {project.clickTag}</div>
+          <div className="hint-text">Polite loading: {project.politeLoad ? 'aan' : 'uit'} · rand en backup volgens formaat-instellingen</div>
         </div>
       </div>
 
@@ -204,18 +205,18 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
   }, [])
   return (
     <Modal title="Instellingen" onClose={onClose}>
-      <Field label="Anthropic API-sleutel">
+      <Row label="Anthropic API-sleutel">
         <input
           type="password"
           placeholder={settings?.hasApiKey ? '•••••• (ingesteld)' : 'sk-ant-…'}
           value={key}
           onChange={(e) => setKey(e.target.value)}
         />
-      </Field>
-      <div className="hint">Nodig voor AI-animatie. Wordt versleuteld opgeslagen op deze computer (OS-sleutelhanger).</div>
-      <Field label="Model">
+      </Row>
+      <div className="hint-text">Nodig voor AI-animatie. Wordt versleuteld opgeslagen op deze computer (OS-sleutelhanger).</div>
+      <Row label="Model">
         <input value={model} onChange={(e) => setModel(e.target.value)} />
-      </Field>
+      </Row>
       <div className="actions">
         {settings?.hasApiKey && (
           <button
@@ -250,12 +251,12 @@ function SaveBoilerplateDialog({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState(`${project.name} boilerplate`)
   return (
     <Modal title="Opslaan als boilerplate" onClose={onClose}>
-      <div className="hint">
+      <div className="hint-text">
         Slaat alle formaten, lagen, animaties, assets en fonts op als startpunt voor nieuwe projecten.
       </div>
-      <Field label="Naam">
+      <Row label="Naam">
         <input autoFocus value={name} onChange={(e) => setName(e.target.value)} />
-      </Field>
+      </Row>
       <div className="actions">
         <button onClick={onClose}>Annuleren</button>
         <button className="primary" disabled={!name.trim()} onClick={() => saveAsBoilerplate(name.trim())}>

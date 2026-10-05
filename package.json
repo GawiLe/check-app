@@ -17,6 +17,7 @@
     "@anthropic-ai/sdk": "^0.131.0",
     "fflate": "^0.8.3",
     "fontverter": "^2.0.0",
+    "lucide-react": "^1.52.0",
     "opentype.js": "^2.0.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

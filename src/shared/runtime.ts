@@ -3,6 +3,11 @@
 //
 // Data-formaat (D):
 //   w,h  formaat     d  duur van één loop (s)     l  aantal loops     a  autoplay
+//   e    eindframe: tijd waarop de laatste loop stopt (vóór de uitgang-animaties)
+//
+// Polite loading: afbeeldingen met data-src worden pas na window.load geladen; de
+// animatie start als alle afbeeldingen en fonts klaar zijn. Tot dan zijn alleen
+// achtergrond en rand zichtbaar.
 //   L    geanimeerde lagen: { i: element-id, b: basiswaarden, p: tracks, g: write-on, f: vul-fractie, w: wipe-modus }
 //        basiswaarden/tracks gebruiken korte sleutels: x y s(scale) r(rotation) o(opacity) v(reveal)
 //        keyframes zijn [tijd, waarde, easing-index] — volgorde van easings gelijk aan EASES in types.ts
@@ -20,12 +25,13 @@ function R(t){for(var m=0;m<L.length;m++){var o=L[m],l=o.l,v={},k;for(k in l.b)v
 var s=o.el.style;s.transform='translate('+v.x+'px,'+v.y+'px) rotate('+v.r+'deg) scale('+v.s+')';s.opacity=v.o;
 if(o.g){var n=o.g.length,w=2/(n+1),f=l.f;for(var j=0;j<n;j++){var q=C((v.v-j/(n+1))/w),ps=o.g[j].style;ps.strokeDashoffset=1-q;ps.visibility=q>0?'visible':'hidden';ps.fillOpacity=f>0?C((q-1+f)/f):0}}
 else if(l.w){var h=(1-C(v.v))*100+'%';s.clipPath=l.w==1?'inset(0 '+h+' 0 0)':l.w==2?'inset(0 0 0 '+h+')':l.w==3?'inset('+h+' 0 0 0)':'inset(0 0 '+h+' 0)'}}}
-var T=D.d,N=D.l,t0=0,cur=0,raf=0;
-function tick(n){var e=(n-t0)/1e3;if(e>=T*N){cur=T;R(T);return}cur=e%T;R(cur);raf=requestAnimationFrame(tick)}
-var BS=window.BS={seek:function(t){cancelAnimationFrame(raf);cur=Math.min(Math.max(t,0),T);R(cur)},play:function(){cancelAnimationFrame(raf);t0=performance.now()-cur*1e3;raf=requestAnimationFrame(tick)},pause:function(){cancelAnimationFrame(raf)}};
+var T=D.d,N=D.l,Z=D.e,t0=0,cur=0,raf=0;
+function tick(n){var e=(n-t0)/1e3;if(e>=T*(N-1)+Z){cur=Z;R(Z);return}cur=e%T;R(cur);raf=requestAnimationFrame(tick)}
+var BS=window.BS={end:Z,seek:function(t){cancelAnimationFrame(raf);cur=Math.min(Math.max(t,0),T);R(cur)},play:function(){cancelAnimationFrame(raf);t0=performance.now()-cur*1e3;raf=requestAnimationFrame(tick)},pause:function(){cancelAnimationFrame(raf)}};
 function go(){R(0);document.body.className+=' r';if(D.a)BS.play()}
-var fr=document.fonts&&document.fonts.ready;
-if(document.readyState=='complete')fr?fr.then(go):go();else window.addEventListener('load',function(){fr?fr.then(go):go()});
+function ready(){var fr=document.fonts&&document.fonts.ready;fr?fr.then(go):go()}
+function ld(){var im=document.querySelectorAll('img[data-src]'),n=im.length,k=0,i;if(!n)return ready();for(i=0;i<n;i++){im[i].onload=im[i].onerror=function(){if(++k==n)ready()};im[i].src=im[i].getAttribute('data-src')}}
+if(document.readyState=='complete')ld();else window.addEventListener('load',ld);
 if(!D.a)window.addEventListener('message',function(m){var d=m.data;if(d&&d.bs=='seek')BS.seek(d.t)});
 })(`
 

@@ -1,4 +1,5 @@
 import { easeIndex, round } from './anim'
+import { effectiveLayer, endFrameTime } from './motion'
 import { minifiedRuntime, WIPE_INDEX } from './runtime'
 import type { AnimProp, Composition, ExportTarget, FontAsset, Layer, Project } from './types'
 
@@ -84,12 +85,13 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
   css.push(
     '*{margin:0;padding:0;box-sizing:border-box}',
     `html,body{width:${W}px;height:${H}px;overflow:hidden}`,
-    `#ad{position:relative;display:block;width:${W}px;height:${H}px;overflow:hidden;background:${cssValue(comp.background)};cursor:pointer;visibility:hidden;text-decoration:none}`,
-    '.r #ad{visibility:visible}',
-    '.L{position:absolute;left:0;top:0;transform-origin:50% 50%}'
+    `#ad{position:relative;display:block;width:${W}px;height:${H}px;overflow:hidden;background:${cssValue(comp.background)};cursor:pointer;text-decoration:none}`,
+    '.L{position:absolute;left:0;top:0;transform-origin:50% 50%;visibility:hidden}',
+    '.r .L{visibility:visible}'
   )
 
-  const layers = comp.layers.filter((l) => l.visible)
+  const polite = opts.mode === 'export' && project.politeLoad
+  const layers = comp.layers.filter((l) => l.visible).map(effectiveLayer)
   // Index 0 is de bovenste laag; in HTML komt de onderste eerst.
   ;[...layers].reverse().forEach((l, idx) => {
     const id = `a${idx}`
@@ -118,7 +120,7 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
         const img = l.image!
         if (img.src) {
           assets.push(img.src)
-          inner = `<img src="${escapeHtml(opts.assetUrl(img.src))}" alt="" style="width:100%;height:100%;object-fit:${img.fit};display:block">`
+          inner = `<img ${polite ? 'data-src' : 'src'}="${escapeHtml(opts.assetUrl(img.src))}" alt="" style="width:100%;height:100%;object-fit:${img.fit};display:block">`
         }
         break
       }
@@ -174,6 +176,7 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
     h: H,
     d: round(comp.duration),
     l: Math.max(1, Math.round(comp.loops)),
+    e: endFrameTime(comp),
     a: opts.mode === 'export' ? 1 : 0,
     L: animated
   }

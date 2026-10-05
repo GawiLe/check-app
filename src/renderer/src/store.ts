@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { upsertKeyframe } from '@shared/anim'
+import { normalizeProject, syncFormats } from '@shared/sync'
 import type { AnimProp, Composition, ExportResult, Layer, Project } from '@shared/types'
 import { ANIM_PROPS } from '@shared/types'
 
@@ -29,6 +30,11 @@ interface State {
   dialog: Dialog
   status: { text: string; kind: 'info' | 'error' } | null
   exportResults: ExportResult[] | null
+  /** Alle formaten naast elkaar tonen. */
+  overview: boolean
+  /** Auto-keyframe (zoals de opname-knop in AE): elke wijziging zet een keyframe. */
+  autoKey: boolean
+  tab: InspectorTab
 
   openProject(dir: string, project: Project): void
   /** Wijzig het project. Met `coalesce` worden snelle opeenvolgende wijzigingen één undo-stap. */
@@ -47,7 +53,12 @@ interface State {
   setAssets(a: string[]): void
   bumpAssets(): void
   setExportResults(r: ExportResult[] | null): void
+  setOverview(o: boolean): void
+  setAutoKey(a: boolean): void
+  setTab(t: InspectorTab): void
 }
+
+export type InspectorTab = 'design' | 'motion' | 'ai'
 
 const HISTORY = 100
 
@@ -69,11 +80,14 @@ export const useStore = create<State>((set, get) => ({
   dialog: null,
   status: null,
   exportResults: null,
+  overview: false,
+  autoKey: false,
+  tab: 'design',
 
   openProject: (dir, project) =>
     set({
       dir,
-      project,
+      project: normalizeProject(project),
       compId: project.baseCompositionId ?? project.compositions[0]?.id ?? null,
       selection: [],
       selectedKey: null,
@@ -90,6 +104,8 @@ export const useStore = create<State>((set, get) => ({
     if (!project) return
     const next = structuredClone(project)
     fn(next)
+    const { compId } = get()
+    if (compId) syncFormats(project, next, compId)
     const now = Date.now()
     const merge = coalesce && lastCoalesce && lastCoalesce.key === coalesce && now - lastCoalesce.at < 1000
     set({
@@ -124,7 +140,10 @@ export const useStore = create<State>((set, get) => ({
   setStatus: (text, kind = 'info') => set({ status: { text, kind } }),
   setAssets: (a) => set({ assets: a }),
   bumpAssets: () => set({ assetsRev: get().assetsRev + 1 }),
-  setExportResults: (r) => set({ exportResults: r })
+  setExportResults: (r) => set({ exportResults: r }),
+  setOverview: (o) => set({ overview: o }),
+  setAutoKey: (a) => set({ autoKey: a }),
+  setTab: (t) => set({ tab: t })
 }))
 
 // ---------- Selectors & helpers ----------
@@ -149,13 +168,16 @@ export const isAnimProp = (k: string): k is AnimProp => (ANIM_PROPS as string[])
  * keyframes), dan komt er een keyframe op de huidige tijd; anders wijzigt de basiswaarde.
  */
 export function setLayerValue(layerId: string, prop: AnimProp, value: number, coalesce?: string) {
-  const { compId, time } = useStore.getState()
+  const { compId, time, autoKey } = useStore.getState()
   useStore.getState().update((p) => {
     const l = findLayer(p, compId, layerId)
     if (!l) return
     const kfs = l.tracks[prop]
     if (kfs && kfs.length) l.tracks[prop] = upsertKeyframe(kfs, time, value)
-    else l[prop] = value
+    else if (autoKey && time > 0.01) {
+      // Eerste wijziging met auto-key: oude waarde op 0s, nieuwe op de huidige tijd.
+      l.tracks[prop] = upsertKeyframe(upsertKeyframe([], 0, l[prop]), time, value)
+    } else l[prop] = value
   }, coalesce)
 }
 

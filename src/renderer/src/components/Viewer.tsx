@@ -1,21 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Maximize, Minus, Plus, Star } from 'lucide-react'
 import { layerStateAt } from '@shared/anim'
 import { buildBanner } from '@shared/build'
-import type { Layer } from '@shared/types'
+import type { Composition, Layer, Project } from '@shared/types'
 import { assetUrl, currentComp, setLayerValue, updateLayer, useStore } from '../store'
 
 /**
- * Het canvas. De preview is de echte banner-HTML (zelfde builder als de export) in
- * een iframe; daaroverheen ligt een overlay voor selecteren, verplaatsen en schalen.
- * Twee iframes wisselen elkaar af zodat herladen niet flikkert.
+ * De echte banner-HTML (zelfde builder als de export) in een iframe. Twee iframes
+ * wisselen elkaar af zodat herladen niet flikkert; de tijd gaat via postMessage.
  */
-export function Viewer() {
-  const project = useStore((s) => s.project)!
-  const comp = useStore(currentComp)!
-  const zoom = useStore((s) => s.zoom)
-  const time = useStore((s) => s.time)
-  const rev = useStore((s) => s.assetsRev)
-  const selection = useStore((s) => s.selection)
+function BannerFrame(props: { project: Project; comp: Composition; time: number; zoom: number; rev: number }) {
+  const { project, comp, time, zoom, rev } = props
   const frames = [useRef<HTMLIFrameElement>(null), useRef<HTMLIFrameElement>(null)]
   const active = useRef(0)
   const timeRef = useRef(time)
@@ -29,9 +24,10 @@ export function Viewer() {
       assetUrl: (p) => assetUrl(p, rev),
       fontSrc
     }).html
-  }, [project, comp, rev])
+    // project.fonts en comp zijn genoeg; de rest van het project raakt de HTML niet
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.fonts, project.name, project.clickTag, comp, rev])
 
-  // Nieuwe HTML in de verborgen iframe laden en na het laden omwisselen.
   useEffect(() => {
     const t = setTimeout(() => {
       const next = 1 - active.current
@@ -59,6 +55,72 @@ export function Viewer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [time])
 
+  return (
+    <>
+      {frames.map((ref, i) => (
+        <iframe
+          key={i}
+          ref={ref}
+          sandbox="allow-scripts"
+          title={`${comp.name}-${i}`}
+          width={comp.width}
+          height={comp.height}
+          style={{ transform: `scale(${zoom})`, visibility: i === 0 ? 'visible' : 'hidden' }}
+        />
+      ))}
+    </>
+  )
+}
+
+export function Viewer() {
+  const overview = useStore((s) => s.overview)
+  return overview ? <Overview /> : <SingleViewer />
+}
+
+/** Alle formaten naast elkaar, synchroon afspelend. Klik om dat formaat te bewerken. */
+function Overview() {
+  const project = useStore((s) => s.project)!
+  const compId = useStore((s) => s.compId)
+  const time = useStore((s) => s.time)
+  const rev = useStore((s) => s.assetsRev)
+  const maxH = 420
+  return (
+    <div className="viewer">
+      <div className="overview">
+        {project.compositions.map((c) => {
+          const z = Math.min(1, maxH / c.height, 560 / c.width)
+          return (
+            <div
+              key={c.id}
+              className={`tile${c.id === compId ? ' active' : ''}`}
+              onClick={() => {
+                useStore.getState().setComp(c.id)
+                useStore.getState().setOverview(false)
+              }}
+            >
+              <div className="cap">
+                {c.id === project.baseCompositionId && <Star size={11} />}
+                {c.width}×{c.height}
+                {z < 1 && <span className="faint">{Math.round(z * 100)}%</span>}
+              </div>
+              <div className="frame" style={{ width: c.width * z, height: c.height * z }}>
+                <BannerFrame project={project} comp={c} time={Math.min(time, c.duration)} zoom={z} rev={rev} />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function SingleViewer() {
+  const project = useStore((s) => s.project)!
+  const comp = useStore(currentComp)!
+  const zoom = useStore((s) => s.zoom)
+  const time = useStore((s) => s.time)
+  const rev = useStore((s) => s.assetsRev)
+  const selection = useStore((s) => s.selection)
   const [hover, setHover] = useState<string | null>(null)
   const drag = useRef<
     | { kind: 'move'; x: number; y: number; start: { id: string; x: number; y: number }[] }
@@ -98,11 +160,13 @@ export function Viewer() {
     if (e.shiftKey) sel = selection.includes(hit.id) ? selection.filter((i) => i !== hit.id) : [...selection, hit.id]
     else if (!selection.includes(hit.id)) sel = [hit.id]
     s.select(sel)
+    // Verplaatsen werkt op de rustpositie (basis of huidige keyframe-waarde).
     const start = comp.layers
       .filter((l) => sel.includes(l.id) && !l.locked)
       .map((l) => {
+        const animated = (p: 'x' | 'y') => !!l.tracks[p]?.length
         const st = layerStateAt(l, time)
-        return { id: l.id, x: st.x, y: st.y }
+        return { id: l.id, x: animated('x') ? st.x : l.x, y: animated('y') ? st.y : l.y }
       })
     drag.current = { kind: 'move', x: p.x, y: p.y, start }
   }
@@ -123,8 +187,7 @@ export function Viewer() {
       }
     } else {
       const w = Math.max(4, Math.round(d.w + p.x - d.x))
-      let h = Math.max(4, Math.round(d.h + p.y - d.y))
-      if (e.shiftKey) h = Math.round(w / d.ratio)
+      const h = e.shiftKey ? Math.round(w / d.ratio) : Math.max(4, Math.round(d.h + p.y - d.y))
       updateLayer(
         d.id,
         (l) => {
@@ -167,7 +230,7 @@ export function Viewer() {
         {handle && (
           <>
             <div className="size-label">
-              {l.name} · {Math.round(l.width)}×{Math.round(l.height)}
+              {Math.round(l.width)} × {Math.round(l.height)}
             </div>
             <div className="handle" onPointerDown={(e) => startResize(e, l)} />
           </>
@@ -178,22 +241,22 @@ export function Viewer() {
 
   const selected = comp.layers.filter((l) => selection.includes(l.id))
   const hovered = comp.layers.find((l) => l.id === hover && !selection.includes(l.id))
+  const setZoom = useStore.getState().setZoom
+
+  // Bij openen of wisselen van formaat: passend inzoomen (max. 100%).
+  const viewerRef = useRef<HTMLDivElement>(null)
+  const fit = () => {
+    const el = viewerRef.current
+    if (!el) return
+    setZoom(Math.min(1, (el.clientWidth - 64) / comp.width, (el.clientHeight - 64) / comp.height))
+  }
+  useEffect(fit, [comp.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="viewer" onWheel={(e) => (e.ctrlKey || e.metaKey) && useStore.getState().setZoom(zoom * (e.deltaY < 0 ? 1.1 : 0.9))}>
+    <div ref={viewerRef} className="viewer" onWheel={(e) => (e.ctrlKey || e.metaKey) && setZoom(zoom * (e.deltaY < 0 ? 1.1 : 0.9))}>
       <div className="stage-wrap">
         <div className="stage" style={{ width: comp.width * zoom, height: comp.height * zoom }}>
-          {frames.map((ref, i) => (
-            <iframe
-              key={i}
-              ref={ref}
-              sandbox="allow-scripts"
-              title={`preview-${i}`}
-              width={comp.width}
-              height={comp.height}
-              style={{ transform: `scale(${zoom})`, visibility: i === 0 ? 'visible' : 'hidden' }}
-            />
-          ))}
+          <BannerFrame project={project} comp={comp} time={time} zoom={zoom} rev={rev} />
           <div
             className="overlay"
             onPointerDown={onDown}
@@ -206,15 +269,18 @@ export function Viewer() {
           </div>
         </div>
       </div>
-      <div className="zoom">
-        <button className="icon" onClick={() => useStore.getState().setZoom(zoom / 1.25)}>
-          −
+      <div className="floating">
+        <button className="icon sm" title="Uitzoomen" onClick={() => setZoom(zoom / 1.25)}>
+          <Minus size={14} />
         </button>
-        <span style={{ minWidth: 40, textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
-        <button className="icon" onClick={() => useStore.getState().setZoom(zoom * 1.25)}>
-          +
+        <span>{Math.round(zoom * 100)}%</span>
+        <button className="icon sm" title="Inzoomen" onClick={() => setZoom(zoom * 1.25)}>
+          <Plus size={14} />
         </button>
-        <button className="icon" onClick={() => useStore.getState().setZoom(1)}>
+        <button className="icon sm" title="Passend" onClick={fit}>
+          <Maximize size={13} />
+        </button>
+        <button className="icon sm" title="100%" onClick={() => setZoom(1)} style={{ width: 'auto', padding: '0 6px', fontSize: 11 }}>
           1:1
         </button>
       </div>

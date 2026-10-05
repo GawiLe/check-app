@@ -1,4 +1,4 @@
-// Rooktest: start de gebouwde app, opent een testproject, maakt screenshots en exporteert.
+// Rooktest: start de gebouwde app, opent een testproject, doorloopt de hoofdflow en exporteert.
 // Gebruik: npm run build && xvfb-run node scripts/smoke.mjs <projectmap> <screenshotmap>
 import { _electron as electron } from 'playwright-core'
 import { mkdir } from 'node:fs/promises'
@@ -7,38 +7,48 @@ const [dir, shots] = process.argv.slice(2)
 await mkdir(shots, { recursive: true })
 const app = await electron.launch({ args: ['--no-sandbox', '.'], env: { ...process.env, BS_USER_DATA: shots + '/userdata' } })
 const page = await app.firstWindow()
-page.on('console', (m) => console.log('[renderer]', m.text()))
+await page.setViewportSize({ width: 1440, height: 900 }).catch(() => {})
 page.on('pageerror', (e) => console.log('[pageerror]', e.message))
-await page.waitForSelector('.welcome')
-await page.screenshot({ path: `${shots}/1-welkom.png` })
+const shot = async (name) => {
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${shots}/${name}.png` })
+}
 
-// project in de recente lijst zetten, herladen en via de UI openen
+await page.waitForSelector('.welcome')
 await page.evaluate((d) => window.bs.openProject(d), dir)
 await page.reload()
+await page.waitForSelector('.welcome .list-item')
+await shot('1-welkom')
 await page.locator('.welcome .list-item').first().click()
-await page.waitForSelector('.app', { timeout: 10000 })
-await page.waitForTimeout(1200)
-await page.screenshot({ path: `${shots}/2-editor.png` })
+await page.waitForSelector('.app')
+await page.locator('.timeline .ruler').click({ position: { x: 10 + 2.6 * 120, y: 10 } })
+await shot('2-editor')
 
-// laag selecteren in de tijdlijn en uitklappen
-await page.locator('.tl-name .grow', { hasText: 'Headline' }).click()
-await page.locator('.tl-name', { hasText: 'Headline' }).locator('button.mini').first().click()
-await page.locator('.timeline .ruler').click({ position: { x: 8 + 2.2 * 110, y: 10 } })
-await page.waitForTimeout(400)
-await page.screenshot({ path: `${shots}/3-writeon-2.2s.png` })
+// Headline selecteren → Animatie-tab
+await page.locator('.tl-name', { hasText: 'Headline' }).click()
+await page.getByRole('button', { name: 'Animatie' }).click()
+await shot('3-animatie-tab')
 
-// formaat 300x250 afleiden van de basis
-await page.getByRole('button', { name: '+ Formaat' }).click()
+// Formaat 300x250 toevoegen
+await page.locator('button[title="Formaat toevoegen"]').click()
 await page.locator('.modal .list-item', { hasText: 'Medium Rectangle' }).click()
-await page.locator('.timeline .ruler').click({ position: { x: 8 + 4 * 110, y: 10 } })
-await page.waitForTimeout(600)
-await page.screenshot({ path: `${shots}/4-300x250.png` })
+await page.locator('.timeline .ruler').click({ position: { x: 10 + 3.5 * 120, y: 10 } })
+await shot('4-300x250')
+
+// Terug naar basis, headline-tekst wijzigen → moet in 300x250 doorkomen
+await page.locator('.formats button', { hasText: '300×600' }).click()
+await page.locator('.tl-name', { hasText: 'Headline' }).click()
+await page.getByRole('button', { name: 'Ontwerp' }).click()
+const ta = page.locator('.inspector textarea').first()
+await ta.fill('Zomer sale\nnu -30%')
+await ta.blur()
+await page.locator('.formats button', { hasText: 'Alle' }).click()
+await shot('5-alle-formaten')
 
 await page.getByRole('button', { name: 'Exporteren' }).click()
 await page.locator('.modal label.check', { hasText: 'Google Ads' }).locator('input').check()
 await page.getByRole('button', { name: /Exporteer \d+ banner/ }).click()
 await page.waitForFunction(() => document.querySelectorAll('.result').length >= 4, null, { timeout: 60000 })
-await page.waitForTimeout(300)
-await page.screenshot({ path: `${shots}/5-export.png` })
-console.log(await page.locator('.result').allInnerTexts())
+await shot('6-export')
+console.log((await page.locator('.result').allInnerTexts()).join('\n---\n'))
 await app.close()

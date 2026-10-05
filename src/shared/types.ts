@@ -2,7 +2,7 @@
 // plus `assets/` en `fonts/`. Alles wat de editor toont, wordt hieruit gegenereerd.
 
 export const PROJECT_FILE = 'project.bsproj'
-export const PROJECT_VERSION = 1
+export const PROJECT_VERSION = 2
 
 export type EaseName =
   | 'linear'
@@ -86,8 +86,35 @@ export interface WriteOnProps {
 /** Wipe-reveal voor niet-write-on lagen, gestuurd door `reveal`. */
 export type RevealMode = 'none' | 'wipeLeft' | 'wipeRight' | 'wipeUp' | 'wipeDown'
 
+/**
+ * Binnenkomst of uitgang van een laag, zoals een GSAP from()/to(): beweegt van/naar
+ * de rustpositie van de laag. Zo hoef je voor de gewone animaties geen keyframes te zetten.
+ */
+export interface Motion {
+  start: number
+  duration: number
+  ease: EaseName
+  /** Vanaf/naar dekking 0. */
+  fade: boolean
+  /** Verschuiving in px t.o.v. de rustpositie. */
+  dx: number
+  dy: number
+  /** Schaalfactor t.o.v. de rustschaal (1 = geen). */
+  scale: number
+  /** Extra rotatie in graden. */
+  rotation: number
+  /** Reveal 0→1 (write-on / wipe). */
+  reveal: boolean
+}
+
 export interface Layer {
   id: string
+  /**
+   * Zelfde linkId = dezelfde laag in een ander formaat. Inhoud (tekst, kleur,
+   * afbeelding) en timing worden tussen gekoppelde lagen gesynchroniseerd;
+   * positie en maat blijven per formaat.
+   */
+  linkId: string
   name: string
   type: LayerType
   visible: boolean
@@ -105,6 +132,8 @@ export interface Layer {
   /** Is deze laag de (zichtbare) CTA-knop? Krijgt een hover-effect bij export. */
   cta: boolean
   tracks: Tracks
+  intro?: Motion | null
+  outro?: Motion | null
   text?: TextProps
   image?: ImageProps
   shape?: ShapeProps
@@ -143,6 +172,10 @@ export interface Project {
   /** Landings-URL die als standaardwaarde in `clickTag` komt. */
   clickTag: string
   targets: ExportTarget[]
+  /** Wijzigingen in inhoud en timing doorvoeren in alle formaten. */
+  syncFormats: boolean
+  /** Polite loading: afbeeldingen pas laden na het `load`-event van de pagina. */
+  politeLoad: boolean
   fonts: FontAsset[]
   baseCompositionId: string
   compositions: Composition[]

@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs'
 import { basename, extname, join } from 'node:path'
 import type { Boilerplate, OpenedProject } from '@shared/api'
 import { createStarterProject, newId } from '@shared/factory'
+import { normalizeProject } from '@shared/sync'
 import type { Project } from '@shared/types'
 import { PROJECT_FILE, PROJECT_VERSION } from '@shared/types'
 
@@ -62,7 +63,7 @@ export const PROJECT_DIRS = ['assets', 'fonts', 'export'] as const
 export async function readProject(dir: string): Promise<OpenedProject> {
   const project = JSON.parse(await readFile(join(dir, PROJECT_FILE), 'utf8')) as Project
   if (project.version > PROJECT_VERSION) throw new Error('Dit project is gemaakt met een nieuwere versie van Banner Studio.')
-  return { dir, project }
+  return { dir, project: normalizeProject(project) }
 }
 
 export async function writeProject(dir: string, project: Project): Promise<void> {

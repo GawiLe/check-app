@@ -68,7 +68,7 @@ describe('export-HTML', () => {
       win.BS.seek(t)
       visible.forEach((l, i) => {
         const el = win.document.getElementById(`a${i}`)!
-        if (!Object.keys(l.tracks).length) return
+        if (!l.intro && !l.outro && !Object.keys(l.tracks).length) return
         const st = layerStateAt(l, Math.min(t, comp.duration))
         const m = el.style.transform.match(/translate\(([-\d.e]+)px, ?([-\d.e]+)px\) rotate\(([-\d.e]+)deg\) scale\(([-\d.e]+)\)/)!
         expect(+m[1]).toBeCloseTo(st.x, 2)
@@ -125,5 +125,79 @@ describe('formaten afleiden', () => {
     }
     expect(new Set(mr.layers.map((l) => l.id)).size).toBe(mr.layers.length)
     expect(mr.layers.every((l) => !base.layers.some((b) => b.id === l.id))).toBe(true)
+  })
+})
+
+describe('meerdere formaten in één werkbestand', () => {
+  it('zet tekst, kleur en timing door naar gekoppelde lagen, positie blijft per formaat', async () => {
+    const { syncFormats } = await import('../src/shared/sync')
+    const p = createStarterProject()
+    const base = p.compositions[0]
+    p.compositions.push(deriveComposition(base, 300, 250))
+    const prev = structuredClone(p)
+    const head = base.layers.find((l) => l.name === 'Headline')!
+    head.text!.content = 'Nieuwe tekst'
+    head.text!.color = '#ff0000'
+    head.x = 5
+    head.tracks.opacity = [
+      { t: 1, v: 0, e: 'easeOut' },
+      { t: 2, v: 1, e: 'linear' }
+    ]
+    syncFormats(prev, p, base.id)
+    const other = p.compositions[1].layers.find((l) => l.linkId === head.linkId)!
+    expect(other.text!.content).toBe('Nieuwe tekst')
+    expect(other.text!.color).toBe('#ff0000')
+    expect(other.text!.size).not.toBe(head.text!.size)
+    expect(other.x).not.toBe(5)
+    expect(other.tracks.opacity!.map((k) => k.t)).toEqual([1, 2])
+  })
+
+  it('voegt nieuwe lagen toe en verwijdert lagen in alle formaten', async () => {
+    const { syncFormats } = await import('../src/shared/sync')
+    const p = createStarterProject()
+    const base = p.compositions[0]
+    p.compositions.push(deriveComposition(base, 728, 90))
+    let prev = structuredClone(p)
+    const l = createLayer('shape', base)
+    base.layers.unshift(l)
+    syncFormats(prev, p, base.id)
+    expect(p.compositions[1].layers[0].linkId).toBe(l.linkId)
+    expect(p.compositions[1].layers[0].height).toBeLessThanOrEqual(90)
+    prev = structuredClone(p)
+    base.layers.shift()
+    syncFormats(prev, p, base.id)
+    expect(p.compositions[1].layers.some((x) => x.linkId === l.linkId)).toBe(false)
+  })
+})
+
+describe('binnenkomst en uitgang', () => {
+  it('maakt keyframes rond de rustpositie en stopt het eindframe vóór de uitgang', async () => {
+    const { effectiveLayer, endFrameTime, defaultOutro } = await import('../src/shared/motion')
+    const p = createStarterProject()
+    const comp = p.compositions[0]
+    const l = createLayer('text', comp)
+    l.y = 100
+    l.intro = { start: 1, duration: 0.5, ease: 'easeOut', fade: true, dx: 0, dy: 20, scale: 1, rotation: 0, reveal: false }
+    l.outro = defaultOutro(comp)
+    comp.layers.unshift(l)
+    const e = effectiveLayer(l)
+    expect(e.tracks.y!.map((k) => k.v)).toEqual([120, 100])
+    expect(e.tracks.opacity!.map((k) => k.v)).toEqual([0, 1, 1, 0])
+    expect(layerStateAt(l, 0).opacity).toBe(0)
+    expect(layerStateAt(l, 1.5).y).toBe(100)
+    expect(endFrameTime(comp)).toBe(l.outro.start)
+    // handmatige keyframes gaan voor
+    l.tracks.y = [{ t: 0, v: 50, e: 'linear' }]
+    expect(effectiveLayer(l).tracks.y!.map((k) => k.v)).toEqual([50])
+  })
+
+  it('polite loading: afbeeldingen via data-src', () => {
+    const p = createStarterProject()
+    const img = createLayer('image', p.compositions[0])
+    img.image!.src = 'assets/a.png'
+    p.compositions[0].layers.unshift(img)
+    expect(build(p).html).toContain('data-src="a.png"')
+    p.politeLoad = false
+    expect(build(p).html).toContain(' src="a.png"')
   })
 })

@@ -27,10 +27,7 @@ const w = createLayer('writeon', comp)
 const g = await textToGlyphPaths(dir, font.file, 'Nu!', 40)
 Object.assign(w, { name: 'Write-on', x: 276 - g.width, y: 180, width: g.width, height: g.height })
 Object.assign(w.writeon!, { content: 'Nu!', fontId: font.id, glyphs: g.glyphs, viewBox: g.viewBox, color: '#e30613' })
-w.tracks.reveal = [
-  { t: 1.5, v: 0, e: 'easeInOut' },
-  { t: 3, v: 1, e: 'linear' }
-]
+w.intro = { start: 1.2, duration: 1.4, ease: 'easeInOut', fade: false, dx: 0, dy: 0, scale: 1, rotation: 0, reveal: true }
 comp.layers.unshift(w, logo)
 await writeFile(join(dir, PROJECT_FILE), JSON.stringify(p, null, 2))
 console.log('demo-project:', dir)

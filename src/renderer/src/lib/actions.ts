@@ -1,4 +1,5 @@
 import { createLayer, deriveComposition, newId } from '@shared/factory'
+import { defaultIntro, INTRO_PRESETS } from '@shared/motion'
 import { mergeTracks, PRESETS } from '@shared/presets'
 import type { ExportTarget, Layer, LayerType } from '@shared/types'
 import { assetUrl, currentComp, findComp, findLayer, updateLayer, useStore } from '../store'
@@ -39,7 +40,7 @@ export async function openProject(dir?: string) {
     if (!opened) return
     S().openProject(opened.dir, opened.project)
     await refreshAssets()
-    S().setStatus(`Geopend: ${opened.dir}`)
+    S().setStatus(`Geopend: ${opened.dir.split(/[\\/]/).pop()}`)
   } catch (e) {
     fail(e)
   }
@@ -125,7 +126,8 @@ export function duplicateSelection() {
     for (const id of selection) {
       const i = comp.layers.findIndex((l) => l.id === id)
       if (i < 0) continue
-      const copy: Layer = { ...structuredClone(comp.layers[i]), id: newId('l'), name: comp.layers[i].name + ' kopie' }
+      const id = newId('l')
+      const copy: Layer = { ...structuredClone(comp.layers[i]), id, linkId: id, name: comp.layers[i].name + ' kopie' }
       copy.x += 10
       copy.y += 10
       comp.layers.splice(i, 0, copy)
@@ -284,4 +286,25 @@ export async function saveAsBoilerplate(name: string) {
   } catch (e) {
     fail(e)
   }
+}
+
+/** Geeft meerdere lagen dezelfde binnenkomst, na elkaar (van boven naar onder in beeld). */
+export function staggerIntros(presetId: string, gap: number) {
+  const { selection, compId } = S()
+  const preset = INTRO_PRESETS[presetId]
+  if (!preset) return
+  S().update((p) => {
+    const comp = findComp(p, compId)
+    const targets = comp.layers
+      .filter((l) => l.visible && (selection.length > 1 ? selection.includes(l.id) : !l.locked))
+      .sort((a, b) => a.y - b.y || a.x - b.x)
+    targets.forEach((l, i) => {
+      const base = defaultIntro(l)
+      l.intro = { ...base, ...preset.spec, reveal: base.reveal, start: Math.round((0.2 + i * gap) * 100) / 100 }
+      if (base.reveal) l.intro.fade = false
+    })
+    const last = targets.length ? 0.2 + (targets.length - 1) * gap + 1.2 : 0
+    comp.duration = Math.max(comp.duration, Math.ceil(last + 2))
+  })
+  S().setStatus('Binnenkomst toegepast. Per laag bij te stellen in de tab Animatie.')
 }
