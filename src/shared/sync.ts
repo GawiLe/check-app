@@ -70,6 +70,9 @@ export const OVERRIDE_LABEL: Record<string, string> = {
   visible: 'zichtbaarheid',
   name: 'naam',
   intro: 'binnenkomst',
+  children: 'inhoud groep',
+  start: 'in-punt',
+  end: 'uit-punt',
   outro: 'uitgang',
   emphasis: 'accent',
   revealMode: 'wipe',
@@ -103,7 +106,28 @@ export const baseComp = (p: Project): Composition | undefined => p.compositions.
 function applyFromBase(base: Composition, src: Layer, dst: Composition, target: Layer, onlyKeys?: string[]) {
   const mapped = mapLayerToFormat(src, base, dst.width, dst.height)
   const skip = new Set(target.overrides ?? [])
-  for (const k of onlyKeys ?? layerKeys(src, target)) if (!skip.has(k)) setKey(target, k, getKey(mapped, k))
+  for (const k of onlyKeys ?? layerKeys(src, target)) {
+    if (skip.has(k)) continue
+    const keepIds = k === 'children' ? idsByLink(target.children ?? []) : null
+    setKey(target, k, getKey(mapped, k))
+    // Inhoud van een groep: ids per formaat stabiel houden (selectie blijft werken).
+    if (keepIds && target.children) restoreIds(target.children, keepIds)
+  }
+}
+
+function idsByLink(list: Layer[], out = new Map<string, string>()) {
+  for (const l of list) {
+    out.set(l.linkId, l.id)
+    if (l.children) idsByLink(l.children, out)
+  }
+  return out
+}
+
+function restoreIds(list: Layer[], ids: Map<string, string>) {
+  for (const l of list) {
+    l.id = ids.get(l.linkId) ?? l.id
+    if (l.children) restoreIds(l.children, ids)
+  }
 }
 
 /**

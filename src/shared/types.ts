@@ -40,7 +40,7 @@ export interface Keyframe {
 
 export type Tracks = Partial<Record<AnimProp, Keyframe[]>>
 
-export type LayerType = 'text' | 'image' | 'shape' | 'writeon'
+export type LayerType = 'text' | 'image' | 'shape' | 'writeon' | 'group'
 
 export interface TextProps {
   content: string
@@ -158,6 +158,16 @@ export interface Layer {
   image?: ImageProps
   shape?: ShapeProps
   writeon?: WriteOnProps
+  /**
+   * Groep (pre-comp): lagen binnen deze laag. Posities zijn relatief aan de groep,
+   * tijden relatief aan `start` van de groep. De groep zelf kun je als geheel
+   * animeren, dupliceren en in de tijd verschuiven.
+   */
+  children?: Layer[]
+  /** In-punt (s): vanaf hier zichtbaar. Bij een groep begint de tijd van de inhoud hier. */
+  start?: number
+  /** Uit-punt (s): tot hier zichtbaar. Leeg = tot het einde. */
+  end?: number | null
 }
 
 export interface Composition {
@@ -180,6 +190,8 @@ export interface Composition {
 export interface FontAsset {
   id: string
   family: string
+  /** Systeemfont (Arial, Georgia, …): wordt niet meegeleverd, alleen als font-family gebruikt. */
+  system?: boolean
   /** Pad relatief aan de projectmap, bijv. `fonts/Brand-Bold.woff2`. */
   file: string
   weight: number

@@ -1,3 +1,5 @@
+import type { UserPreset } from './library'
+import type { WebFont } from './webfonts'
 import type { ExportResult, ExportTarget, FontAsset, Project, Tracks, RevealMode, WriteOnProps } from './types'
 
 export interface OpenedProject {
@@ -59,6 +61,10 @@ export interface BannerStudioApi {
   setApiKey(key: string): Promise<void>
   setModel(model: string): Promise<void>
   aiAnimate(project: Project, compositionId: string, layerIds: string[], prompt: string): Promise<AiAnimationResult>
+  fontCatalog(): Promise<{ fonts: WebFont[]; online: boolean }>
+  installWebFont(dir: string, font: WebFont, weight: number, style: 'normal' | 'italic'): Promise<FontAsset>
+  listPresets(): Promise<UserPreset[]>
+  savePresets(list: UserPreset[]): Promise<void>
   onFilesChanged(cb: () => void): () => void
   onMenu(cb: (action: string) => void): () => void
 }

@@ -5,6 +5,7 @@ import {
   FolderOpen,
   ImagePlus,
   LayoutGrid,
+  MousePointerClick,
   Link2,
   Link2Off,
   PenLine,
@@ -98,6 +99,7 @@ export function Toolbar() {
       </div>
 
       <div className="group end">
+        <ClickTagField />
         <button className="icon" title="Opslaan als boilerplate" onClick={() => s().setDialog('saveBoilerplate')}>
           <BookmarkPlus size={16} />
         </button>
@@ -156,5 +158,26 @@ function AddMenu() {
         </div>
       )}
     </div>
+  )
+}
+
+/** De clickTag (landings-URL) altijd binnen handbereik; geldt voor alle formaten en exports. */
+function ClickTagField() {
+  const url = useStore((s) => s.project!.clickTag)
+  const [v, setV] = useState(url)
+  useEffect(() => setV(url), [url])
+  const valid = /^https?:\/\/[^\s.]+\.[^\s]+$/.test(v.trim())
+  const commit = () => v.trim() !== url && useStore.getState().update((p) => void (p.clickTag = v.trim()))
+  return (
+    <label className={`clicktag${valid ? '' : ' invalid'}`} title="clickTag: de landings-URL voor alle formaten. Wordt bij export als clickTag in elke banner gezet.">
+      <MousePointerClick size={14} />
+      <input
+        value={v}
+        placeholder="https://landingspagina.nl"
+        onChange={(e) => setV(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+      />
+    </label>
   )
 }

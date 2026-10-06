@@ -2,9 +2,12 @@ import { useRef, useState } from 'react'
 import {
   ChevronDown,
   ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
   ChevronUp,
   Eye,
   EyeOff,
+  Folder,
   Image as ImageIcon,
   Lock,
   Pause,
@@ -16,20 +19,21 @@ import {
   Type,
   Unlock
 } from 'lucide-react'
-import { round, sortKeyframes } from '@shared/anim'
+import { layerStateAt, round, sortKeyframes, upsertKeyframe } from '@shared/anim'
 import { effectiveLayer, endFrameTime } from '@shared/motion'
 import { overrideLabel } from '@shared/sync'
+import { allLayers, layerLength, shiftTiming, trimIn, trimOut } from '@shared/tree'
 import type { AnimProp, EaseName, Layer } from '@shared/types'
 import { ANIM_PROPS, EASES } from '@shared/types'
 import { applyLibrary, moveLayer } from '../lib/actions'
-import { DRAG_TYPE } from './Library'
 import { currentComp, updateComp, updateLayer, useStore } from '../store'
 import { EASE_LABEL } from './Inspector'
+import { DRAG_TYPE } from './Library'
 import { formatTime } from './ui'
 
 const FPS = 30
-const snap = (t: number) => Math.max(0, Math.round(t * FPS) / FPS)
-const NAME_W = 240
+const snap = (t: number) => Math.round(t * FPS) / FPS
+const NAME_W = 260
 
 const PROP_LABEL: Record<AnimProp, string> = {
   x: 'Positie X',
@@ -39,7 +43,7 @@ const PROP_LABEL: Record<AnimProp, string> = {
   opacity: 'Dekking',
   reveal: 'Reveal'
 }
-const TYPE_ICON = { text: Type, image: ImageIcon, shape: Square, writeon: PenLine }
+const TYPE_ICON = { text: Type, image: ImageIcon, shape: Square, writeon: PenLine, group: Folder }
 
 /** Sleepgedrag via pointer capture; geeft de verschuiving in seconden door. */
 function useTimeDrag(pps: number) {
@@ -61,30 +65,37 @@ function useTimeDrag(pps: number) {
   }
 }
 
+const propsFor = (l: Layer): AnimProp[] =>
+  ANIM_PROPS.filter((p) => p !== 'reveal' || l.type === 'writeon' || l.revealMode !== 'none')
+
 export function Timeline() {
   const comp = useStore(currentComp)!
+  const project = useStore((st) => st.project)!
   const time = useStore((s) => s.time)
   const playing = useStore((s) => s.playing)
   const autoKey = useStore((s) => s.autoKey)
   const selection = useStore((s) => s.selection)
   const selectedKey = useStore((s) => s.selectedKey)
+  const expanded = useStore((s) => s.expanded)
   const [pps, setPps] = useState(120)
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const s = useStore.getState
   const drag = useTimeDrag(pps)
+  const setExpanded = (id: string, on: boolean) => s().setExpanded({ ...s().expanded, [id]: on })
 
   const span = Math.max(comp.duration + 1, 4)
   const width = span * pps + 24
   const xOf = (t: number) => t * pps + 10
   const tOf = (x: number) => (x - 10) / pps
   const endFrame = endFrameTime(comp)
+  const derived = project.syncFormats && comp.id !== project.baseCompositionId
+  const baseLinks = new Set(project.compositions.find((c) => c.id === project.baseCompositionId)?.layers.map((x) => x.linkId))
 
   const scrub = (e: React.PointerEvent) => {
     const el = e.currentTarget as HTMLElement
     el.setPointerCapture(e.pointerId)
     const set = (ev: { clientX: number }) => {
       const r = el.getBoundingClientRect()
-      s().setTime(Math.min(span, snap(tOf(ev.clientX - r.left))))
+      s().setTime(Math.max(0, Math.min(span, snap(tOf(ev.clientX - r.left)))))
     }
     set(e)
     s().setPlaying(false)
@@ -92,19 +103,19 @@ export function Timeline() {
     el.onpointerup = () => (el.onpointermove = null)
   }
 
-  // Keyframe slepen
-  const keyDrag = useRef<{ layerId: string; prop: AnimProp; t: number; x: number } | null>(null)
-  const onKeyDown = (e: React.PointerEvent, layerId: string, prop: AnimProp, t: number) => {
+  // Keyframe slepen (tijden zijn lokaal binnen een groep; offset = in-punten van de groepen)
+  const keyDrag = useRef<{ layerId: string; prop: AnimProp; t: number; x: number; offset: number } | null>(null)
+  const onKeyDown = (e: React.PointerEvent, layerId: string, prop: AnimProp, t: number, offset: number) => {
     e.stopPropagation()
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
     s().selectKey({ layerId, prop, t })
-    s().setTime(t)
-    keyDrag.current = { layerId, prop, t, x: e.clientX }
+    s().setTime(t + offset)
+    keyDrag.current = { layerId, prop, t, x: e.clientX, offset }
   }
   const onKeyMove = (e: React.PointerEvent) => {
     const d = keyDrag.current
     if (!d) return
-    const nt = snap(d.t + (e.clientX - d.x) / pps)
+    const nt = Math.max(0, snap(d.t + (e.clientX - d.x) / pps))
     const cur = s().selectedKey
     if (!cur || Math.abs(nt - cur.t) < 1e-6) return
     updateLayer(
@@ -120,35 +131,31 @@ export function Timeline() {
       'kfdrag'
     )
     s().selectKey({ ...cur, t: nt })
-    s().setTime(nt)
+    s().setTime(nt + d.offset)
   }
 
-  /** Hele laag in de tijd verschuiven: alle keyframes, binnenkomst en uitgang. */
-  const shiftLayer = (e: React.PointerEvent, l: Layer) => {
+  /** Hele laag in de tijd verschuiven (balk slepen), of in/uit trimmen (randen slepen). */
+  const barDrag = (e: React.PointerEvent, l: Layer, mode: 'move' | 'in' | 'out', shownEnd = 0) => {
     s().select([l.id])
     const orig = structuredClone(l)
-    drag(e, (dt) => {
+    drag(e, (dt) =>
       updateLayer(
         l.id,
         (x) => {
-          const minT = Math.min(
-            ...Object.values(orig.tracks).flatMap((k) => (k ?? []).map((kf) => kf.t)),
-            orig.intro?.start ?? Infinity,
-            orig.outro?.start ?? Infinity,
-            orig.emphasis?.start ?? Infinity
-          )
-          const d = Math.max(dt, -minT)
-          for (const p of ANIM_PROPS) if (orig.tracks[p]) x.tracks[p] = orig.tracks[p]!.map((k) => ({ ...k, t: round(k.t + d) }))
-          if (orig.intro && x.intro) x.intro.start = round(orig.intro.start + d)
-          if (orig.outro && x.outro) x.outro.start = round(orig.outro.start + d)
-          if (orig.emphasis && x.emphasis) x.emphasis.start = round(orig.emphasis.start + d)
+          if (mode === 'move') {
+            Object.assign(x, structuredClone(orig))
+            shiftTiming(x, Math.max(dt, -(orig.start ?? 0)))
+          } else if (mode === 'in') {
+            Object.assign(x, structuredClone(orig))
+            trimIn(x, (orig.start ?? 0) + dt)
+          } else trimOut(x, shownEnd + dt)
         },
-        'shift'
+        `bar-${mode}`
       )
-    })
+    )
   }
 
-  const motionSegment = (l: Layer, kind: 'intro' | 'outro') => {
+  const motionSegment = (l: Layer, kind: 'intro' | 'outro', offset: number) => {
     const m = l[kind]
     if (!m) return null
     const orig = { ...m }
@@ -156,8 +163,8 @@ export function Timeline() {
       <div
         key={kind}
         className={`seg-motion ${kind}`}
-        style={{ left: xOf(m.start), width: Math.max(6, m.duration * pps) }}
-        title={`${kind === 'intro' ? 'Binnenkomst' : 'Uitgang'} ${m.start.toFixed(2)}s – ${(m.start + m.duration).toFixed(2)}s · sleep om te verschuiven`}
+        style={{ left: xOf(offset + m.start), width: Math.max(6, m.duration * pps) }}
+        title={`${kind === 'intro' ? 'Binnenkomst' : 'Uitgang'} · sleep om te verschuiven, rand = duur`}
         onPointerDown={(e) => {
           s().select([l.id])
           s().setTab('motion')
@@ -175,50 +182,22 @@ export function Timeline() {
     )
   }
 
-  // Animaties uit de bibliotheek op een laag laten vallen. Op het spoor: start waar je loslaat.
-  const [dropOn, setDropOn] = useState<string | null>(null)
-  const [dropAt, setDropAt] = useState<number | null>(null)
-  const dropProps = (layerId: string, onTrack: boolean) => ({
-    onDragOver: (e: React.DragEvent) => {
-      if (!e.dataTransfer.types.includes(DRAG_TYPE)) return
-      e.preventDefault()
-      setDropOn(layerId)
-      if (onTrack) {
-        const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-        setDropAt(snap(tOf(e.clientX - r.left)))
-      } else setDropAt(null)
-    },
-    onDragLeave: () => {
-      setDropOn(null)
-      setDropAt(null)
-    },
-    onDrop: (e: React.DragEvent) => {
-      const id = e.dataTransfer.getData(DRAG_TYPE)
-      if (!id) return
-      e.preventDefault()
-      const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-      applyLibrary(id, [layerId], onTrack ? snap(tOf(e.clientX - r.left)) : undefined)
-      setDropOn(null)
-      setDropAt(null)
-    }
-  })
-
-  const emphasisSegment = (l: Layer) => {
+  const emphasisSegment = (l: Layer, offset: number) => {
     const em = l.emphasis
     if (!em) return null
     const orig = { ...em }
     return (
       <div
         className="seg-motion emphasis"
-        style={{ left: xOf(em.start), width: Math.max(6, em.duration * pps) }}
-        title={`Accent ${em.start.toFixed(2)}s – ${(em.start + em.duration).toFixed(2)}s · sleep om te verschuiven`}
+        style={{ left: xOf(offset + em.start), width: Math.max(6, em.duration * pps) }}
+        title="Accent · sleep om te verschuiven, rand = duur"
         onPointerDown={(e) => {
           s().select([l.id])
           s().setTab('motion')
           drag(e, (dt) => updateLayer(l.id, (x) => void (x.emphasis && (x.emphasis.start = Math.max(0, round(orig.start + dt)))), 'seg-em'))
         }}
       >
-        {em.duration * pps > 50 && 'ACCENT'}
+        {em.duration * pps > 60 && 'ACCENT'}
         <div
           className="edge"
           onPointerDown={(e) =>
@@ -229,77 +208,121 @@ export function Timeline() {
     )
   }
 
-  const selKf = (() => {
-    if (!selectedKey) return null
-    const l = comp.layers.find((x) => x.id === selectedKey.layerId)
-    return l?.tracks[selectedKey.prop]?.find((k) => Math.abs(k.t - selectedKey.t) < 1e-4) ?? null
-  })()
+  // Animaties uit de bibliotheek op een laag laten vallen. Op het spoor: start waar je loslaat.
+  const [dropOn, setDropOn] = useState<string | null>(null)
+  const [dropAt, setDropAt] = useState<number | null>(null)
+  const dropProps = (layerId: string, offset: number, onTrack: boolean) => ({
+    onDragOver: (e: React.DragEvent) => {
+      if (!e.dataTransfer.types.includes(DRAG_TYPE)) return
+      e.preventDefault()
+      setDropOn(layerId)
+      const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+      setDropAt(onTrack ? snap(tOf(e.clientX - r.left)) : null)
+    },
+    onDragLeave: () => {
+      setDropOn(null)
+      setDropAt(null)
+    },
+    onDrop: (e: React.DragEvent) => {
+      const id = e.dataTransfer.getData(DRAG_TYPE)
+      if (!id) return
+      e.preventDefault()
+      const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+      applyLibrary(id, [layerId], onTrack ? Math.max(0, snap(tOf(e.clientX - r.left)) - offset) : undefined)
+      setDropOn(null)
+      setDropAt(null)
+    }
+  })
 
-  const ticks = []
-  const minor = pps >= 90 ? 0.1 : pps >= 45 ? 0.5 : 1
-  for (let t = 0; t <= span + 1e-6; t = round(t + minor, 3)) {
-    const major = Math.abs(t - Math.round(t)) < 1e-6
-    ticks.push(
-      <div key={t} className={`tick${major ? ' major' : ''}`} style={{ left: xOf(t) }}>
-        {major && <span>{Math.round(t)}s</span>}
-      </div>
-    )
+  /** Keyframes van één eigenschap: eigen keyframes (sleepbaar) en die uit binnenkomst/accent/uitgang (hol). */
+  const propDiamonds = (l: Layer, prop: AnimProp, offset: number) => {
+    const own = l.tracks[prop]
+    if (own?.length)
+      return own.map((k) => {
+        const sel = selectedKey?.layerId === l.id && selectedKey.prop === prop && Math.abs(selectedKey.t - k.t) < 1e-4
+        return (
+          <div
+            key={'k' + k.t}
+            className={`diamond${sel ? ' sel' : ''}`}
+            style={{ left: xOf(offset + k.t) }}
+            title={`${PROP_LABEL[prop]} ${round(k.v, 2)} @ ${(offset + k.t).toFixed(2)}s · ${EASE_LABEL[k.e]}`}
+            onPointerDown={(e) => onKeyDown(e, l.id, prop, k.t, offset)}
+            onPointerMove={onKeyMove}
+            onPointerUp={() => (keyDrag.current = null)}
+          />
+        )
+      })
+    return (effectiveLayer(l).tracks[prop] ?? []).map((k) => (
+      <div
+        key={'g' + k.t}
+        className="diamond generated"
+        style={{ left: xOf(offset + k.t) }}
+        title={`${PROP_LABEL[prop]} ${round(k.v, 2)} @ ${(offset + k.t).toFixed(2)}s · uit binnenkomst/accent/uitgang (sleep het gekleurde blok)`}
+      />
+    ))
   }
 
-  const diamonds = (l: Layer, prop: AnimProp, summary = false) =>
-    (l.tracks[prop] ?? []).map((k) => {
-      const sel = !summary && selectedKey?.layerId === l.id && selectedKey.prop === prop && Math.abs(selectedKey.t - k.t) < 1e-4
-      return (
-        <div
-          key={prop + k.t}
-          className={`diamond${sel ? ' sel' : ''}${summary ? ' summary' : ''}`}
-          style={{ left: xOf(k.t) }}
-          title={`${PROP_LABEL[prop]} ${round(k.v, 2)} @ ${k.t.toFixed(2)}s · ${EASE_LABEL[k.e]}`}
-          onPointerDown={summary ? undefined : (e) => onKeyDown(e, l.id, prop, k.t)}
-          onPointerMove={summary ? undefined : onKeyMove}
-          onPointerUp={() => (keyDrag.current = null)}
-        />
-      )
+  /** Keyframe op de playhead toevoegen of weghalen (◆ in de eigenschap-rij). */
+  const toggleKeyAtPlayhead = (l: Layer, prop: AnimProp, offset: number) => {
+    const t = round(time - offset)
+    const v = layerStateAt(l, t)[prop]
+    updateLayer(l.id, (x) => {
+      const kfs = x.tracks[prop] ?? []
+      const has = kfs.find((k) => Math.abs(k.t - t) < 1 / 60)
+      if (has) {
+        const rest = kfs.filter((k) => k !== has)
+        if (rest.length) x.tracks[prop] = rest
+        else {
+          x[prop] = v
+          delete x.tracks[prop]
+        }
+      } else x.tracks[prop] = upsertKeyframe(kfs, t, v)
     })
+  }
 
-  const project = useStore((st) => st.project)!
-  const derived = project.syncFormats && comp.id !== project.baseCompositionId
-  const baseLinks = new Set(project.compositions.find((c) => c.id === project.baseCompositionId)?.layers.map((x) => x.linkId))
   const rows: React.ReactNode[] = []
-  comp.layers.forEach((l) => {
-    const animated = ANIM_PROPS.filter((p) => l.tracks[p]?.length)
+  const renderLayer = (l: Layer, depth: number, offset: number, ancestors: Layer[]) => {
     const active = selection.includes(l.id)
     const Icon = TYPE_ICON[l.type]
-    const eff = effectiveLayer(l)
-    const times = Object.values(eff.tracks).flatMap((k) => (k ?? []).map((x) => x.t))
-    const barStart = times.length ? Math.min(...times) : 0
+    const open = !!expanded[l.id]
+    const start = offset + (l.start ?? 0)
+    const barEnd = start + layerLength(l)
+    const ranged = l.start != null || l.end != null
     const select = (e: React.MouseEvent) =>
-      s().select(e.shiftKey ? (active ? selection.filter((x) => x !== l.id) : [...selection, l.id]) : [l.id])
+      s().select(e.shiftKey || e.metaKey ? (active ? selection.filter((x) => x !== l.id) : [...selection, l.id]) : [l.id])
+    const pad = { paddingLeft: 8 + depth * 16 }
     rows.push(
       <div
         key={l.id + 'n'}
         className={`tl-name${active ? ' active' : ''}${l.visible ? '' : ' hidden'}${dropOn === l.id ? ' drop-hint' : ''}`}
+        style={pad}
         onClick={select}
-        {...dropProps(l.id, false)}
+        onDoubleClick={() => setExpanded(l.id, !open)}
+        {...dropProps(l.id, offset, false)}
       >
         <button
           className="icon sm"
-          style={{ width: 16, visibility: animated.length ? 'visible' : 'hidden' }}
+          style={{ width: 16 }}
+          title={l.type === 'group' ? 'Groep openklappen' : 'Eigenschappen tonen (U)'}
           onClick={(e) => {
             e.stopPropagation()
-            setExpanded({ ...expanded, [l.id]: !expanded[l.id] })
+            setExpanded(l.id, !open)
           }}
         >
-          {expanded[l.id] ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         </button>
         <Icon size={13} className="type" />
         <span className="grow" title={l.name}>
           {l.name}
         </span>
-        {derived && l.overrides?.length ? (
+        {derived && depth === 0 && l.overrides?.length ? (
           <span className="override-dot" title={`Wijkt af van basis: ${l.overrides.map(overrideLabel).join(', ')}`} />
         ) : null}
-        {derived && !baseLinks.has(l.linkId) && <span className="faint" style={{ fontSize: 10 }}>eigen</span>}
+        {derived && depth === 0 && !baseLinks.has(l.linkId) && (
+          <span className="faint" style={{ fontSize: 10 }}>
+            eigen
+          </span>
+        )}
         <span className="tools" onClick={(e) => e.stopPropagation()}>
           <button title="Naar voren" onClick={() => moveLayer(l.id, -1)}>
             <ChevronUp size={13} />
@@ -315,31 +338,69 @@ export function Timeline() {
           </button>
         </span>
       </div>,
-      <div key={l.id + 't'} className={`tl-track${dropOn === l.id ? ' drop-hint' : ''}`} {...dropProps(l.id, true)}>
+      <div key={l.id + 't'} className={`tl-track${dropOn === l.id ? ' drop-hint' : ''}`} {...dropProps(l.id, offset, true)}>
         {dropOn === l.id && dropAt != null && <div className="endframe" style={{ left: xOf(dropAt), borderColor: 'var(--accent)' }} />}
         <div
-          className={`tl-bar${active ? ' active' : ''}`}
-          style={{ left: xOf(Math.min(barStart, comp.duration)), width: Math.max(0, (comp.duration - Math.min(barStart, comp.duration)) * pps) }}
-          title="Sleep om de hele laag in de tijd te verschuiven"
-          onPointerDown={(e) => shiftLayer(e, l)}
-        />
-        {motionSegment(l, 'intro')}
-        {emphasisSegment(l)}
-        {motionSegment(l, 'outro')}
-        {!expanded[l.id] && animated.map((p) => diamonds(l, p, true))}
+          className={`tl-bar${active ? ' active' : ''}${l.type === 'group' ? ' group' : ''}`}
+          style={{ left: xOf(start), width: Math.max(4, ((ranged ? barEnd : Math.max(barEnd, comp.duration)) - start) * pps) }}
+          title="Sleep om de laag in de tijd te verschuiven; sleep de randen om in- en uitpunt te zetten"
+          onPointerDown={(e) => barDrag(e, l, 'move')}
+        >
+          <div className="trim in" onPointerDown={(e) => barDrag(e, l, 'in')} />
+          <div className="trim out" onPointerDown={(e) => barDrag(e, l, 'out', (ranged ? barEnd : Math.max(barEnd, comp.duration)) - offset)} />
+        </div>
+        {motionSegment(l, 'intro', offset)}
+        {emphasisSegment(l, offset)}
+        {motionSegment(l, 'outro', offset)}
+        {!open &&
+          ANIM_PROPS.filter((p) => l.tracks[p]?.length).flatMap((p) =>
+            l.tracks[p]!.map((k) => <div key={p + k.t} className="diamond summary" style={{ left: xOf(offset + k.t) }} />)
+          )}
       </div>
     )
-    if (expanded[l.id])
-      for (const p of animated)
-        rows.push(
-          <div key={l.id + p + 'n'} className="tl-name sub">
-            {PROP_LABEL[p]}
-          </div>,
-          <div key={l.id + p + 't'} className="tl-track">
-            {diamonds(l, p)}
-          </div>
-        )
-  })
+    if (!open) return
+    // Eigenschappen met keyframes (positie, schaal, rotatie, dekking …)
+    const st = layerStateAt(l, time - offset)
+    for (const p of propsFor(l)) {
+      const hasKeyHere = l.tracks[p]?.some((k) => Math.abs(k.t - (time - offset)) < 1 / 60)
+      rows.push(
+        <div key={l.id + p + 'n'} className="tl-name sub" style={{ paddingLeft: 30 + depth * 16 }}>
+          <button
+            className={`kf-btn${l.tracks[p]?.length ? ' on' : ''}${hasKeyHere ? ' here' : ''}`}
+            title={hasKeyHere ? 'Keyframe op de playhead weghalen' : 'Keyframe op de playhead zetten'}
+            onClick={() => toggleKeyAtPlayhead(l, p, offset)}
+          >
+            ◆
+          </button>
+          <span className="grow">{PROP_LABEL[p]}</span>
+          <span className="faint" style={{ fontVariantNumeric: 'tabular-nums' }}>
+            {p === 'scale' || p === 'opacity' || p === 'reveal' ? `${Math.round(st[p] * 100)}%` : p === 'rotation' ? `${Math.round(st[p])}°` : Math.round(st[p])}
+          </span>
+        </div>,
+        <div key={l.id + p + 't'} className="tl-track sub">
+          {propDiamonds(l, p, offset)}
+        </div>
+      )
+    }
+    if (l.children) for (const c of l.children) renderLayer(c, depth + 1, start, [...ancestors, l])
+  }
+  comp.layers.forEach((l) => renderLayer(l, 0, 0, []))
+
+  const selLayer = selectedKey ? allLayers(comp.layers).find((x) => x.id === selectedKey.layerId) : null
+  const selKf = selLayer?.tracks[selectedKey!.prop]?.find((k) => Math.abs(k.t - selectedKey!.t) < 1e-4) ?? null
+
+  const ticks = []
+  const minor = pps >= 90 ? 0.1 : pps >= 45 ? 0.5 : 1
+  for (let t = 0; t <= span + 1e-6; t = round(t + minor, 3)) {
+    const major = Math.abs(t - Math.round(t)) < 1e-6
+    ticks.push(
+      <div key={t} className={`tick${major ? ' major' : ''}`} style={{ left: xOf(t) }}>
+        {major && <span>{Math.round(t)}s</span>}
+      </div>
+    )
+  }
+
+  const anyOpen = Object.values(expanded).some(Boolean)
 
   return (
     <div className="timeline">
@@ -367,6 +428,13 @@ export function Timeline() {
           ●
         </button>
         {autoKey && <span style={{ color: '#ff5b5b', fontSize: 11 }}>Auto-key</span>}
+        <button
+          className="icon"
+          title={anyOpen ? 'Alles inklappen' : 'Alle lagen uitklappen'}
+          onClick={() => s().setExpanded(anyOpen ? {} : Object.fromEntries(allLayers(comp.layers).map((l) => [l.id, true])))}
+        >
+          {anyOpen ? <ChevronsDownUp size={15} /> : <ChevronsUpDown size={15} />}
+        </button>
         <div style={{ flex: 1 }} />
         {selKf && selectedKey && (
           <>
@@ -396,10 +464,7 @@ export function Timeline() {
           className="ghost sm"
           title="Duur aanpassen aan de laatste animatie"
           onClick={() => {
-            const last = Math.max(
-              0,
-              ...comp.layers.flatMap((l) => Object.values(effectiveLayer({ ...l, outro: null }).tracks).flatMap((k) => (k ?? []).map((x) => x.t)))
-            )
+            const last = Math.max(0, ...comp.layers.map((l) => (l.start ?? 0) + layerLength({ ...l, outro: null }) - 1.5))
             updateComp((c) => void (c.duration = Math.max(1, Math.ceil((last + 1.5) * 2) / 2)))
           }}
         >

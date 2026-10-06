@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { upsertKeyframe } from '@shared/anim'
+import type { UserPreset } from '@shared/library'
 import { normalizeProject, syncFormats } from '@shared/sync'
+import { findDeep, localTime } from '@shared/tree'
 import type { AnimProp, Composition, ExportResult, Layer, Project } from '@shared/types'
 import { ANIM_PROPS } from '@shared/types'
 
@@ -35,6 +37,10 @@ interface State {
   /** Auto-keyframe (zoals de opname-knop in AE): elke wijziging zet een keyframe. */
   autoKey: boolean
   tab: InspectorTab
+  /** Uitgeklapte lagen in de tijdlijn (eigenschappen en/of inhoud van groepen). */
+  expanded: Record<string, boolean>
+  /** Eigen animatie-presets (gedeeld over projecten). */
+  presets: UserPreset[]
 
   openProject(dir: string, project: Project): void
   /** Wijzig het project. Met `coalesce` worden snelle opeenvolgende wijzigingen één undo-stap. */
@@ -56,6 +62,8 @@ interface State {
   setOverview(o: boolean): void
   setAutoKey(a: boolean): void
   setTab(t: InspectorTab): void
+  setExpanded(e: Record<string, boolean>): void
+  setPresets(p: UserPreset[]): void
 }
 
 export type InspectorTab = 'design' | 'motion' | 'ai'
@@ -83,6 +91,8 @@ export const useStore = create<State>((set, get) => ({
   overview: false,
   autoKey: false,
   tab: 'design',
+  expanded: {},
+  presets: [],
 
   openProject: (dir, project) =>
     set({
@@ -143,7 +153,9 @@ export const useStore = create<State>((set, get) => ({
   setExportResults: (r) => set({ exportResults: r }),
   setOverview: (o) => set({ overview: o }),
   setAutoKey: (a) => set({ autoKey: a }),
-  setTab: (t) => set({ tab: t })
+  setTab: (t) => set({ tab: t }),
+  setExpanded: (e) => set({ expanded: e }),
+  setPresets: (p) => set({ presets: p })
 }))
 
 // ---------- Selectors & helpers ----------
@@ -158,7 +170,13 @@ export function findComp(p: Project, id: string | null): Composition {
 }
 
 export function findLayer(p: Project, compId: string | null, layerId: string): Layer | undefined {
-  return findComp(p, compId).layers.find((l) => l.id === layerId)
+  return findDeep(findComp(p, compId).layers, layerId)?.layer
+}
+
+/** Tijd binnen de groep waar de laag in zit (de playhead min de in-punten van de groepen). */
+export function layerLocalTime(p: Project, compId: string | null, layerId: string, t: number): number {
+  const f = findDeep(findComp(p, compId).layers, layerId)
+  return f ? localTime(t, f.ancestors) : t
 }
 
 export const isAnimProp = (k: string): k is AnimProp => (ANIM_PROPS as string[]).includes(k)
@@ -168,7 +186,8 @@ export const isAnimProp = (k: string): k is AnimProp => (ANIM_PROPS as string[])
  * keyframes), dan komt er een keyframe op de huidige tijd; anders wijzigt de basiswaarde.
  */
 export function setLayerValue(layerId: string, prop: AnimProp, value: number, coalesce?: string) {
-  const { compId, time, autoKey } = useStore.getState()
+  const { compId, autoKey, project } = useStore.getState()
+  const time = layerLocalTime(project!, compId, layerId, useStore.getState().time)
   useStore.getState().update((p) => {
     const l = findLayer(p, compId, layerId)
     if (!l) return
@@ -183,7 +202,8 @@ export function setLayerValue(layerId: string, prop: AnimProp, value: number, co
 
 /** Stopwatch aan/uit: aan = eerste keyframe op huidige tijd met huidige waarde. */
 export function toggleStopwatch(layerId: string, prop: AnimProp, currentValue: number) {
-  const { compId, time } = useStore.getState()
+  const { compId, project } = useStore.getState()
+  const time = layerLocalTime(project!, compId, layerId, useStore.getState().time)
   useStore.getState().update((p) => {
     const l = findLayer(p, compId, layerId)
     if (!l) return

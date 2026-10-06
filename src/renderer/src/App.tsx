@@ -5,8 +5,21 @@ import { LeftPanel } from './components/LeftPanel'
 import { Timeline } from './components/Timeline'
 import { Toolbar } from './components/Toolbar'
 import { Viewer } from './components/Viewer'
-import { confirmDiscard, deleteSelection, duplicateSelection, openProject, refreshAssets, save } from './lib/actions'
-import { currentComp, setLayerValue, useStore } from './store'
+import {
+  confirmDiscard,
+  deleteSelection,
+  duplicateSelection,
+  groupSelection,
+  loadPresets,
+  openProject,
+  refreshAssets,
+  save,
+  sequenceSelection,
+  setInOut,
+  ungroupSelection
+} from './lib/actions'
+import { currentComp, layerLocalTime, setLayerValue, useStore } from './store'
+import { allLayers } from '@shared/tree'
 import { layerStateAt } from '@shared/anim'
 import { endFrameTime } from '@shared/motion'
 import { FilePlus2, FolderOpen } from 'lucide-react'
@@ -16,7 +29,68 @@ const isTyping = () => {
   return !!el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !(el as HTMLInputElement).readOnly) || el.tagName === 'SELECT')
 }
 
+export interface Layout {
+  left: number
+  right: number
+  timeline: number
+}
+const DEFAULT_LAYOUT: Layout = { left: 220, right: 288, timeline: 260 }
+
+function loadLayout(): Layout {
+  try {
+    return { ...DEFAULT_LAYOUT, ...JSON.parse(localStorage.getItem('bs-layout') ?? '{}') }
+  } catch {
+    return DEFAULT_LAYOUT
+  }
+}
+
+/** Sleepbare scheidingslijnen tussen de panelen (worden onthouden). */
+function Splitters({ layout, setLayout }: { layout: Layout; setLayout: (l: Layout) => void }) {
+  const dragFor = (key: keyof Layout, axis: 'x' | 'y', dir: 1 | -1, min: number, max: () => number) => (e: React.PointerEvent) => {
+    const el = e.currentTarget as HTMLElement
+    el.setPointerCapture(e.pointerId)
+    const p0 = axis === 'x' ? e.clientX : e.clientY
+    const v0 = layout[key]
+    el.onpointermove = (ev) => {
+      const d = ((axis === 'x' ? ev.clientX : ev.clientY) - p0) * dir
+      setLayout({ ...layout, [key]: Math.round(Math.min(max(), Math.max(min, v0 + d))) })
+    }
+    el.onpointerup = () => (el.onpointermove = null)
+  }
+  return (
+    <>
+      <div
+        className="splitter v"
+        style={{ left: layout.left - 3, top: 48, bottom: layout.timeline }}
+        onPointerDown={dragFor('left', 'x', 1, 160, () => 420)}
+        onDoubleClick={() => setLayout({ ...layout, left: DEFAULT_LAYOUT.left })}
+      />
+      <div
+        className="splitter v"
+        style={{ right: layout.right - 3, top: 48, bottom: layout.timeline }}
+        onPointerDown={dragFor('right', 'x', -1, 240, () => 520)}
+        onDoubleClick={() => setLayout({ ...layout, right: DEFAULT_LAYOUT.right })}
+      />
+      <div
+        className="splitter h"
+        style={{ bottom: layout.timeline - 3 }}
+        onPointerDown={dragFor('timeline', 'y', -1, 120, () => window.innerHeight - 220)}
+        onDoubleClick={() => setLayout({ ...layout, timeline: DEFAULT_LAYOUT.timeline })}
+      />
+    </>
+  )
+}
+
 export function App() {
+  const [layout, setLayoutState] = useState<Layout>(loadLayout)
+  const setLayout = (l: Layout) => {
+    setLayoutState(l)
+    try {
+      localStorage.setItem('bs-layout', JSON.stringify(l))
+    } catch {
+      /* geen opslag: niet erg */
+    }
+  }
   const project = useStore((s) => s.project)
   const dialog = useStore((s) => s.dialog)
   const playing = useStore((s) => s.playing)
@@ -34,11 +108,17 @@ export function App() {
         if (action === 'export') s.setDialog('export')
         if (action === 'saveBoilerplate') s.setDialog('saveBoilerplate')
         if (action === 'duplicate' && !isTyping()) duplicateSelection()
+        if (action === 'group' && !isTyping()) groupSelection()
+        if (action === 'ungroup' && !isTyping()) ungroupSelection()
+        if (action === 'sequence') sequenceSelection()
         if (action === 'undo') isTyping() ? document.execCommand('undo') : s.undo()
         if (action === 'redo') isTyping() ? document.execCommand('redo') : s.redo()
       }),
     []
   )
+
+  // Eigen presets laden (gedeeld over alle projecten)
+  useEffect(() => void loadPresets(), [])
 
   // Bronbestanden gewijzigd (assets/ of fonts/): preview en assetlijst verversen
   useEffect(
@@ -98,6 +178,18 @@ export function App() {
         case 'Backspace':
           deleteSelection()
           break
+        case 'u':
+        case 'U':
+          // Eigenschappen van de geselecteerde lagen uit-/inklappen (zoals U in After Effects)
+          if (s.selection.length) {
+            const open = s.selection.some((id) => !s.expanded[id])
+            s.setExpanded({ ...s.expanded, ...Object.fromEntries(s.selection.map((id) => [id, open])) })
+          }
+          break
+        case '[':
+        case ']':
+          if (e.altKey) setInOut(e.key === '[' ? 'in' : 'out')
+          break
         case 'Escape':
           s.select([])
           break
@@ -110,8 +202,8 @@ export function App() {
           const d = e.shiftKey ? 10 : 1
           const dx = e.key === 'ArrowLeft' ? -d : e.key === 'ArrowRight' ? d : 0
           const dy = e.key === 'ArrowUp' ? -d : e.key === 'ArrowDown' ? d : 0
-          for (const l of comp.layers.filter((x) => s.selection.includes(x.id) && !x.locked)) {
-            const st = layerStateAt(l, s.time)
+          for (const l of allLayers(comp.layers).filter((x) => s.selection.includes(x.id) && !x.locked)) {
+            const st = layerStateAt(l, layerLocalTime(s.project!, s.compId, l.id, s.time))
             if (dx) setLayerValue(l.id, 'x', st.x + dx, 'nudge')
             if (dy) setLayerValue(l.id, 'y', st.y + dy, 'nudge')
           }
@@ -136,7 +228,8 @@ export function App() {
     )
 
   return (
-    <div className="app">
+    <div className="app" style={{ gridTemplateColumns: `${layout.left}px 1fr ${layout.right}px`, gridTemplateRows: `48px 1fr ${layout.timeline}px` }}>
+      <Splitters layout={layout} setLayout={setLayout} />
       <Toolbar />
       <LeftPanel />
       <Viewer />

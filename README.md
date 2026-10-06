@@ -94,6 +94,55 @@ In de tijdlijn staan ze als groene (IN), gele (ACCENT) en oranje (UIT) blokken, 
 - **Hele laag verschuiven**: sleep de balk van een laag in de tijdlijn. Alle keyframes en de binnenkomst/uitgang gaan mee.
 - Het **eindframe** ligt vóór de eerste uitgang. De laatste loop stopt daar, zodat het eindbeeld en de backup-afbeelding alles tonen.
 
+### Groepen (pre-comps) en scènes
+
+Groepen werken zoals pre-comps in After Effects.
+
+- **Groeperen:** selecteer lagen (Shift-klik) en kies *Groeperen* of druk Cmd/Ctrl+G. De groep animeer je als geheel: sleep er bijvoorbeeld *Bounce in* op. Daarnaast houden de lagen binnen de groep hun eigen animaties.
+- **In de groep werken:**
+  - Klik op het canvas selecteert de hele groep. Dubbelklik pakt een laag ín de groep.
+  - In de tijdlijn klap je de groep open; de lagen erin staan ingesprongen.
+- **Dupliceren** (Cmd/Ctrl+D) kopieert de groep met alle inhoud en animaties.
+- **Achter elkaar zetten:** selecteer meerdere lagen of groepen (bijvoorbeeld scène 1, 2 en 3) en kies *Achter elkaar*, eventueel met overlap. Elke laag begint dan waar de vorige eindigt.
+- **In- en uitpunt** (wanneer een laag zichtbaar is):
+  - Sleep de randen van de balk in de tijdlijn, of gebruik Alt+[ en Alt+], of het blok *Tijd* in de inspector.
+  - Sleep je de hele balk, dan schuift de laag met al zijn animaties mee.
+- **Degroeperen** (Shift+Cmd/Ctrl+G) zet alles terug op dezelfde plek en tijd.
+
+### Tijdlijn
+
+- Klap een laag uit met het pijltje, een dubbelklik of **U** (voor alle geselecteerde lagen). Je ziet dan per eigenschap de keyframes: positie X/Y, schaal, rotatie, dekking en reveal.
+  - **Dichte ◆** zijn eigen keyframes: sleepbaar, met een easing per keyframe.
+  - **Holle ◇** komen uit een binnenkomst, accent of uitgang. Die verschuif je via het gekleurde blok.
+  - Met ◆ vóór een eigenschap zet je een keyframe op de playhead, of haal je hem weg.
+- Met de knop naast de opname-stip klap je alles in één keer uit of in.
+- **Panelen** zijn te vergroten door de scheidingslijnen te slepen (tijdlijn, links, rechts). Dubbelklik op een lijn zet hem terug. De indeling wordt onthouden.
+
+### clickTag
+
+De clickTag (landings-URL) staat altijd rechtsboven in de balk en geldt voor alle formaten. Is het geen geldige http(s)-URL, dan kleurt het veld rood.
+
+### Fonts
+
+Bij een tekstlaag kies je een font met de font-kiezer:
+
+- **In dit project:** fonts die je al gebruikt of hebt geïmporteerd.
+- **Systeem:** Arial, Helvetica, Verdana, Georgia en dergelijke. Die worden niet meegeleverd (0 KB).
+- **Google Fonts:** de hele catalogus, doorzoekbaar, met een voorbeeld als je over een naam beweegt.
+  - Kies een gewicht; dat wordt gedownload naar `fonts/` in je project.
+  - Bij export wordt het font weer verkleind tot alleen de gebruikte tekens.
+  - Hiervoor is internet nodig. De catalogus wordt een week bewaard; offline zie je de populairste fonts.
+
+Eigen WOFF/WOFF2/TTF/OTF-bestanden kun je nog steeds importeren onder *Assets & fonts*.
+
+### Eigen presets
+
+Animeer een laag en kies in de tab *Animatie* **Opslaan als preset**.
+
+- De preset verschijnt in de bibliotheek onder *Eigen presets* en is beschikbaar in al je projecten.
+- Hij wordt relatief opgeslagen (verschuivingen in plaats van vaste posities), dus hij past op elke laag.
+- De bibliotheekgroepen klap je in en uit door op de titel te klikken.
+
 ### Rand en polite loading
 
 - **Rand**: per formaat aan/uit, met kleur en dikte (standaard 1px #ccc). Hij wordt als aparte laag bovenop de banner geëxporteerd.
@@ -116,7 +165,11 @@ Een write-on laag zet tekst uit je eigen font om naar SVG-paden per letter. De e
 | Pijltjes | laag 1px verplaatsen (Shift: 10px) |
 | Delete | laag of geselecteerde keyframe verwijderen |
 | Cmd/Ctrl+Z, Shift+Cmd/Ctrl+Z | ongedaan maken / opnieuw |
-| Cmd/Ctrl+D | laag dupliceren |
+| Cmd/Ctrl+D | laag of groep dupliceren |
+| Cmd/Ctrl+G, Shift+Cmd/Ctrl+G | groeperen / degroeperen |
+| U | eigenschappen van de selectie uit-/inklappen in de tijdlijn |
+| Alt+[ / Alt+] | in- / uitpunt op de playhead |
+| Dubbelklik (canvas) | laag binnen een groep selecteren |
 | Cmd/Ctrl+S, +E | opslaan, exporteren |
 | Cmd/Ctrl+scroll | inzoomen in de viewer |
 

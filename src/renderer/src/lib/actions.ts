@@ -1,7 +1,8 @@
 import { createLayer, deriveComposition, newId } from '@shared/factory'
-import { applyLibraryItem, LIBRARY } from '@shared/library'
+import { applyLibraryItem, applyUserPreset, LIBRARY, presetFromLayer } from '@shared/library'
 import { mergeTracks, PRESETS } from '@shared/presets'
 import { resetCompOverrides, resetOverrides } from '@shared/sync'
+import { cloneLayer, findDeep, groupLayers, localTime, sequenceLayers, ungroup } from '@shared/tree'
 import type { ExportTarget, Layer, LayerType } from '@shared/types'
 import { assetUrl, currentComp, findComp, findLayer, updateLayer, useStore } from '../store'
 
@@ -125,13 +126,11 @@ export function duplicateSelection() {
   S().update((p) => {
     const comp = findComp(p, compId)
     for (const id of selection) {
-      const i = comp.layers.findIndex((l) => l.id === id)
-      if (i < 0) continue
-      const id = newId('l')
-      const copy: Layer = { ...structuredClone(comp.layers[i]), id, linkId: id, name: comp.layers[i].name + ' kopie' }
-      copy.x += 10
-      copy.y += 10
-      comp.layers.splice(i, 0, copy)
+      const f = findDeep(comp.layers, id)
+      if (!f) continue
+      const copy = cloneLayer(f.layer)
+      copy.name = f.layer.name + ' kopie'
+      f.list.splice(f.index, 0, copy)
       ids.push(copy.id)
     }
   })
@@ -152,7 +151,10 @@ export function deleteSelection() {
   if (!selection.length) return
   S().update((p) => {
     const comp = findComp(p, compId)
-    comp.layers = comp.layers.filter((l) => !selection.includes(l.id))
+    for (const id of selection) {
+      const f = findDeep(comp.layers, id)
+      if (f) f.list.splice(f.index, 1)
+    }
   })
   S().select([])
 }
@@ -160,12 +162,70 @@ export function deleteSelection() {
 export function moveLayer(layerId: string, dir: -1 | 1) {
   const { compId } = S()
   S().update((p) => {
-    const layers = findComp(p, compId).layers
-    const i = layers.findIndex((l) => l.id === layerId)
-    const j = i + dir
-    if (i < 0 || j < 0 || j >= layers.length) return
-    ;[layers[i], layers[j]] = [layers[j], layers[i]]
+    const f = findDeep(findComp(p, compId).layers, layerId)
+    if (!f) return
+    const j = f.index + dir
+    if (j < 0 || j >= f.list.length) return
+    ;[f.list[f.index], f.list[j]] = [f.list[j], f.list[f.index]]
   })
+}
+
+/** Selectie groeperen tot één groep (pre-comp), zoals Cmd+G. */
+export function groupSelection() {
+  const { selection, compId } = S()
+  if (!selection.length) return
+  let gid: string | null = null
+  S().update((p) => {
+    const g = groupLayers(findComp(p, compId), selection, selection.length > 1 ? 'Groep' : 'Groep 1')
+    gid = g?.id ?? null
+  })
+  if (gid) S().select([gid])
+  S().setStatus('Gegroepeerd. Animeer de groep als geheel, of klap hem open in de tijdlijn.')
+}
+
+export function ungroupSelection() {
+  const { selection, compId } = S()
+  const ids: string[] = []
+  S().update((p) => {
+    for (const id of selection) ids.push(...ungroup(findComp(p, compId), id))
+  })
+  if (ids.length) S().select(ids)
+}
+
+/** Geselecteerde lagen/groepen achter elkaar zetten in de tijd. */
+export function sequenceSelection(overlap = 0) {
+  const { selection, compId } = S()
+  if (selection.length < 2) {
+    S().setStatus('Selecteer minstens twee lagen of groepen (Shift-klik) om ze achter elkaar te zetten.', 'error')
+    return
+  }
+  S().update((p) => sequenceLayers(findComp(p, compId), selection, overlap))
+  S().setStatus('Achter elkaar gezet. Sleep de balken om de timing aan te passen.')
+}
+
+/** In- of uit-punt op de huidige tijd zetten (zoals Alt+[ en Alt+] in After Effects). */
+export function setInOut(which: 'in' | 'out') {
+  const { selection, compId, project, time } = S()
+  if (!selection.length || !project) return
+  S().update((p) => {
+    for (const id of selection) {
+      const f = findDeep(findComp(p, compId).layers, id)
+      if (!f) continue
+      const t = Math.round(localTime(time, f.ancestors) * 1000) / 1000
+      if (which === 'in') f.layer.start = Math.max(0, Math.min(t, (f.layer.end ?? Infinity) - 0.1))
+      else f.layer.end = Math.max(t, (f.layer.start ?? 0) + 0.1)
+    }
+  })
+}
+
+export function clearInOut() {
+  const { selection } = S()
+  for (const id of selection)
+    updateLayer(id, (l) => {
+      if (l.type !== 'group') delete l.start
+      else l.start = 0
+      delete l.end
+    })
 }
 
 export function applyPreset(presetId: string, start: number, duration: number) {
@@ -220,7 +280,8 @@ export async function regenerateWriteOn(layerId: string) {
   const l = findLayer(project, compId, layerId)
   const w = l?.writeon
   if (!l || !w) return
-  const font = project.fonts.find((f) => f.id === w.fontId) ?? project.fonts[0]
+  const files = project.fonts.filter((f) => !f.system)
+  const font = files.find((f) => f.id === w.fontId) ?? files[0]
   if (!font) {
     S().setStatus('Importeer eerst een font (woff/woff2/ttf/otf) voor write-on.', 'error')
     return
@@ -313,14 +374,17 @@ export function staggerIntros(libraryId: string, gap: number) {
 
 /** Bibliotheek-animatie toepassen op lagen (na slepen of klikken). `at` = starttijd. */
 export function applyLibrary(itemId: string, layerIds: string[], at?: number) {
-  const { compId } = S()
-  const item = LIBRARY.find((i) => i.id === itemId)
+  const { compId, presets } = S()
+  const user = itemId.startsWith('user:') ? presets.find((p) => `user:${p.id}` === itemId) : undefined
+  const item = user ? { label: user.name } : LIBRARY.find((i) => i.id === itemId)
   if (!item || !layerIds.length) return
   S().update((p) => {
     const comp = findComp(p, compId)
     for (const id of layerIds) {
-      const l = comp.layers.find((x) => x.id === id)
-      if (l) applyLibraryItem(l, item, comp, at)
+      const l = findDeep(comp.layers, id)?.layer
+      if (!l) continue
+      if (user) applyUserPreset(l, user, at)
+      else applyLibraryItem(l, item as (typeof LIBRARY)[number], comp, at)
     }
     // Duur verlengen als de animatie er buiten valt
     const ends = comp.layers.flatMap((l) => [
@@ -345,4 +409,30 @@ export function resetCompositionOverrides(keys?: string[]) {
   const { compId } = S()
   if (!compId) return
   S().update((p) => resetCompOverrides(p, compId, keys), undefined, true)
+}
+
+export async function loadPresets() {
+  S().setPresets(await window.bs.listPresets())
+}
+
+/** Animatie van de geselecteerde laag opslaan als eigen preset in de bibliotheek. */
+export async function savePresetFromLayer(layerId: string, name: string) {
+  const { project, compId, presets } = S()
+  const l = project && findLayer(project, compId, layerId)
+  if (!l) return
+  const preset = presetFromLayer(l, name, newId('p'))
+  if (!preset.intro && !preset.outro && !preset.emphasis && !Object.keys(preset.tracks ?? {}).length) {
+    S().setStatus('Deze laag heeft nog geen animatie om op te slaan.', 'error')
+    return
+  }
+  const list = [...presets, preset]
+  await window.bs.savePresets(list)
+  S().setPresets(list)
+  S().setStatus(`Preset "${name}" opgeslagen in de bibliotheek.`)
+}
+
+export async function deletePreset(id: string) {
+  const list = S().presets.filter((p) => p.id !== id)
+  await window.bs.savePresets(list)
+  S().setPresets(list)
 }

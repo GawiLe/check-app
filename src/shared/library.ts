@@ -1,5 +1,6 @@
 import { round } from './anim'
-import type { Composition, Emphasis, EmphasisType, Layer, Motion } from './types'
+import type { AnimProp, Composition, Emphasis, EmphasisType, Keyframe, Layer, Motion } from './types'
+import { ANIM_PROPS } from './types'
 
 // De animatiebibliotheek: kant-en-klare animaties die je op een laag sleept.
 // Elke animatie wordt een binnenkomst, uitgang of accent op de laag, die je daarna
@@ -110,4 +111,57 @@ export function matchLibraryItem(l: Layer, kind: LibraryKind): string | null {
   if (!cur) return null
   const keys: (keyof Motion)[] = ['fade', 'dx', 'dy', 'scale', 'rotation', 'reveal', 'ease']
   return LIBRARY.find((i) => i.kind === kind && keys.every((k) => (i.motion as Motion)[k] === cur[k]))?.id ?? null
+}
+
+// ---------- Eigen presets ----------
+
+/** Eigen preset: de animatie van een laag, relatief opgeslagen zodat hij op elke laag past. */
+export interface UserPreset {
+  id: string
+  name: string
+  intro?: Motion | null
+  outro?: Motion | null
+  emphasis?: Emphasis | null
+  /** Keyframes relatief: x/y/rotatie als verschil, schaal als factor, dekking/reveal absoluut. Tijden vanaf 0. */
+  tracks?: Partial<Record<AnimProp, Keyframe[]>>
+  /** Oorspronkelijke starttijd (gebruikt als je hem niet op een tijd loslaat). */
+  at: number
+}
+
+const REL_DIFF: AnimProp[] = ['x', 'y', 'rotation']
+
+export function presetFromLayer(l: Layer, name: string, id: string): UserPreset {
+  const times: number[] = []
+  for (const p of ANIM_PROPS) for (const k of l.tracks[p] ?? []) times.push(k.t)
+  if (l.intro) times.push(l.intro.start)
+  if (l.outro) times.push(l.outro.start)
+  if (l.emphasis) times.push(l.emphasis.start)
+  const t0 = times.length ? Math.min(...times) : 0
+  const tracks: Partial<Record<AnimProp, Keyframe[]>> = {}
+  for (const p of ANIM_PROPS) {
+    const kfs = l.tracks[p]
+    if (!kfs?.length) continue
+    tracks[p] = kfs.map((k) => ({
+      ...k,
+      t: round(k.t - t0),
+      v: REL_DIFF.includes(p) ? round(k.v - l[p], 2) : p === 'scale' ? round(l.scale ? k.v / l.scale : k.v, 3) : k.v
+    }))
+  }
+  const rel = <T extends { start: number }>(m: T | null | undefined) => (m ? { ...m, start: round(m.start - t0) } : null)
+  return { id, name, intro: rel(l.intro), outro: rel(l.outro), emphasis: rel(l.emphasis), tracks, at: round(t0) }
+}
+
+export function applyUserPreset(l: Layer, preset: UserPreset, at?: number) {
+  const t0 = at ?? preset.at
+  const abs = <T extends { start: number }>(m: T | null | undefined) => (m ? { ...m, start: round(m.start + t0) } : null)
+  if (preset.intro) l.intro = abs(preset.intro)
+  if (preset.outro) l.outro = abs(preset.outro)
+  if (preset.emphasis) l.emphasis = abs(preset.emphasis)
+  for (const [p, kfs] of Object.entries(preset.tracks ?? {}) as [AnimProp, Keyframe[]][]) {
+    l.tracks[p] = kfs.map((k) => ({
+      ...k,
+      t: round(k.t + t0),
+      v: REL_DIFF.includes(p) ? round(l[p] + k.v, 2) : p === 'scale' ? round(l.scale * k.v, 3) : k.v
+    }))
+  }
 }

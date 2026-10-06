@@ -8,7 +8,8 @@
 // Polite loading: afbeeldingen met data-src worden pas na window.load geladen; de
 // animatie start als alle afbeeldingen en fonts klaar zijn. Tot dan zijn alleen
 // achtergrond en rand zichtbaar.
-//   L    geanimeerde lagen: { i: element-id, b: basiswaarden, p: tracks, g: write-on, f: vul-fractie, w: wipe-modus }
+//   L    geanimeerde lagen: { i: element-id, b: basiswaarden, p: tracks, g: write-on, f: vul-fractie, w: wipe-modus,
+//        r: [in, uit] zichtbaarheid in absolute tijd }
 //        basiswaarden/tracks gebruiken korte sleutels: x y s(scale) r(rotation) o(opacity) v(reveal)
 //        keyframes zijn [tijd, waarde, easing-index] — volgorde van easings gelijk aan EASES in types.ts
 //
@@ -22,7 +23,7 @@ function S(k,t){var n=k.length,i=0;if(t<=k[0][0])return k[0][1];if(t>=k[n-1][0])
 function C(x){return x<0?0:x>1?1:x}
 var L=D.L.map(function(l){var el=document.getElementById(l.i);return{l:l,el:el,g:l.g?el.getElementsByTagName('path'):null}});
 function R(t){for(var m=0;m<L.length;m++){var o=L[m],l=o.l,v={},k;for(k in l.b)v[k]=l.p[k]?S(l.p[k],t):l.b[k];
-var s=o.el.style;s.transform='translate('+v.x+'px,'+v.y+'px) rotate('+v.r+'deg) scale('+v.s+')';s.opacity=v.o;
+var s=o.el.style;if(l.r)s.display=t>=l.r[0]-1e-6&&t<l.r[1]-1e-6?'':'none';s.transform='translate('+v.x+'px,'+v.y+'px) rotate('+v.r+'deg) scale('+v.s+')';s.opacity=v.o;
 if(o.g){var n=o.g.length,w=2/(n+1),f=l.f;for(var j=0;j<n;j++){var q=C((v.v-j/(n+1))/w),ps=o.g[j].style;ps.strokeDashoffset=1-q;ps.visibility=q>0?'visible':'hidden';ps.fillOpacity=f>0?C((q-1+f)/f):0}}
 else if(l.w){var h=(1-C(v.v))*100+'%';s.clipPath=l.w==1?'inset(0 '+h+' 0 0)':l.w==2?'inset(0 0 0 '+h+')':l.w==3?'inset('+h+' 0 0 0)':'inset(0 0 '+h+' 0)'}}}
 var T=D.d,N=D.l,Z=D.e,t0=0,cur=0,raf=0;

@@ -6,6 +6,7 @@ import type { Boilerplate, OpenedProject } from '@shared/api'
 import { createStarterProject, newId } from '@shared/factory'
 import { normalizeProject } from '@shared/sync'
 import type { Project } from '@shared/types'
+import type { UserPreset } from '@shared/library'
 import { PROJECT_FILE, PROJECT_VERSION } from '@shared/types'
 
 // ---------- Instellingen ----------
@@ -149,4 +150,21 @@ export async function saveBoilerplate(dir: string, project: Project, name: strin
 export async function deleteBoilerplate(id: string): Promise<void> {
   if (id.startsWith('builtin:') || id.includes('..') || id.includes('/')) return
   await rm(join(bpRoot(), id), { recursive: true, force: true })
+}
+
+// ---------- Eigen animatie-presets (gedeeld over alle projecten) ----------
+
+const presetsPath = () => join(app.getPath('userData'), 'presets.json')
+
+export async function readPresets(): Promise<UserPreset[]> {
+  try {
+    return JSON.parse(await readFile(presetsPath(), 'utf8')) as UserPreset[]
+  } catch {
+    return []
+  }
+}
+
+export async function writePresets(list: UserPreset[]): Promise<void> {
+  await mkdir(app.getPath('userData'), { recursive: true })
+  await writeFile(presetsPath(), JSON.stringify(list, null, 2))
 }

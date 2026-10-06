@@ -29,6 +29,10 @@ const api: BannerStudioApi = {
   setApiKey: call('setApiKey'),
   setModel: call('setModel'),
   aiAnimate: call('aiAnimate'),
+  fontCatalog: call('fontCatalog'),
+  installWebFont: call('installWebFont'),
+  listPresets: call('listPresets'),
+  savePresets: call('savePresets'),
   onFilesChanged: subscribe('bs:filesChanged') as BannerStudioApi['onFilesChanged'],
   onMenu: subscribe('bs:menu') as BannerStudioApi['onMenu']
 } as BannerStudioApi

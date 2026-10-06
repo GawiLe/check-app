@@ -7,6 +7,7 @@ import type { Project } from '@shared/types'
 import { aiAnimate } from './ai'
 import { exportBanners, MIME } from './exporter'
 import { describeFont, textToGlyphPaths } from './fonts'
+import { fontCatalog, installWebFont } from './webfonts'
 import {
   addRecent,
   boilerplateSource,
@@ -18,7 +19,9 @@ import {
   listBoilerplates,
   loadApiKey,
   readProject,
+  readPresets,
   readSettings,
+  writePresets,
   saveBoilerplate,
   storeApiKey,
   writeProject,
@@ -141,6 +144,11 @@ const handlers: Handlers = {
     await writeSettings(s)
   },
 
+  fontCatalog: () => fontCatalog(),
+  installWebFont: (dir, font, weight, style) => installWebFont(dir, font, weight, style),
+  listPresets: () => readPresets(),
+  savePresets: (list) => writePresets(list),
+
   async aiAnimate(project: Project, compositionId, layerIds, prompt) {
     const key = await loadApiKey()
     if (!key) throw new Error('Geen Anthropic API-sleutel ingesteld. Ga naar Instellingen.')
@@ -181,7 +189,11 @@ function buildMenu() {
           { role: 'cut', label: 'Knippen' },
           { role: 'copy', label: 'Kopiëren' },
           { role: 'paste', label: 'Plakken' },
-          { label: 'Laag dupliceren', accelerator: 'CmdOrCtrl+D', click: send('duplicate') }
+          { label: 'Laag dupliceren', accelerator: 'CmdOrCtrl+D', click: send('duplicate') },
+          { type: 'separator' },
+          { label: 'Groeperen', accelerator: 'CmdOrCtrl+G', click: send('group') },
+          { label: 'Degroeperen', accelerator: 'Shift+CmdOrCtrl+G', click: send('ungroup') },
+          { label: 'Achter elkaar zetten', click: send('sequence') }
         ]
       },
       {

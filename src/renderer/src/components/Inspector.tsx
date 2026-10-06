@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Image as ImageIcon, PenLine, RotateCcw, Sparkles, Square, Timer, Trash2, Type, Wand2, X } from 'lucide-react'
+import { BookmarkPlus, Folder, Image as ImageIcon, ListOrdered, PenLine, RotateCcw, Sparkles, Square, Timer, Trash2, Type, Wand2, X } from 'lucide-react'
 import { layerStateAt } from '@shared/anim'
 import { applyLibraryItem, LIBRARY, matchLibraryItem } from '@shared/library'
 import { defaultIntro, defaultOutro } from '@shared/motion'
 import { baseComp, isLinkedToBase, overrideLabel } from '@shared/sync'
+import { findDeep, layerLength, trimIn, trimOut } from '@shared/tree'
 import { PRESETS } from '@shared/presets'
 import { TARGET_IDS, TARGETS } from '@shared/specs'
 import type { AnimProp, EaseName, Emphasis, EmphasisType, Layer, Motion, RevealMode } from '@shared/types'
@@ -13,11 +14,19 @@ import {
   applyPreset,
   deleteComposition,
   regenerateWriteOn,
+  clearInOut,
+  duplicateSelection,
+  groupSelection,
   resetCompositionOverrides,
+  savePresetFromLayer,
   resetLayerOverrides,
-  staggerIntros
+  sequenceSelection,
+  setInOut,
+  staggerIntros,
+  ungroupSelection
 } from '../lib/actions'
-import { currentComp, setLayerValue, toggleStopwatch, updateComp, updateLayer, useStore } from '../store'
+import { currentComp, layerLocalTime, setLayerValue, toggleStopwatch, updateComp, updateLayer, useStore } from '../store'
+import { FontPicker } from './FontPicker'
 import { Num, Row, Scrub, Section, Switch, TextInput } from './ui'
 
 export const EASE_LABEL: Record<EaseName, string> = {
@@ -31,13 +40,13 @@ export const EASE_LABEL: Record<EaseName, string> = {
   hold: 'Hold'
 }
 
-const TYPE_ICON = { text: Type, image: ImageIcon, shape: Square, writeon: PenLine }
+const TYPE_ICON = { text: Type, image: ImageIcon, shape: Square, writeon: PenLine, group: Folder }
 
 export function Inspector() {
   const tab = useStore((s) => s.tab)
   const comp = useStore(currentComp)!
   const selection = useStore((s) => s.selection)
-  const layer = selection.length === 1 ? comp.layers.find((l) => l.id === selection[0]) : undefined
+  const layer = selection.length === 1 ? findDeep(comp.layers, selection[0])?.layer : undefined
   const setTab = useStore.getState().setTab
 
   return (
@@ -108,9 +117,62 @@ function Overrides(props: { keys: string[] | undefined; onReset: (keys?: string[
 }
 
 function Multi({ n }: { n: number }) {
+  const [overlap, setOverlap] = useState(0)
   return (
-    <Section title={`${n} lagen geselecteerd`}>
-      <div className="hint-text">Sleep in het canvas om ze samen te verplaatsen. In de tab Animatie kun je ze in één keer laten binnenkomen.</div>
+    <>
+      <Section title={`${n} lagen geselecteerd`}>
+        <div className="grid2">
+          <button className="ghost" onClick={groupSelection} title="Cmd/Ctrl+G">
+            <Folder size={13} /> Groeperen
+          </button>
+          <button className="ghost" onClick={() => sequenceSelection(overlap)} title="Zoals Sequence Layers in After Effects">
+            <ListOrdered size={13} /> Achter elkaar
+          </button>
+        </div>
+        <Row label="Overlap">
+          <Num label="s" value={overlap} step={0.05} min={0} max={5} decimals={2} onChange={(v) => setOverlap(v)} />
+        </Row>
+        <div className="hint-text">
+          Groeperen maakt er één laag van die je als geheel animeert, dupliceert en in de tijd verschuift. Achter elkaar zet de lagen (bijv. scènes) na
+          elkaar in de tijd.
+        </div>
+      </Section>
+    </>
+  )
+}
+
+/** In- en uit-punt van een laag: wanneer hij zichtbaar is. */
+function TimeRange({ layer }: { layer: Layer }) {
+  const start = layer.start ?? 0
+  return (
+    <Section title="Tijd">
+      <div className="grid2">
+        <Num label="In" value={start} step={0.05} min={0} max={60} decimals={2} suffix="s" onChange={(v, co) => updateLayer(layer.id, (l) => trimIn(l, v), co ? 'tin' : undefined)} />
+        <Num
+          label="Uit"
+          value={layer.end ?? layerLength(layer) + start}
+          step={0.05}
+          min={0}
+          max={60}
+          decimals={2}
+          suffix="s"
+          animated={layer.end != null}
+          onChange={(v, co) => updateLayer(layer.id, (l) => trimOut(l, v), co ? 'tout' : undefined)}
+        />
+      </div>
+      <div className="grid2">
+        <button className="ghost sm" onClick={() => setInOut('in')} title="Alt+[">
+          In op playhead
+        </button>
+        <button className="ghost sm" onClick={() => setInOut('out')} title="Alt+]">
+          Uit op playhead
+        </button>
+      </div>
+      {(layer.end != null || start > 0) && (
+        <button className="sm" onClick={clearInOut}>
+          Altijd zichtbaar
+        </button>
+      )}
     </Section>
   )
 }
@@ -219,7 +281,8 @@ function CompDesign() {
 function LayerDesign({ layer }: { layer: Layer }) {
   const time = useStore((s) => s.time)
   const project = useStore((s) => s.project)!
-  const st = layerStateAt(layer, time)
+  const project_ = useStore.getState().project!
+  const st = layerStateAt(layer, layerLocalTime(project_, useStore.getState().compId, layer.id, time))
   const up = (fn: (l: Layer) => void, co?: string) => updateLayer(layer.id, fn, co)
   const Icon = TYPE_ICON[layer.type]
   const anim = (p: AnimProp) => !!layer.tracks[p]?.length
@@ -232,7 +295,7 @@ function LayerDesign({ layer }: { layer: Layer }) {
     <>
       {derived && <Overrides keys={layer.overrides} onReset={(keys) => resetLayerOverrides(layer.id, keys)} />}
       {own && <div className="notice">Eigen laag: bestaat alleen in dit formaat.</div>}
-      <Section title={<Icon size={14} />} actions={<span className="faint">{{ text: 'Tekst', image: 'Afbeelding', shape: 'Vorm', writeon: 'Write-on' }[layer.type]}</span>}>
+      <Section title={<Icon size={14} />} actions={<span className="faint">{{ text: 'Tekst', image: 'Afbeelding', shape: 'Vorm', writeon: 'Write-on', group: 'Groep' }[layer.type]}</span>}>
         <TextInput value={layer.name} onCommit={(v) => up((l) => void (l.name = v))} />
       </Section>
 
@@ -240,15 +303,15 @@ function LayerDesign({ layer }: { layer: Layer }) {
         <Section title="Tekst">
           <TextInput multiline value={layer.text.content} onCommit={(v) => up((l) => void (l.text!.content = v))} />
           <div style={{ height: 6 }} />
-          <select value={layer.text.fontId ?? ''} onChange={(e) => up((l) => void (l.text!.fontId = e.target.value || null))} style={{ marginBottom: 6 }}>
-            <option value="">Arial (systeem)</option>
-            {fonts.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.family} {f.weight}
-                {f.style === 'italic' ? ' italic' : ''}
-              </option>
-            ))}
-          </select>
+          <FontPicker
+            value={layer.text.fontId}
+            onPick={(id, weight) =>
+              up((l) => {
+                l.text!.fontId = id
+                if (weight) l.text!.weight = weight
+              })
+            }
+          />
           <div className="row">
             <input type="color" value={layer.text.color} onChange={(e) => up((l) => void (l.text!.color = e.target.value), 'tc')} />
             <div className="grow">
@@ -287,21 +350,14 @@ function LayerDesign({ layer }: { layer: Layer }) {
             }}
           />
           <div style={{ height: 6 }} />
-          <select
-            value={layer.writeon.fontId ?? ''}
-            onChange={(e) => {
-              up((l) => void (l.writeon!.fontId = e.target.value || null))
+          <FontPicker
+            allowSystem={false}
+            value={layer.writeon.fontId}
+            onPick={(id) => {
+              up((l) => void (l.writeon!.fontId = id))
               void regenerateWriteOn(layer.id)
             }}
-            style={{ marginBottom: 6 }}
-          >
-            <option value="">Kies een font…</option>
-            {fonts.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.family} {f.weight}
-              </option>
-            ))}
-          </select>
+          />
           <div className="row">
             <input type="color" value={layer.writeon.color} onChange={(e) => up((l) => void (l.writeon!.color = e.target.value), 'wc')} />
             <div className="grow">
@@ -359,6 +415,22 @@ function LayerDesign({ layer }: { layer: Layer }) {
         </Section>
       )}
 
+      {layer.type === 'group' && (
+        <Section title="Groep">
+          <div className="hint-text" style={{ marginTop: 0, marginBottom: 8 }}>
+            {layer.children?.length ?? 0} lagen. Animeer de groep als geheel via de tab Animatie, of klap hem open in de tijdlijn om de lagen erin te bewerken.
+          </div>
+          <div className="grid2">
+            <button className="ghost sm" onClick={duplicateSelection}>
+              Dupliceren
+            </button>
+            <button className="ghost sm" onClick={ungroupSelection}>
+              Degroeperen
+            </button>
+          </div>
+        </Section>
+      )}
+      <TimeRange layer={layer} />
       <Section title="Positie en maat">
         <div className="grid2">
           <Num label="X" value={st.x} animated={anim('x')} onChange={set('x')} />
@@ -426,7 +498,8 @@ function CompMotion() {
 function LayerMotion({ layer }: { layer: Layer }) {
   const comp = useStore(currentComp)!
   const time = useStore((s) => s.time)
-  const st = layerStateAt(layer, time)
+  const project_ = useStore.getState().project!
+  const st = layerStateAt(layer, layerLocalTime(project_, useStore.getState().compId, layer.id, time))
   const [dur, setDur] = useState(0.6)
   const canReveal = layer.type === 'writeon' || layer.revealMode !== 'none'
 
@@ -465,6 +538,8 @@ function LayerMotion({ layer }: { layer: Layer }) {
           De laatste loop stopt vóór de uitgang, zodat het eindbeeld (en de backup) alles toont.
         </div>
       )}
+
+      <SavePreset layer={layer} />
 
       <Section title={<><Timer size={13} /> Keyframes</>} defaultOpen={Object.keys(layer.tracks).length > 0}>
         <div className="hint-text" style={{ marginTop: 0, marginBottom: 8 }}>
@@ -596,6 +671,32 @@ function MotionCard(props: {
             </Row>
           </>
         )}
+      </div>
+    </div>
+  )
+}
+
+/** Animatie van deze laag bewaren als eigen preset in de bibliotheek. */
+function SavePreset({ layer }: { layer: Layer }) {
+  const [name, setName] = useState('')
+  const has = !!(layer.intro || layer.outro || layer.emphasis || Object.keys(layer.tracks).length)
+  if (!has) return null
+  return (
+    <div className="section">
+      <div className="row" style={{ marginBottom: 0 }}>
+        <div className="grow">
+          <input placeholder="Naam voor preset…" value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <button
+          className="ghost"
+          disabled={!name.trim()}
+          onClick={() => {
+            void savePresetFromLayer(layer.id, name.trim())
+            setName('')
+          }}
+        >
+          <BookmarkPlus size={13} /> Opslaan als preset
+        </button>
       </div>
     </div>
   )

@@ -303,3 +303,121 @@ describe('animatiebibliotheek', () => {
     expect(layerStateAt(l, 0.9).y).toBeCloseTo(100)
   })
 })
+
+describe('groepen (pre-comps) en in/uit-punten', () => {
+  const setup = async () => {
+    const tree = await import('../src/shared/tree')
+    const p = createStarterProject()
+    const comp = p.compositions[0]
+    const cta = comp.layers.find((l) => l.name === 'CTA')!
+    const ctaText = comp.layers.find((l) => l.name === 'CTA tekst')!
+    return { tree, p, comp, cta, ctaText }
+  }
+
+  it('groeperen houdt de lagen op dezelfde plek en de groep is als geheel te animeren', async () => {
+    const { tree, p, comp, cta, ctaText } = await setup()
+    const absBefore = [cta.x, cta.y, ctaText.x, ctaText.y]
+    const g = tree.groupLayers(comp, [cta.id, ctaText.id], 'CTA-groep')!
+    expect(g.children!.length).toBe(2)
+    expect(comp.layers.some((l) => l.id === cta.id)).toBe(false)
+    expect([g.x + cta.x, g.y + cta.y, g.x + ctaText.x, g.y + ctaText.y]).toEqual(absBefore)
+    g.intro = { start: 3, duration: 0.5, ease: 'easeOut', fade: true, dx: 0, dy: 40, scale: 1, rotation: 0, reveal: false }
+    const html = build(p).html
+    // geneste div's: de CTA-lagen zitten binnen de groep
+    expect(html).toMatch(/<div id="a\d+" class="L"><div id="a\d+" class="L">/)
+  })
+
+  it('degroeperen zet alles terug', async () => {
+    const { tree, comp, cta, ctaText } = await setup()
+    const before = structuredClone(comp.layers.map((l) => [l.name, l.x, l.y]))
+    const g = tree.groupLayers(comp, [cta.id, ctaText.id])!
+    tree.ungroup(comp, g.id)
+    expect(comp.layers.map((l) => [l.name, l.x, l.y])).toEqual(before)
+  })
+
+  it('in-punt verschuift de inhoud van een groep en uit-punt verbergt hem', async () => {
+    const { tree, p, comp, cta, ctaText } = await setup()
+    const g = tree.groupLayers(comp, [cta.id, ctaText.id])!
+    const introStart = cta.intro!.start
+    tree.shiftTiming(g, 2)
+    g.end = 6
+    const dom = new JSDOM(build(p, 'preview').html, { runScripts: 'dangerously', pretendToBeVisual: true })
+    await new Promise((r) => dom.window.addEventListener('load', () => setTimeout(r, 20)))
+    const win = dom.window as unknown as { BS: { seek(t: number): void }; document: Document }
+    const groupEl = win.document.querySelector('.L > .L')!.parentElement as HTMLElement
+    win.BS.seek(1)
+    expect(groupEl.style.display).toBe('none')
+    win.BS.seek(3)
+    expect(groupEl.style.display).toBe('')
+    win.BS.seek(6.5)
+    expect(groupEl.style.display).toBe('none')
+    // CTA-animatie start nu 2s later (absolute tijd in de runtime-data)
+    expect(build(p).html).toContain(`[${introStart + 2},`)
+  })
+
+  it('achter elkaar zetten (sequence) zoals in After Effects', async () => {
+    const { tree, comp } = await setup()
+    const [a, b] = [comp.layers[0], comp.layers[1]]
+    const g1 = tree.groupLayers(comp, [a.id], 'Scene 1')!
+    const g2 = tree.groupLayers(comp, [b.id], 'Scene 2')!
+    g1.end = 3
+    tree.sequenceLayers(comp, [g1.id, g2.id])
+    expect(g1.start).toBe(0)
+    expect(g2.start).toBe(3)
+    expect(g2.end).toBeGreaterThan(3)
+  })
+
+  it('dupliceren geeft nieuwe ids, ook binnen de groep', async () => {
+    const { tree, comp, cta, ctaText } = await setup()
+    const g = tree.groupLayers(comp, [cta.id, ctaText.id])!
+    const c = tree.cloneLayer(g)
+    const ids = tree.allLayers([g, c]).map((l) => l.id)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+})
+
+describe('fonts', () => {
+  it('Google Fonts-catalogus wordt genormaliseerd en gesorteerd', async () => {
+    const { normalizeCatalog, fontFileUrl } = await import('../src/shared/webfonts')
+    const list = normalizeCatalog([
+      { id: 'roboto', family: 'Roboto', weights: [400, 700], styles: ['normal', 'italic'], category: 'sans-serif' },
+      { id: 'abel', family: 'Abel', weights: [400], styles: ['normal'] },
+      { nonsense: true }
+    ])
+    expect(list.map((f) => f.family)).toEqual(['Abel', 'Roboto'])
+    expect(list[1].styles).toEqual(['normal', 'italic'])
+    expect(fontFileUrl('roboto', 700, 'normal')).toBe('https://cdn.jsdelivr.net/fontsource/fonts/roboto@latest/latin-700-normal.woff2')
+  })
+
+  it('systeemfonts worden op naam gebruikt en niet meegeleverd', () => {
+    const p = createStarterProject()
+    p.fonts.push({ id: 'sys', family: 'Georgia', file: '', weight: 400, style: 'normal', system: true })
+    p.compositions[0].layers.find((l) => l.name === 'Headline')!.text!.fontId = 'sys'
+    const html = build(p).html
+    expect(html).toContain('font-family:"Georgia",Arial')
+    expect(html).not.toContain('@font-face')
+  })
+})
+
+describe('eigen presets', () => {
+  it('slaat animatie relatief op en past hem op een andere laag toe', async () => {
+    const { presetFromLayer, applyUserPreset } = await import('../src/shared/library')
+    const comp = createStarterProject().compositions[0]
+    const a = createLayer('shape', comp)
+    a.x = 100
+    a.tracks.x = [
+      { t: 2, v: 50, e: 'easeOut' },
+      { t: 3, v: 100, e: 'linear' }
+    ]
+    a.emphasis = { type: 'pulse', start: 4, duration: 1, repeat: 2, strength: 1 }
+    const preset = presetFromLayer(a, 'Mijn slide', 'p1')
+    const b = createLayer('shape', comp)
+    b.x = 10
+    applyUserPreset(b, preset, 0)
+    expect(b.tracks.x!.map((k) => [k.t, k.v])).toEqual([
+      [0, -40],
+      [1, 10]
+    ])
+    expect(b.emphasis!.start).toBe(2)
+  })
+})

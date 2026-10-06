@@ -917,7 +917,7 @@ input[type='range'] {
 .toast {
   position: fixed;
   left: 50%;
-  bottom: 266px;
+  top: 60px;
   transform: translateX(-50%);
   background: var(--panel-2);
   border: 1px solid var(--line-2);
@@ -1193,4 +1193,221 @@ input[type='range'] {
 }
 .motion-card.emphasis {
   box-shadow: inset 3px 0 0 var(--key);
+}
+
+/* ---------- Tijdlijn: groepen, trimmen, eigenschappen ---------- */
+.tl-bar .trim {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 7px;
+  cursor: ew-resize;
+  z-index: 1;
+}
+.tl-bar .trim.in {
+  left: -3px;
+}
+.tl-bar .trim.out {
+  right: -3px;
+}
+.tl-bar .trim:hover {
+  background: rgba(124, 140, 255, 0.5);
+  border-radius: 3px;
+}
+.tl-bar.group {
+  background: #2f2a44;
+}
+.tl-bar.group.active {
+  background: #463c6e;
+}
+.tl-track.sub,
+.tl-name.sub {
+  height: 24px;
+}
+.tl-name.sub {
+  gap: 6px;
+}
+.diamond.generated {
+  background: transparent;
+  border: 1.5px solid var(--key);
+  cursor: default;
+  opacity: 0.75;
+}
+.kf-btn {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  font-size: 10px;
+  color: var(--faint);
+  border-radius: 3px;
+}
+.kf-btn.on {
+  color: var(--key);
+}
+.kf-btn.here {
+  color: #fff;
+  background: rgba(242, 193, 78, 0.25);
+}
+.viewer .sel.group {
+  outline-style: dashed;
+}
+
+/* ---------- Sleepbare panelen ---------- */
+.app {
+  position: relative;
+}
+.splitter {
+  position: absolute;
+  z-index: 20;
+}
+.splitter.v {
+  width: 6px;
+  cursor: col-resize;
+}
+.splitter.h {
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: row-resize;
+}
+.splitter:hover,
+.splitter:active {
+  background: rgba(124, 140, 255, 0.35);
+}
+.clicktag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel-2);
+  border-radius: var(--radius);
+  padding: 0 4px 0 8px;
+  height: 28px;
+  color: var(--muted);
+  margin-right: 6px;
+  border: 1px solid transparent;
+}
+.clicktag input {
+  background: transparent;
+  width: 210px;
+  padding: 0 4px;
+  height: 26px;
+  border: none;
+}
+.clicktag.invalid {
+  border-color: rgba(255, 107, 107, 0.6);
+  color: var(--danger);
+}
+.lib-head {
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+.lib-head .hint {
+  color: var(--faint);
+  font-weight: 400;
+}
+.lib-swatch.custom,
+.lib-tile.custom .lib-dot {
+  background: var(--accent);
+}
+.lib-preview {
+  position: relative;
+}
+.lib-del {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  visibility: hidden;
+}
+.lib-tile:hover .lib-del {
+  visibility: visible;
+}
+
+/* ---------- Font-kiezer ---------- */
+.font-picker {
+  position: relative;
+  margin-bottom: 6px;
+}
+.font-current {
+  width: 100%;
+  justify-content: space-between;
+  background: var(--panel-2);
+  color: var(--text);
+}
+.font-pop {
+  position: absolute;
+  z-index: 60;
+  left: 0;
+  right: 0;
+  top: 32px;
+  background: var(--panel-2);
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+.font-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+}
+.font-search input {
+  background: transparent;
+  border: none;
+}
+.font-list {
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 4px;
+}
+.font-group {
+  color: var(--faint);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 8px 6px 4px;
+}
+.font-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.font-row:hover {
+  background: var(--hover);
+}
+.font-row.on {
+  background: var(--accent-bg);
+}
+.font-row .meta {
+  font-size: 11px;
+  color: var(--muted);
+}
+.font-weights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 8px 8px;
+}
+.font-weights button {
+  height: 22px;
+  font-size: 11px;
+  border: 1px solid var(--line-2);
+  border-radius: 11px;
+  padding: 0 8px;
+  color: var(--muted);
+}
+.spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

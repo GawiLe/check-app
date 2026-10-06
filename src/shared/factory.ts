@@ -13,7 +13,7 @@ export function createLayer(type: LayerType, comp: { width: number; height: numb
   const base: Layer = {
     id,
     linkId: id,
-    name: { text: 'Tekst', image: 'Afbeelding', shape: 'Vorm', writeon: 'Write-on' }[type],
+    name: { text: 'Tekst', image: 'Afbeelding', shape: 'Vorm', writeon: 'Write-on', group: 'Groep' }[type],
     type,
     visible: true,
     locked: false,
@@ -192,5 +192,26 @@ export function mapLayerToFormat(l: Layer, src: { width: number; height: number 
   if (copy.text) copy.text.size = round(copy.text.size * s, 1)
   if (copy.writeon) copy.writeon.size = round(copy.writeon.size * s, 1)
   if (copy.shape) copy.shape.radius = round(copy.shape.radius * s, 1)
+  if (copy.children) copy.children = copy.children.map((c) => scaleLayer(c, s))
   return copy
+}
+
+/** Schaalt een laag binnen een groep (posities relatief aan de groep) met factor s. */
+function scaleLayer(l: Layer, s: number): Layer {
+  const c: Layer = { ...l, id: newId('l') }
+  delete c.overrides
+  c.x = round(l.x * s, 1)
+  c.y = round(l.y * s, 1)
+  c.width = round(l.width * s, 1)
+  c.height = round(l.height * s, 1)
+  c.tracks = { ...l.tracks }
+  if (l.tracks.x) c.tracks.x = l.tracks.x.map((k) => ({ ...k, v: round(k.v * s, 1) }))
+  if (l.tracks.y) c.tracks.y = l.tracks.y.map((k) => ({ ...k, v: round(k.v * s, 1) }))
+  c.intro = scaleMotion(l.intro, s)
+  c.outro = scaleMotion(l.outro, s)
+  if (l.text) c.text = { ...l.text, size: round(l.text.size * s, 1) }
+  if (l.writeon) c.writeon = { ...l.writeon, size: round(l.writeon.size * s, 1) }
+  if (l.shape) c.shape = { ...l.shape, radius: round(l.shape.radius * s, 1) }
+  if (l.children) c.children = l.children.map((x) => scaleLayer(x, s))
+  return c
 }

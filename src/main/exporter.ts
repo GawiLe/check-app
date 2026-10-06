@@ -29,7 +29,7 @@ const MIME: Record<string, string> = {
 async function prepareFonts(dir: string, project: Project): Promise<Record<string, Buffer>> {
   const chars = charsPerFont(project)
   const out: Record<string, Buffer> = {}
-  for (const f of project.fonts) if (chars[f.id]) out[f.id] = await subsetToWoff2(dir, f.file, chars[f.id])
+  for (const f of project.fonts) if (!f.system && chars[f.id]) out[f.id] = await subsetToWoff2(dir, f.file, chars[f.id])
   return out
 }
 
