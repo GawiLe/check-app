@@ -161,6 +161,55 @@ export async function addImageLayer(path: string, at?: { x: number; y: number })
   })
 }
 
+/** Natuurlijke maat van een asset (0 als onbekend). */
+async function naturalSize(path: string) {
+  const img = new Image()
+  img.src = assetUrl(path, S().assetsRev)
+  try {
+    await img.decode()
+  } catch {
+    /* onbekend */
+  }
+  return { w: img.naturalWidth, h: img.naturalHeight }
+}
+
+/**
+ * Afbeelding van een laag vervangen (zoals "Replace footage" in After Effects):
+ * positie, animatie en breedte blijven, de hoogte volgt de verhouding van de nieuwe afbeelding.
+ */
+export async function replaceImage(layerId: string, path: string) {
+  const comp = currentComp(S())
+  const found = comp && findDeep(comp.layers, layerId)
+  if (!found?.layer.image) return
+  const { w, h } = await naturalSize(path)
+  const file = path.split('/').pop()!
+  updateLayer(layerId, (l) => {
+    const old = l.image!.src.split('/').pop()
+    l.image!.src = path
+    if (l.name === old || !l.name) l.name = file
+    if (w && h) {
+      const nh = Math.round((l.width * h) / w)
+      l.y = Math.round(l.y + (l.height - nh) * (l.anchorY ?? 0.5))
+      l.height = nh
+    }
+  })
+  S().setStatus(`Afbeelding vervangen door ${file}`)
+}
+
+/** Kies een bestand uit een map, zet het in assets/ en vervang er de afbeelding mee. */
+export async function uploadAndReplace(layerId: string) {
+  const { dir } = S()
+  if (!dir) return
+  try {
+    const paths = await window.bs.importImages(dir)
+    await refreshAssets()
+    if (paths[0]) await replaceImage(layerId, paths[0])
+    return paths.length > 0
+  } catch (e) {
+    fail(e)
+  }
+}
+
 export async function importImages() {
   const { dir } = S()
   if (!dir) return

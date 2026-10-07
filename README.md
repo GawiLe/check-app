@@ -90,7 +90,7 @@ In de tijdlijn staan ze als groene (IN), gele (ACCENT) en oranje (UIT) blokken, 
 - **Alles laten binnenkomen**: zonder selectie (of met meerdere lagen geselecteerd) geeft de tab *Animatie* alle lagen dezelfde binnenkomst, van boven naar onder na elkaar.
 - **Keyframes** voor eigen bewegingen:
   - Klik ◆ bij een eigenschap, of zet **Auto-key** (de rode stip in de tijdlijn) aan. Dan zet elke wijziging in positie, schaal, rotatie of dekking een keyframe op de huidige tijd.
-  - Sleep keyframes, en kies een easing per keyframe.
+  - Sleep keyframes, en kies een easing per keyframe. Alleen het keyframe beweegt; de laagbalk blijft staan. Een plek waar al een keyframe staat wordt overgeslagen.
 - **Transform zoals in After Effects**: positie (X en Y) en schaal staan elk op één regel, met één ◆. Eén klik zet een keyframe voor X én Y tegelijk; in de tijdlijn is het ook één regel *Positie* en één regel *Schaal*.
   - **Schaal X% / Y%** zijn standaard gekoppeld (🔗). Ontkoppel om breedte en hoogte apart te schalen; opnieuw koppelen zet Y weer gelijk aan X.
   - **Maat B / H** (pixels) kun je ook koppelen: dan blijft de verhouding gelijk bij typen en bij slepen aan de hoeken.
@@ -133,6 +133,11 @@ Lagen: selecteer en druk **Enter**, dubbelklik op de naam in de tijdlijn, of rec
   - naar voren of achteren
   - achter elkaar zetten, in- en uitpunt
   - verbergen, vergrendelen, animatie verwijderen, verwijderen
+- **Afbeelding vervangen** (zoals *Replace footage* in After Effects): positie, animatie en breedte blijven, de hoogte volgt de verhouding van de nieuwe afbeelding.
+  - Rechtermuisknop op de laag → *Afbeelding vervangen…* (kies uit de assets of *Uploaden uit map…*) of direct *Vervangen door bestand uit map…*
+  - Knop *Vervangen…* bij Afbeelding in het paneel Ontwerp
+  - Rechtermuisknop op een asset → *Vervang geselecteerde afbeelding*, of sleep een asset op een afbeeldingslaag in de tijdlijn
+  - In een afwijkend formaat (niet de basis) geldt de nieuwe afbeelding alleen voor dat formaat.
 
   Op een lege plek: plakken of een nieuwe laag.
 - **Kopiëren en plakken** (Cmd/Ctrl+C, X, V) werkt binnen het project, ook tussen formaten en composities. In tekstvelden werkt het gewone kopiëren en plakken van het systeem.

@@ -2066,3 +2066,50 @@ pre.code.wrap {
 .dock-resizing-col * {
   cursor: row-resize !important;
 }
+
+/* ---------- Afbeelding vervangen ---------- */
+.replace-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 8px;
+  max-height: 340px;
+  overflow-y: auto;
+  margin-bottom: 4px;
+}
+.replace-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  height: auto;
+  padding: 6px;
+  background: var(--panel-2);
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+.replace-tile:hover {
+  border-color: var(--line-2);
+}
+.replace-tile.on {
+  border-color: var(--accent);
+}
+.replace-thumb {
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  background: repeating-conic-gradient(#2a2a2e 0% 25%, #222226 0% 50%) 50% / 12px 12px;
+}
+.replace-thumb img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.replace-name {
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

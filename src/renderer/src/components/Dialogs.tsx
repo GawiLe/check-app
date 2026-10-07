@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import type { Boilerplate, Settings } from '@shared/api'
 import { IAB_SIZES, TARGET_IDS, TARGETS } from '@shared/specs'
 import type { ExportTarget } from '@shared/types'
-import { addFormat, newProject, rememberedSvgMode, runExport, saveAsBoilerplate, setRememberedSvgMode } from '../lib/actions'
-import { Image as ImageIcon, Shapes } from 'lucide-react'
-import { useStore } from '../store'
+import { addFormat, newProject, rememberedSvgMode, replaceImage, runExport, saveAsBoilerplate, setRememberedSvgMode, uploadAndReplace } from '../lib/actions'
+import { FolderOpen, Image as ImageIcon, Shapes } from 'lucide-react'
+import { assetUrl, currentComp, useStore } from '../store'
+import { findDeep } from '@shared/tree'
 import { Modal, Row } from './ui'
 
 const kb = (b: number) => `${(b / 1024).toFixed(1)} KB`
@@ -23,6 +24,8 @@ export function Dialogs() {
       return <SettingsDialog onClose={close} />
     case 'saveBoilerplate':
       return <SaveBoilerplateDialog onClose={close} />
+    case 'replaceImage':
+      return <ReplaceImageDialog onClose={close} />
     default:
       return null
   }
@@ -301,6 +304,55 @@ export function SvgChoiceDialog() {
       </label>
       <div className="actions">
         <button onClick={() => pick(null)}>Annuleren</button>
+      </div>
+    </Modal>
+  )
+}
+
+/** Afbeelding vervangen: kies uit de assets van het project, of upload een nieuw bestand uit een map. */
+function ReplaceImageDialog({ onClose }: { onClose: () => void }) {
+  const layerId = useStore((s) => s.replaceId)
+  const assets = useStore((s) => s.assets)
+  const rev = useStore((s) => s.assetsRev)
+  const layer = useStore((s) => {
+    const c = currentComp(s)
+    return c && layerId ? findDeep(c.layers, layerId)?.layer : undefined
+  })
+  if (!layer?.image) return null
+  const images = assets.filter((a) => /\.(png|jpe?g|gif|svg|webp)$/i.test(a))
+  const pick = async (path: string) => {
+    onClose()
+    if (path !== layer.image!.src) await replaceImage(layer.id, path)
+  }
+  return (
+    <Modal title={`Afbeelding vervangen: ${layer.name}`} onClose={onClose}>
+      <p className="muted" style={{ marginTop: 0 }}>
+        Positie, animatie en breedte blijven behouden; de hoogte volgt de verhouding van de nieuwe afbeelding.
+      </p>
+      {images.length ? (
+        <div className="replace-grid">
+          {images.map((a) => (
+            <button key={a} className={`replace-tile${a === layer.image!.src ? ' on' : ''}`} title={a} onClick={() => pick(a)}>
+              <span className="replace-thumb">
+                <img src={assetUrl(a, rev)} alt="" draggable={false} />
+              </span>
+              <span className="replace-name">{a.replace(/^assets\//, '')}</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="faint">Nog geen afbeeldingen in assets/.</p>
+      )}
+      <div className="actions">
+        <button
+          className="primary"
+          onClick={async () => {
+            if (await uploadAndReplace(layer.id)) onClose()
+          }}
+        >
+          <FolderOpen size={14} /> Uploaden uit map…
+        </button>
+        <button onClick={onClose}>Annuleren</button>
       </div>
     </Modal>
   )

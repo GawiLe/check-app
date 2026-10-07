@@ -17,7 +17,8 @@ import {
   sequenceSelection,
   setAnchor,
   setInOut,
-  ungroupSelection
+  ungroupSelection,
+  uploadAndReplace
 } from './actions'
 import { updateLayer } from '../store'
 
@@ -45,6 +46,12 @@ export function openLayerMenu(e: React.MouseEvent, layerId: string) {
         ] as MenuItem[])
       : []),
     ...(single ? ([{ label: 'Naam wijzigen', shortcut: 'Enter', onClick: () => S().setRenaming(l.id) }] as MenuItem[]) : []),
+    ...(single && l.image
+      ? ([
+          { label: 'Afbeelding vervangen…', onClick: () => S().openReplace(l.id) },
+          { label: 'Vervangen door bestand uit map…', onClick: () => void uploadAndReplace(l.id) }
+        ] as MenuItem[])
+      : []),
     sep,
     { label: 'Knippen', shortcut: cmd('X'), onClick: cutSelection },
     { label: 'Kopiëren', shortcut: cmd('C'), onClick: copySelection },

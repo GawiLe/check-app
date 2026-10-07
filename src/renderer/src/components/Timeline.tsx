@@ -23,10 +23,11 @@ import { baseValue, layerStateAt, round, sampleTrack, sortKeyframes, upsertKeyfr
 import { effectiveLayer, endFrameTime } from '@shared/motion'
 import { overrideLabel } from '@shared/sync'
 import { GROUP_LABEL, groupOf, groupProps, groupTimes, layerGroups, type PropGroupId } from '@shared/propgroups'
-import { allLayers, layerLength, shiftTiming, trimIn, trimOut } from '@shared/tree'
+import { allLayers, findDeep, layerLength, shiftTiming, trimIn, trimOut } from '@shared/tree'
 import type { AnimProp, EaseName, Layer } from '@shared/types'
 import { ANIM_PROPS, EASES } from '@shared/types'
-import { applyLibrary, keyAssist, moveLayer, openComp, renameLayer, reorderTo } from '../lib/actions'
+import { applyLibrary, keyAssist, moveLayer, openComp, renameLayer, reorderTo, replaceImage } from '../lib/actions'
+import { ASSET_DRAG } from './LeftPanel'
 import { openEmptyMenu, openKeyMenu, openLayerMenu } from '../lib/menus'
 import { contextOf, currentComp, updateComp, updateLayer, useStore } from '../store'
 import { EASE_LABEL } from './Inspector'
@@ -111,39 +112,51 @@ export function Timeline() {
     el.onpointerup = () => (el.onpointermove = null)
   }
 
-  // Keyframe slepen (tijden zijn lokaal binnen een groep; offset = in-punten van de groepen)
-  const keyDrag = useRef<{ layerId: string; prop: AnimProp; t: number; x: number; offset: number } | null>(null)
-  const onKeyDown = (e: React.PointerEvent, layerId: string, prop: AnimProp, t: number, offset: number) => {
+  // Keyframe slepen (tijden zijn lokaal binnen een groep; offset = in-punten van de groepen).
+  // Via window-listeners: het ruitje krijgt bij elke stap een nieuwe plek (en key), dus pointer capture zou wegvallen.
+  const onKeyDown = (e: React.PointerEvent, layerId: string, prop: AnimProp, t0: number, offset: number) => {
     e.stopPropagation()
-    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-    s().selectKey({ layerId, prop, t }, e.shiftKey || e.metaKey)
-    s().setTime(t + offset)
-    keyDrag.current = { layerId, prop, t, x: e.clientX, offset }
-  }
-  const onKeyMove = (e: React.PointerEvent) => {
-    const d = keyDrag.current
-    if (!d) return
-    const nt = Math.max(0, snap(d.t + (e.clientX - d.x) / pps))
-    const cur = s().selectedKey
-    if (!cur || Math.abs(nt - cur.t) < 1e-6) return
-    updateLayer(
-      d.layerId,
-      (l) => {
-        // Alle onderdelen van de groep (bijv. X en Y van Positie) samen verschuiven
-        const members = groupProps(l, groupOf(d.prop))
-        if (members.some((m) => l.tracks[m]?.some((x) => Math.abs(x.t - nt) < 1e-4))) return
-        for (const m of members) {
-          const kfs = l.tracks[m]
-          const k = kfs?.find((x) => Math.abs(x.t - cur.t) < 1e-4)
-          if (!kfs || !k) continue
-          k.t = round(nt)
-          l.tracks[m] = sortKeyframes(kfs)
-        }
-      },
-      'kfdrag'
-    )
-    s().selectKey({ ...cur, t: nt })
-    s().setTime(nt + d.offset)
+    e.preventDefault()
+    s().selectKey({ layerId, prop, t: t0 }, e.shiftKey || e.metaKey)
+    s().setTime(t0 + offset)
+    s().setPlaying(false)
+    const x0 = e.clientX
+    let cur = t0
+    let moved = false
+    const move = (ev: PointerEvent) => {
+      if (!moved && Math.abs(ev.clientX - x0) < 3) return
+      moved = true
+      const nt = round(Math.max(0, snap(t0 + (ev.clientX - x0) / pps)))
+      if (Math.abs(nt - cur) < 1e-6) return
+      let ok = false
+      updateLayer(
+        layerId,
+        (l) => {
+          // Alle onderdelen van de groep (bijv. X en Y van Positie) samen verschuiven
+          const members = groupProps(l, groupOf(prop))
+          if (members.some((m) => l.tracks[m]?.some((x) => Math.abs(x.t - nt) < 1e-4))) return
+          for (const m of members) {
+            const kfs = l.tracks[m]
+            const k = kfs?.find((x) => Math.abs(x.t - cur) < 1e-4)
+            if (!kfs || !k) continue
+            k.t = nt
+            l.tracks[m] = sortKeyframes(kfs)
+            ok = true
+          }
+        },
+        'kfdrag'
+      )
+      if (!ok) return // bezet door een ander keyframe: blijf staan
+      cur = nt
+      s().selectKey({ layerId, prop, t: nt })
+      s().setTime(nt + offset)
+    }
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
   }
 
   /** Hele laag in de tijd verschuiven (balk slepen), of in/uit trimmen (randen slepen). */
@@ -234,6 +247,14 @@ export function Timeline() {
         setDropLine({ id: layerId, where: e.clientY < r.top + r.height / 2 ? 'before' : 'after' })
         return
       }
+      if (e.dataTransfer.types.includes(ASSET_DRAG)) {
+        // Alleen een afbeeldingslaag kan een asset ontvangen (vervangen)
+        if (!findDeep(comp.layers, layerId)?.layer.image) return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'copy'
+        setDropOn(layerId)
+        return
+      }
       if (!e.dataTransfer.types.includes(DRAG_TYPE)) return
       e.preventDefault()
       setDropOn(layerId)
@@ -250,6 +271,13 @@ export function Timeline() {
         const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
         reorderTo(moving, layerId, e.clientY < r.top + r.height / 2 ? 'before' : 'after')
         setDropLine(null)
+        return
+      }
+      const asset = e.dataTransfer.getData(ASSET_DRAG)
+      if (asset) {
+        e.preventDefault()
+        setDropOn(null)
+        void replaceImage(layerId, asset)
         return
       }
       const id = e.dataTransfer.getData(DRAG_TYPE)
@@ -281,8 +309,6 @@ export function Timeline() {
             title={`${GROUP_LABEL[g]} ${vals} @ ${(offset + t).toFixed(2)}s${k ? ` · ${EASE_LABEL[k.e]}` : ''}`}
             onPointerDown={(e) => e.button === 0 && onKeyDown(e, l.id, prop, t, offset)}
             onContextMenu={(e) => openKeyMenu(e, { layerId: l.id, prop, t })}
-            onPointerMove={onKeyMove}
-            onPointerUp={() => (keyDrag.current = null)}
           />
         )
       })
@@ -327,7 +353,7 @@ export function Timeline() {
     const open = !!expanded[l.id]
     const start = offset + (l.start ?? 0)
     const barEnd = start + layerLength(l)
-    const ranged = (l.start ?? 0) > 0 || l.end != null
+    const ranged = l.end != null
     const select = (e: React.MouseEvent) =>
       s().select(e.shiftKey || e.metaKey ? (active ? selection.filter((x) => x !== l.id) : [...selection, l.id]) : [l.id])
     const pad = { paddingLeft: 8 + depth * 16 }
@@ -529,7 +555,7 @@ export function Timeline() {
           <SkipForward size={15} />
         </button>
         <span className="timecode">{formatTime(time)}</span>
-        <span className="faint">
+        <span className="faint" style={{ whiteSpace: 'nowrap' }}>
           / {formatTime(comp.duration)}
           {comp.loops > 1 ? ` · ${comp.loops}×` : ''}
         </span>

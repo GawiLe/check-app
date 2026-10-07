@@ -393,9 +393,12 @@ function LayerDesign({ layer }: { layer: Layer }) {
       {layer.image && (
         <Section title="Afbeelding">
           <Row label="Bestand">
-            <span className="muted" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <span className="muted grow" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {layer.image.src.replace(/^assets\//, '') || '—'}
             </span>
+            <button className="ghost sm" title="Vervangen uit assets of uit een map" onClick={() => useStore.getState().openReplace(layer.id)}>
+              Vervangen…
+            </button>
           </Row>
           <Row label="Passend">
             <select value={layer.image.fit} onChange={(e) => up((l) => void (l.image!.fit = e.target.value as 'contain'))}>

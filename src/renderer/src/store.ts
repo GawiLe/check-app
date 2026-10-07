@@ -8,7 +8,7 @@ import { findDeep, localTime } from '@shared/tree'
 import type { AnimProp, Composition, ExportResult, Layer, Project } from '@shared/types'
 import { ANIM_PROPS } from '@shared/types'
 
-export type Dialog = null | 'new' | 'export' | 'settings' | 'saveBoilerplate' | 'addFormat'
+export type Dialog = null | 'new' | 'export' | 'settings' | 'saveBoilerplate' | 'addFormat' | 'replaceImage'
 
 export interface SelectedKey {
   layerId: string
@@ -38,6 +38,8 @@ interface State {
   /** Laag, compositie of formaat waarvan de naam nu bewerkt wordt. */
   renaming: string | null
   /** Open keuzevenster bij het importeren van een SVG. */
+  /** Laag waarvan de afbeelding vervangen wordt (venster 'replaceImage'). */
+  replaceId: string | null
   svgChoice: { name: string; resolve: (mode: SvgMode | null, remember: boolean) => void } | null
   time: number
   playing: boolean
@@ -80,6 +82,7 @@ interface State {
   setEditingText(id: string | null): void
   setRenaming(id: string | null): void
   setSvgChoice(c: State['svgChoice']): void
+  openReplace(layerId: string): void
   setTime(t: number): void
   setPlaying(p: boolean): void
   setZoom(z: number): void
@@ -122,6 +125,7 @@ export const useStore = create<State>((set, get) => ({
   editingText: null,
   renaming: null,
   svgChoice: null,
+  replaceId: null,
   time: 0,
   playing: false,
   zoom: 1,
@@ -213,6 +217,7 @@ export const useStore = create<State>((set, get) => ({
   setEditingText: (id) => set({ editingText: id }),
   setRenaming: (id) => set({ renaming: id }),
   setSvgChoice: (c) => set({ svgChoice: c }),
+  openReplace: (layerId) => set({ replaceId: layerId, dialog: 'replaceImage' }),
   setTime: (t) => set({ time: Math.max(0, t) }),
   setPlaying: (p) => set({ playing: p }),
   setZoom: (z) => set({ zoom: Math.min(4, Math.max(0.25, z)) }),

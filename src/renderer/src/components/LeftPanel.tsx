@@ -1,6 +1,17 @@
 import { ImagePlus, Type, X } from 'lucide-react'
-import { addAsset, importDroppedFiles, importFonts, importImages } from '../lib/actions'
-import { assetUrl, useStore } from '../store'
+import { addAsset, importDroppedFiles, importFonts, importImages, replaceImage } from '../lib/actions'
+import { assetUrl, currentComp, useStore } from '../store'
+import { allLayers } from '@shared/tree'
+
+/** Asset slepen naar een afbeeldingslaag in de tijdlijn = afbeelding vervangen. */
+export const ASSET_DRAG = 'application/x-banner-asset'
+
+/** Geselecteerde afbeeldingslagen in de huidige compositie. */
+function selectedImages() {
+  const st = useStore.getState()
+  const comp = currentComp(st)
+  return comp ? allLayers(comp.layers).filter((l) => l.image && st.selection.includes(l.id)) : []
+}
 import { Section } from './ui'
 
 export function AssetsPanel() {
@@ -33,7 +44,29 @@ export function AssetsPanel() {
             <div className="empty">Sleep afbeeldingen in de map assets/ of klik op + om te importeren.</div>
           )}
           {assets.map((a) => (
-            <div key={a} className="list-item" title="Klik om als laag toe te voegen" onClick={() => addAsset(a)}>
+            <div
+              key={a}
+              className="list-item"
+              title="Klik om als laag toe te voegen · sleep op een afbeeldingslaag in de tijdlijn of rechtermuisknop om te vervangen"
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData(ASSET_DRAG, a)
+                e.dataTransfer.effectAllowed = 'copy'
+              }}
+              onClick={() => addAsset(a)}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                const imgs = selectedImages()
+                s().openMenu(e.clientX, e.clientY, [
+                  { label: 'Toevoegen als nieuwe laag', onClick: () => void addAsset(a) },
+                  {
+                    label: imgs.length > 1 ? `Vervang ${imgs.length} geselecteerde afbeeldingen` : 'Vervang geselecteerde afbeelding',
+                    disabled: !imgs.length,
+                    onClick: () => imgs.forEach((l) => void replaceImage(l.id, a))
+                  }
+                ])
+              }}
+            >
               <img className="thumb" src={assetUrl(a, rev)} alt="" />
               <span className="grow">{a.replace(/^assets\//, '')}</span>
             </div>
