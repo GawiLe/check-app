@@ -51,20 +51,16 @@ await check('Annuleren: venster blijft open, wijziging blijft', async () =>
   (await windows()) === 1 && (await page.evaluate(() => window.__bsStore.getState().project.name)) === 'Gewijzigd zonder opslaan'
 )
 
-// 3. Nieuw project → Annuleren: blijft in dit project
+// 3. Nieuw project met wijzigingen: geen vraag meer (het nieuwe project komt in een eigen tabblad),
+//    het huidige project en zijn wijzigingen blijven gewoon open
 await answer(2)
 await menu('new')
 await page.waitForTimeout(300)
-await check('Nieuw met wijzigingen → Annuleren: geen nieuw-venster', async () => (await asked()) === 1 && (await page.locator('.modal').count()) === 0)
-
-// 4. Nieuw project → Niet opslaan: gaat door zonder op te slaan
-await answer(1)
-await menu('new')
-await page.waitForTimeout(300)
-await check('Nieuw → Niet opslaan: gaat door, bestand onaangeroerd', async () => {
-  const onDisk = JSON.parse(await readFile(join(dir, 'project.bsproj'), 'utf8'))
-  return (await page.locator('.modal').count()) === 1 && onDisk.name !== 'Gewijzigd zonder opslaan'
-})
+await check('Nieuw met wijzigingen: geen vraag, nieuw-venster, huidig project blijft', async () =>
+  (await asked()) === 0 &&
+  (await page.locator('.modal').count()) === 1 &&
+  (await page.evaluate(() => window.__bsStore.getState().project.name)) === 'Gewijzigd zonder opslaan'
+)
 await page.keyboard.press('Escape')
 
 // 5. Sluiten → Opslaan: wordt opgeslagen en het venster sluit
