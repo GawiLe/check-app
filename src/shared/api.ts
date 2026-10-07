@@ -64,6 +64,7 @@ export interface BannerStudioApi {
   fontCatalog(): Promise<{ fonts: WebFont[]; online: boolean }>
   installWebFont(dir: string, font: WebFont, weight: number, style: 'normal' | 'italic'): Promise<FontAsset>
   listPresets(): Promise<UserPreset[]>
+  nativeEdit(cmd: 'cut' | 'copy' | 'paste' | 'selectAll'): Promise<void>
   savePresets(list: UserPreset[]): Promise<void>
   onFilesChanged(cb: () => void): () => void
   onMenu(cb: (action: string) => void): () => void

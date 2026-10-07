@@ -91,7 +91,7 @@ export function TextInput(props: { value: string; onCommit: (v: string) => void;
 export function Num(props: Parameters<typeof Scrub>[0] & { label: string; title?: string }) {
   const { label, title, ...rest } = props
   return (
-    <div className={`num${label.length > 2 ? ' wide-lbl' : ''}`} title={title}>
+    <div className="num" title={title} style={{ ['--lbl' as string]: `${12 + label.length * 7}px` }}>
       <span className="lbl">{label}</span>
       <Scrub {...rest} />
     </div>

@@ -4,7 +4,10 @@ import {
   FilePlus2,
   FolderOpen,
   ImagePlus,
+  Circle,
   LayoutGrid,
+  MousePointer2,
+  PenTool,
   MousePointerClick,
   Link2,
   Link2Off,
@@ -57,6 +60,7 @@ export function Toolbar() {
           <Redo2 size={16} />
         </button>
         <div className="vsep" />
+        <Tools />
         <AddMenu />
       </div>
 
@@ -179,5 +183,27 @@ function ClickTagField() {
         onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
       />
     </label>
+  )
+}
+
+/** Gereedschap op het canvas (zoals in After Effects). */
+function Tools() {
+  const tool = useStore((s) => s.tool)
+  const set = useStore.getState().setTool
+  const items = [
+    { id: 'select', icon: <MousePointer2 size={15} />, title: 'Selecteren (V)' },
+    { id: 'text', icon: <Type size={15} />, title: 'Tekst (T): klik op het canvas' },
+    { id: 'rect', icon: <Square size={15} />, title: 'Rechthoek (R): sleep op het canvas, Shift = vierkant' },
+    { id: 'ellipse', icon: <Circle size={15} />, title: 'Ellips (E): sleep op het canvas, Shift = cirkel' },
+    { id: 'pen', icon: <PenTool size={15} />, title: 'Pen tool (G): klik voor punten, sleep voor bochten' }
+  ] as const
+  return (
+    <div className="seg" style={{ marginRight: 4 }}>
+      {items.map((i) => (
+        <button key={i.id} className={`icon${tool === i.id ? ' on' : ''}`} title={i.title} onClick={() => set(i.id)}>
+          {i.icon}
+        </button>
+      ))}
+    </div>
   )
 }

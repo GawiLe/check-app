@@ -421,3 +421,84 @@ describe('eigen presets', () => {
     expect(b.emphasis!.start).toBe(2)
   })
 })
+
+describe('keyframe-assistent (Easy Ease)', () => {
+  const kfs = () => [
+    { t: 0, v: 0, e: 'linear' as const },
+    { t: 1, v: 100, e: 'linear' as const },
+    { t: 2, v: 50, e: 'bounceOut' as const },
+    { t: 3, v: 0, e: 'linear' as const }
+  ]
+  it('Easy Ease op de middelste keyframe: rustig aankomen én vertrekken', async () => {
+    const { applyKeyAssist } = await import('../src/shared/keys')
+    const out = applyKeyAssist(kfs(), [1], 'easy')
+    expect(out.map((k) => k.e)).toEqual(['easeOut', 'easeIn', 'bounceOut', 'linear'])
+  })
+  it('Easy Ease op twee keyframes: segment ertussen wordt ease in-out', async () => {
+    const { applyKeyAssist } = await import('../src/shared/keys')
+    const out = applyKeyAssist(kfs(), [0, 1], 'easy')
+    expect(out[0].e).toBe('easeInOut')
+  })
+  it('In en Out apart, en terug naar lineair', async () => {
+    const { applyKeyAssist } = await import('../src/shared/keys')
+    expect(applyKeyAssist(kfs(), [1], 'in').map((k) => k.e).slice(0, 2)).toEqual(['easeOut', 'linear'])
+    expect(applyKeyAssist(kfs(), [1], 'out').map((k) => k.e).slice(0, 2)).toEqual(['linear', 'easeIn'])
+    const lin = applyKeyAssist(applyKeyAssist(kfs(), [1], 'easy'), [1], 'linear')
+    expect(lin.map((k) => k.e).slice(0, 2)).toEqual(['linear', 'linear'])
+  })
+})
+
+describe('anchor point', () => {
+  it('verplaatsen houdt de laag op dezelfde plek (ook geschaald en gedraaid)', async () => {
+    const { moveAnchor, layerCorners } = await import('../src/shared/geometry')
+    const l = createLayer('shape', { width: 300, height: 600 })
+    Object.assign(l, { x: 50, y: 80, width: 100, height: 40, scale: 1.5, rotation: 30 })
+    const before = layerCorners(l.x, l.y, l.width, l.height, 0.5, 0.5, 1.5, 30).corners
+    moveAnchor(l, 0, 1, 1.5, 30)
+    const after = layerCorners(l.x, l.y, l.width, l.height, 0, 1, 1.5, 30).corners
+    after.forEach((c, i) => {
+      expect(c[0]).toBeCloseTo(before[i][0], 1)
+      expect(c[1]).toBeCloseTo(before[i][1], 1)
+    })
+  })
+  it('wordt als transform-origin geëxporteerd', () => {
+    const p = createStarterProject()
+    p.compositions[0].layers[0].anchorX = 0
+    p.compositions[0].layers[0].anchorY = 1
+    expect(build(p).html).toContain('transform-origin:0% 100%')
+  })
+})
+
+describe('vormen', () => {
+  it('ellips, rechthoek zonder vulling, en pen-pad', async () => {
+    const { penToPath } = await import('../src/shared/path')
+    const p = createStarterProject()
+    const comp = p.compositions[0]
+    const e = createLayer('shape', comp)
+    e.shape!.kind = 'ellipse'
+    const r = createLayer('shape', comp)
+    r.shape!.fillEnabled = false
+    r.shape!.strokeWidth = 2
+    const path = penToPath(
+      [
+        { x: 10, y: 10 },
+        { x: 60, y: 10, hx: 80, hy: 30 },
+        { x: 30, y: 70 }
+      ],
+      true
+    )!
+    expect(path.d.startsWith('M0 ')).toBe(true)
+    expect(path.y).toBe(-10)
+    expect(path.d).toContain('C')
+    expect(path.d.endsWith('Z')).toBe(true)
+    const pen = createLayer('shape', comp)
+    pen.shape!.kind = 'path'
+    pen.shape!.strokeWidth = 3
+    pen.shape!.path = { d: path.d, w: path.w, h: path.h, closed: true }
+    comp.layers.unshift(e, r, pen)
+    const html = build(p).html
+    expect(html).toContain('border-radius:50%')
+    expect(html).toContain('vector-effect="non-scaling-stroke"')
+    expect(html).toMatch(/border:2px solid/)
+  })
+})

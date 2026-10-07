@@ -25,8 +25,9 @@ import { overrideLabel } from '@shared/sync'
 import { allLayers, layerLength, shiftTiming, trimIn, trimOut } from '@shared/tree'
 import type { AnimProp, EaseName, Layer } from '@shared/types'
 import { ANIM_PROPS, EASES } from '@shared/types'
-import { applyLibrary, moveLayer } from '../lib/actions'
-import { currentComp, updateComp, updateLayer, useStore } from '../store'
+import { applyLibrary, keyAssist, moveLayer, openComp } from '../lib/actions'
+import { openEmptyMenu, openKeyMenu, openLayerMenu } from '../lib/menus'
+import { contextOf, currentComp, updateComp, updateLayer, useStore } from '../store'
 import { EASE_LABEL } from './Inspector'
 import { DRAG_TYPE } from './Library'
 import { formatTime } from './ui'
@@ -76,6 +77,9 @@ export function Timeline() {
   const autoKey = useStore((s) => s.autoKey)
   const selection = useStore((s) => s.selection)
   const selectedKey = useStore((s) => s.selectedKey)
+  const selectedKeys = useStore((s) => s.selectedKeys)
+  const tabs = useStore((s) => s.tabs)
+  const activeTab = useStore((s) => s.activeTab)
   const expanded = useStore((s) => s.expanded)
   const [pps, setPps] = useState(120)
   const s = useStore.getState
@@ -108,7 +112,7 @@ export function Timeline() {
   const onKeyDown = (e: React.PointerEvent, layerId: string, prop: AnimProp, t: number, offset: number) => {
     e.stopPropagation()
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-    s().selectKey({ layerId, prop, t })
+    s().selectKey({ layerId, prop, t }, e.shiftKey || e.metaKey)
     s().setTime(t + offset)
     keyDrag.current = { layerId, prop, t, x: e.clientX, offset }
   }
@@ -239,14 +243,15 @@ export function Timeline() {
     const own = l.tracks[prop]
     if (own?.length)
       return own.map((k) => {
-        const sel = selectedKey?.layerId === l.id && selectedKey.prop === prop && Math.abs(selectedKey.t - k.t) < 1e-4
+        const sel = selectedKeys.some((sk) => sk.layerId === l.id && sk.prop === prop && Math.abs(sk.t - k.t) < 1e-4)
         return (
           <div
             key={'k' + k.t}
             className={`diamond${sel ? ' sel' : ''}`}
             style={{ left: xOf(offset + k.t) }}
             title={`${PROP_LABEL[prop]} ${round(k.v, 2)} @ ${(offset + k.t).toFixed(2)}s · ${EASE_LABEL[k.e]}`}
-            onPointerDown={(e) => onKeyDown(e, l.id, prop, k.t, offset)}
+            onPointerDown={(e) => e.button === 0 && onKeyDown(e, l.id, prop, k.t, offset)}
+            onContextMenu={(e) => openKeyMenu(e, { layerId: l.id, prop, t: k.t })}
             onPointerMove={onKeyMove}
             onPointerUp={() => (keyDrag.current = null)}
           />
@@ -297,13 +302,14 @@ export function Timeline() {
         className={`tl-name${active ? ' active' : ''}${l.visible ? '' : ' hidden'}${dropOn === l.id ? ' drop-hint' : ''}`}
         style={pad}
         onClick={select}
-        onDoubleClick={() => setExpanded(l.id, !open)}
+        onDoubleClick={() => (l.type === 'group' ? openComp(l.id) : setExpanded(l.id, !open))}
+        onContextMenu={(e) => openLayerMenu(e, l.id)}
         {...dropProps(l.id, offset, false)}
       >
         <button
           className="icon sm"
           style={{ width: 16 }}
-          title={l.type === 'group' ? 'Groep openklappen' : 'Eigenschappen tonen (U)'}
+          title={l.type === 'group' ? 'Inhoud tonen (dubbelklik = compositie openen in eigen tab)' : 'Eigenschappen tonen (U)'}
           onClick={(e) => {
             e.stopPropagation()
             setExpanded(l.id, !open)
@@ -338,7 +344,12 @@ export function Timeline() {
           </button>
         </span>
       </div>,
-      <div key={l.id + 't'} className={`tl-track${dropOn === l.id ? ' drop-hint' : ''}`} {...dropProps(l.id, offset, true)}>
+      <div
+        key={l.id + 't'}
+        className={`tl-track${dropOn === l.id ? ' drop-hint' : ''}`}
+        onContextMenu={(e) => openLayerMenu(e, l.id)}
+        {...dropProps(l.id, offset, true)}
+      >
         {dropOn === l.id && dropAt != null && <div className="endframe" style={{ left: xOf(dropAt), borderColor: 'var(--accent)' }} />}
         <div
           className={`tl-bar${active ? ' active' : ''}${l.type === 'group' ? ' group' : ''}`}
@@ -384,7 +395,8 @@ export function Timeline() {
     }
     if (l.children) for (const c of l.children) renderLayer(c, depth + 1, start, [...ancestors, l])
   }
-  comp.layers.forEach((l) => renderLayer(l, 0, 0, []))
+  const ctx = contextOf(project, comp.id, activeTab)
+  ctx.list.forEach((l) => renderLayer(l, 0, ctx.offset, ctx.ancestors))
 
   const selLayer = selectedKey ? allLayers(comp.layers).find((x) => x.id === selectedKey.layerId) : null
   const selKf = selLayer?.tracks[selectedKey!.prop]?.find((k) => Math.abs(k.t - selectedKey!.t) < 1e-4) ?? null
@@ -404,6 +416,25 @@ export function Timeline() {
 
   return (
     <div className="timeline">
+      <div className="tl-tabs">
+        <button className={activeTab ? '' : 'on'} onClick={() => s().setActiveTab(null)} title="Het formaat zelf">
+          {comp.width}×{comp.height}
+        </button>
+        {tabs
+          .map((id) => allLayers(comp.layers).find((x) => x.id === id))
+          .filter((g): g is Layer => !!g)
+          .map((g) => (
+            <span key={g.id} className={`tl-tab${activeTab === g.id ? ' on' : ''}`}>
+              <button onClick={() => s().setActiveTab(g.id)} title="Compositie">
+                <Folder size={12} /> {g.name}
+              </button>
+              <button className="close" title="Tab sluiten" onClick={() => s().closeTab(g.id)}>
+                ×
+              </button>
+            </span>
+          ))}
+        <span className="faint tl-tabs-hint">Dubbelklik op een compositie om hem hier te openen</span>
+      </div>
       <div className="transport">
         <button className="icon" title="Naar begin (Home)" onClick={() => s().setTime(0)}>
           <SkipBack size={15} />
@@ -436,11 +467,22 @@ export function Timeline() {
           {anyOpen ? <ChevronsDownUp size={15} /> : <ChevronsUpDown size={15} />}
         </button>
         <div style={{ flex: 1 }} />
+        {selectedKeys.length > 0 && (
+          <>
+            <span className="faint">◆ {selectedKeys.length}</span>
+            <button className="ghost sm" title="Easy Ease (F9)" onClick={() => keyAssist('easy')}>
+              Easy Ease
+            </button>
+            <button className="ghost sm" title="Easy Ease In: rustig aankomen (Shift+F9)" onClick={() => keyAssist('in')}>
+              In
+            </button>
+            <button className="ghost sm" title="Easy Ease Out: rustig vertrekken (Ctrl/Cmd+Shift+F9)" onClick={() => keyAssist('out')}>
+              Out
+            </button>
+          </>
+        )}
         {selKf && selectedKey && (
           <>
-            <span className="faint">
-              ◆ {PROP_LABEL[selectedKey.prop]} @ {selectedKey.t.toFixed(2)}s
-            </span>
             <select
               style={{ width: 130 }}
               value={selKf.e}
@@ -472,7 +514,7 @@ export function Timeline() {
         </button>
         <input type="range" min={40} max={320} value={pps} onChange={(e) => setPps(+e.target.value)} style={{ width: 90 }} title="Zoom tijdlijn" />
       </div>
-      <div className="body">
+      <div className="body" onContextMenu={(e) => e.target === e.currentTarget && openEmptyMenu(e)}>
         <div className="grid" style={{ gridTemplateColumns: `${NAME_W}px ${width}px` }}>
           <div className="tl-head names">LAGEN</div>
           <div className="tl-head">

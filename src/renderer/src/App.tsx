@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ContextMenu } from './components/ContextMenu'
 import { Dialogs } from './components/Dialogs'
 import { Inspector } from './components/Inspector'
 import { LeftPanel } from './components/LeftPanel'
@@ -7,6 +8,10 @@ import { Toolbar } from './components/Toolbar'
 import { Viewer } from './components/Viewer'
 import {
   confirmDiscard,
+  copySelection,
+  cutSelection,
+  keyAssist,
+  pasteClipboard,
   deleteSelection,
   duplicateSelection,
   groupSelection,
@@ -18,8 +23,8 @@ import {
   setInOut,
   ungroupSelection
 } from './lib/actions'
-import { currentComp, layerLocalTime, setLayerValue, useStore } from './store'
-import { allLayers } from '@shared/tree'
+import { contextOf, currentComp, layerLocalTime, setLayerValue, useStore } from './store'
+import { allLayers, findDeep } from '@shared/tree'
 import { layerStateAt } from '@shared/anim'
 import { endFrameTime } from '@shared/motion'
 import { FilePlus2, FolderOpen } from 'lucide-react'
@@ -111,6 +116,16 @@ export function App() {
         if (action === 'group' && !isTyping()) groupSelection()
         if (action === 'ungroup' && !isTyping()) ungroupSelection()
         if (action === 'sequence') sequenceSelection()
+        if (['cut', 'copy', 'paste', 'selectAll'].includes(action)) {
+          if (isTyping()) return void window.bs.nativeEdit(action as 'cut')
+          if (action === 'cut') cutSelection()
+          if (action === 'copy') copySelection()
+          if (action === 'paste') pasteClipboard()
+          if (action === 'selectAll') {
+            const c = contextOf(s.project, s.compId, s.activeTab)
+            s.select(c.list.map((l) => l.id))
+          }
+        }
         if (action === 'undo') isTyping() ? document.execCommand('undo') : s.undo()
         if (action === 'redo') isTyping() ? document.execCommand('redo') : s.redo()
       }),
@@ -178,6 +193,25 @@ export function App() {
         case 'Backspace':
           deleteSelection()
           break
+        case 'F9':
+          e.preventDefault()
+          keyAssist(e.shiftKey && (e.metaKey || e.ctrlKey) ? 'out' : e.shiftKey ? 'in' : 'easy')
+          break
+        case 'v':
+        case 't':
+        case 'r':
+        case 'e':
+        case 'g':
+          if (e.metaKey || e.ctrlKey || e.altKey) break
+          s.setTool(({ v: 'select', t: 'text', r: 'rect', e: 'ellipse', g: 'pen' } as const)[e.key])
+          break
+        case 'Enter':
+          // Enter op een tekstlaag: tekst bewerken
+          if (s.selection.length === 1 && s.tool === 'select') {
+            const l = findDeep(comp.layers, s.selection[0])?.layer
+            if (l?.type === 'text') s.setEditingText(l.id)
+          }
+          break
         case 'u':
         case 'U':
           // Eigenschappen van de geselecteerde lagen uit-/inklappen (zoals U in After Effects)
@@ -236,6 +270,7 @@ export function App() {
       <Inspector />
       <Timeline />
       <Toast />
+      <ContextMenu />
       <Dialogs />
     </div>
   )

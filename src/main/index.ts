@@ -147,6 +147,15 @@ const handlers: Handlers = {
   fontCatalog: () => fontCatalog(),
   installWebFont: (dir, font, weight, style) => installWebFont(dir, font, weight, style),
   listPresets: () => readPresets(),
+  async nativeEdit(cmd) {
+    // In tekstvelden: gewoon het normale knippen/kopiëren/plakken van het systeem
+    const wc = win?.webContents
+    if (!wc) return
+    if (cmd === 'cut') wc.cut()
+    if (cmd === 'copy') wc.copy()
+    if (cmd === 'paste') wc.paste()
+    if (cmd === 'selectAll') wc.selectAll()
+  },
   savePresets: (list) => writePresets(list),
 
   async aiAnimate(project: Project, compositionId, layerIds, prompt) {
@@ -186,9 +195,10 @@ function buildMenu() {
           { label: 'Ongedaan maken', accelerator: 'CmdOrCtrl+Z', click: send('undo') },
           { label: 'Opnieuw', accelerator: 'Shift+CmdOrCtrl+Z', click: send('redo') },
           { type: 'separator' },
-          { role: 'cut', label: 'Knippen' },
-          { role: 'copy', label: 'Kopiëren' },
-          { role: 'paste', label: 'Plakken' },
+          { label: 'Knippen', accelerator: 'CmdOrCtrl+X', click: send('cut') },
+          { label: 'Kopiëren', accelerator: 'CmdOrCtrl+C', click: send('copy') },
+          { label: 'Plakken', accelerator: 'CmdOrCtrl+V', click: send('paste') },
+          { label: 'Alles selecteren', accelerator: 'CmdOrCtrl+A', click: send('selectAll') },
           { label: 'Laag dupliceren', accelerator: 'CmdOrCtrl+D', click: send('duplicate') },
           { type: 'separator' },
           { label: 'Groeperen', accelerator: 'CmdOrCtrl+G', click: send('group') },

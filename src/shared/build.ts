@@ -2,6 +2,7 @@ import { easeIndex, round } from './anim'
 import { effectiveLayer, endFrameTime } from './motion'
 import { minifiedRuntime, WIPE_INDEX } from './runtime'
 import { allLayers } from './tree'
+import { anchorOf } from './geometry'
 import type { AnimProp, Composition, ExportTarget, FontAsset, Layer, Project } from './types'
 
 // Bouwt de banner-HTML uit een compositie. Wordt zowel door de editor (preview)
@@ -112,6 +113,8 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
       const hasRange = (l.start ?? 0) > 0 || l.end != null
       const animated = isAnimated(l) || hasRange
       const rules: string[] = [`width:${n(l.width)}px`, `height:${n(l.height)}px`]
+      const { ax, ay } = anchorOf(l)
+      if (ax !== 0.5 || ay !== 0.5) rules.push(`transform-origin:${n(ax * 100)}% ${n(ay * 100)}%`)
       if (!isAnimated(l)) rules.push(staticTransform(l))
       let inner = ''
 
@@ -141,8 +144,17 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
         }
         case 'shape': {
           const sh = l.shape!
-          rules.push(`background:${cssValue(sh.fill)}`, `border-radius:${n(sh.radius)}px`)
-          if (sh.strokeWidth > 0) rules.push(`border:${n(sh.strokeWidth)}px solid ${cssValue(sh.strokeColor)}`)
+          const fill = sh.fillEnabled === false ? 'none' : cssValue(sh.fill)
+          if (sh.kind === 'path' && sh.path) {
+            // Vrije vorm: SVG die meeschaalt met de laag; lijndikte blijft gelijk.
+            const stroke = sh.strokeWidth > 0 ? ` stroke="${cssValue(sh.strokeColor)}" stroke-width="${n(sh.strokeWidth)}" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"` : ''
+            inner = `<svg viewBox="0 0 ${n(sh.path.w)} ${n(sh.path.h)}" width="100%" height="100%" preserveAspectRatio="none" style="overflow:visible;display:block"><path d="${escapeHtml(sh.path.d)}" fill="${sh.path.closed ? fill : 'none'}"${stroke}/></svg>`
+          } else {
+            // Rechthoek / ellips: gewone CSS (lichtst).
+            if (fill !== 'none') rules.push(`background:${fill}`)
+            rules.push(`border-radius:${sh.kind === 'ellipse' ? '50%' : `${n(sh.radius)}px`}`)
+            if (sh.strokeWidth > 0) rules.push(`border:${n(sh.strokeWidth)}px solid ${cssValue(sh.strokeColor)}`)
+          }
           break
         }
         case 'writeon': {

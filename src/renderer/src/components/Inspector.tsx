@@ -17,6 +17,8 @@ import {
   clearInOut,
   duplicateSelection,
   groupSelection,
+  openComp,
+  setAnchor,
   resetCompositionOverrides,
   savePresetFromLayer,
   resetLayerOverrides,
@@ -123,7 +125,7 @@ function Multi({ n }: { n: number }) {
       <Section title={`${n} lagen geselecteerd`}>
         <div className="grid2">
           <button className="ghost" onClick={groupSelection} title="Cmd/Ctrl+G">
-            <Folder size={13} /> Groeperen
+            <Folder size={13} /> Nieuwe compositie
           </button>
           <button className="ghost" onClick={() => sequenceSelection(overlap)} title="Zoals Sequence Layers in After Effects">
             <ListOrdered size={13} /> Achter elkaar
@@ -133,7 +135,7 @@ function Multi({ n }: { n: number }) {
           <Num label="s" value={overlap} step={0.05} min={0} max={5} decimals={2} onChange={(v) => setOverlap(v)} />
         </Row>
         <div className="hint-text">
-          Groeperen maakt er één laag van die je als geheel animeert, dupliceert en in de tijd verschuift. Achter elkaar zet de lagen (bijv. scènes) na
+          Nieuwe compositie (precompose) maakt er één laag van die je als geheel animeert, dupliceert en in de tijd verschuift. Dubbelklik om hem te openen. Achter elkaar zet de lagen (bijv. scènes) na
           elkaar in de tijd.
         </div>
       </Section>
@@ -144,13 +146,14 @@ function Multi({ n }: { n: number }) {
 /** In- en uit-punt van een laag: wanneer hij zichtbaar is. */
 function TimeRange({ layer }: { layer: Layer }) {
   const start = layer.start ?? 0
+  const compDuration = useStore(currentComp)!.duration
   return (
     <Section title="Tijd">
       <div className="grid2">
         <Num label="In" value={start} step={0.05} min={0} max={60} decimals={2} suffix="s" onChange={(v, co) => updateLayer(layer.id, (l) => trimIn(l, v), co ? 'tin' : undefined)} />
         <Num
           label="Uit"
-          value={layer.end ?? layerLength(layer) + start}
+          value={layer.end ?? Math.max(start, compDuration)}
           step={0.05}
           min={0}
           max={60}
@@ -295,7 +298,7 @@ function LayerDesign({ layer }: { layer: Layer }) {
     <>
       {derived && <Overrides keys={layer.overrides} onReset={(keys) => resetLayerOverrides(layer.id, keys)} />}
       {own && <div className="notice">Eigen laag: bestaat alleen in dit formaat.</div>}
-      <Section title={<Icon size={14} />} actions={<span className="faint">{{ text: 'Tekst', image: 'Afbeelding', shape: 'Vorm', writeon: 'Write-on', group: 'Groep' }[layer.type]}</span>}>
+      <Section title={<Icon size={14} />} actions={<span className="faint">{{ text: 'Tekst', image: 'Afbeelding', shape: 'Vorm', writeon: 'Write-on', group: 'Compositie' }[layer.type]}</span>}>
         <TextInput value={layer.name} onCommit={(v) => up((l) => void (l.name = v))} />
       </Section>
 
@@ -397,35 +400,85 @@ function LayerDesign({ layer }: { layer: Layer }) {
 
       {layer.shape && (
         <Section title="Vorm">
+          {layer.shape.kind !== 'path' && (
+            <div className="seg" style={{ width: '100%', marginBottom: 8 }}>
+              {(
+                [
+                  ['rect', 'Rechthoek'],
+                  ['ellipse', 'Ellips']
+                ] as const
+              ).map(([k, label]) => (
+                <button
+                  key={k}
+                  className={(layer.shape!.kind ?? 'rect') === k ? 'on' : ''}
+                  style={{ flex: 1 }}
+                  onClick={() => up((l) => void (l.shape!.kind = k))}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+          {layer.shape.kind === 'path' && (
+            <div className="hint-text" style={{ marginTop: 0, marginBottom: 8 }}>
+              Pen-vorm ({layer.shape.path?.closed ? 'gesloten' : 'open lijn'}). Schaalt mee met breedte en hoogte.
+            </div>
+          )}
           <div className="row">
-            <input type="color" value={layer.shape.fill} onChange={(e) => up((l) => void (l.shape!.fill = e.target.value), 'sf')} />
-            <div className="grow">
-              <TextInput value={layer.shape.fill} onCommit={(v) => up((l) => void (l.shape!.fill = v))} />
-            </div>
-            <div style={{ width: 80 }}>
-              <Num label="◜" title="Hoekradius" value={layer.shape.radius} min={0} max={1000} onChange={(v, co) => up((l) => void (l.shape!.radius = v), co ? 'sr' : undefined)} />
-            </div>
+            <span className="label">Vulling</span>
+            <Switch checked={layer.shape.fillEnabled !== false} onChange={(v) => up((l) => void (l.shape!.fillEnabled = v))} />
+            {layer.shape.fillEnabled !== false && (
+              <>
+                <input type="color" value={layer.shape.fill} onChange={(e) => up((l) => void (l.shape!.fill = e.target.value), 'sf')} />
+                <div className="grow">
+                  <TextInput value={layer.shape.fill} onCommit={(v) => up((l) => void (l.shape!.fill = v))} />
+                </div>
+              </>
+            )}
           </div>
           <div className="row">
-            <input type="color" value={layer.shape.strokeColor} onChange={(e) => up((l) => void (l.shape!.strokeColor = e.target.value), 'sc')} />
-            <div className="grow">
-              <Num label="Rand" value={layer.shape.strokeWidth} min={0} max={50} suffix="px" onChange={(v, co) => up((l) => void (l.shape!.strokeWidth = v), co ? 'ss' : undefined)} />
-            </div>
+            <span className="label">Lijn</span>
+            <Switch
+              checked={layer.shape.strokeWidth > 0}
+              onChange={(v) => up((l) => void (l.shape!.strokeWidth = v ? Math.max(1, l.shape!.strokeWidth || 2) : 0))}
+            />
+            {layer.shape.strokeWidth > 0 && (
+              <>
+                <input type="color" value={layer.shape.strokeColor} onChange={(e) => up((l) => void (l.shape!.strokeColor = e.target.value), 'sc')} />
+                <div className="grow">
+                  <Num label="px" value={layer.shape.strokeWidth} min={0.5} max={50} step={0.5} decimals={1} onChange={(v, co) => up((l) => void (l.shape!.strokeWidth = v), co ? 'ss' : undefined)} />
+                </div>
+              </>
+            )}
           </div>
+          {(layer.shape.kind ?? 'rect') === 'rect' && (
+            <div className="row">
+              <span className="label">Hoekradius</span>
+              <div className="grow">
+                <Num label="◜" value={layer.shape.radius} min={0} max={1000} onChange={(v, co) => up((l) => void (l.shape!.radius = v), co ? 'sr' : undefined)} />
+              </div>
+              <button className="ghost sm" title="Pil-vorm" onClick={() => up((l) => void (l.shape!.radius = Math.round(Math.min(l.width, l.height) / 2)))}>
+                Rond
+              </button>
+            </div>
+          )}
         </Section>
       )}
 
       {layer.type === 'group' && (
-        <Section title="Groep">
+        <Section title="Compositie">
           <div className="hint-text" style={{ marginTop: 0, marginBottom: 8 }}>
-            {layer.children?.length ?? 0} lagen. Animeer de groep als geheel via de tab Animatie, of klap hem open in de tijdlijn om de lagen erin te bewerken.
+            {layer.children?.length ?? 0} lagen. Animeer de compositie als geheel via de tab Animatie, of open hem (dubbelklik) om de lagen erin te bewerken.
           </div>
           <div className="grid2">
+            <button className="ghost sm" onClick={() => openComp(layer.id)}>
+              Openen
+            </button>
             <button className="ghost sm" onClick={duplicateSelection}>
               Dupliceren
             </button>
             <button className="ghost sm" onClick={ungroupSelection}>
-              Degroeperen
+              Opheffen
             </button>
           </div>
         </Section>
@@ -443,6 +496,26 @@ function LayerDesign({ layer }: { layer: Layer }) {
         <div className="grid2">
           <Num label="°" title="Rotatie" value={st.rotation} animated={anim('rotation')} onChange={set('rotation')} />
           <Num label="%" title="Schaal" value={Math.round(st.scale * 100)} animated={anim('scale')} min={0} max={1000} onChange={(v, co) => set('scale')(v / 100, co)} />
+        </div>
+        <div className="row" style={{ alignItems: 'flex-start', marginTop: 4 }}>
+          <span className="label" style={{ paddingTop: 4 }}>
+            Anchor
+          </span>
+          <div className="anchor-grid" title="Anchor point (draaipunt voor schaal en rotatie). Je kunt hem ook op het canvas slepen.">
+            {[0, 0.5, 1].flatMap((ay) =>
+              [0, 0.5, 1].map((ax) => (
+                <button
+                  key={`${ax}-${ay}`}
+                  className={(layer.anchorX ?? 0.5) === ax && (layer.anchorY ?? 0.5) === ay ? 'on' : ''}
+                  onClick={() => setAnchor(layer.id, ax, ay)}
+                />
+              ))
+            )}
+          </div>
+          <div className="grow" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <Num label="X%" value={Math.round((layer.anchorX ?? 0.5) * 100)} min={0} max={100} onChange={(v, co) => setAnchor(layer.id, v / 100, layer.anchorY ?? 0.5, co ? 'anchor' : undefined)} />
+            <Num label="Y%" value={Math.round((layer.anchorY ?? 0.5) * 100)} min={0} max={100} onChange={(v, co) => setAnchor(layer.id, layer.anchorX ?? 0.5, v / 100, co ? 'anchor' : undefined)} />
+          </div>
         </div>
         <Row label="Dekking">
           <input

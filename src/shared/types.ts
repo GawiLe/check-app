@@ -36,6 +36,9 @@ export interface Keyframe {
   v: number
   /** Easing van deze keyframe naar de volgende. */
   e: EaseName
+  /** Keyframe-assistent (zoals in AE): rustig aankomen (Easy Ease In) / rustig vertrekken (Easy Ease Out). */
+  ei?: boolean
+  eo?: boolean
 }
 
 export type Tracks = Partial<Record<AnimProp, Keyframe[]>>
@@ -59,11 +62,20 @@ export interface ImageProps {
   fit: 'contain' | 'cover' | 'fill'
 }
 
+export type ShapeKind = 'rect' | 'ellipse' | 'path'
+
 export interface ShapeProps {
+  /** Rechthoek (met hoekradius), ellips of vrije vorm (pen tool). Ontbreekt = rechthoek. */
+  kind?: ShapeKind
   fill: string
+  /** Vulling aan/uit (ontbreekt = aan). */
+  fillEnabled?: boolean
   radius: number
   strokeColor: string
+  /** 0 = geen lijn. */
   strokeWidth: number
+  /** Pen tool: SVG-pad in een eigen coördinatenstelsel van w×h (schaalt mee met de laag). */
+  path?: { d: string; w: number; h: number; closed: boolean }
 }
 
 export interface WriteOnGlyph {
@@ -139,6 +151,9 @@ export interface Layer {
   rotation: number
   scale: number
   opacity: number
+  /** Anchor point (draaipunt voor schaal en rotatie), relatief: 0 = links/boven, 1 = rechts/onder. Standaard 0,5. */
+  anchorX?: number
+  anchorY?: number
   /** Beginwaarde voor `reveal` als er geen keyframes zijn. */
   reveal: number
   revealMode: RevealMode

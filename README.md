@@ -94,7 +94,51 @@ In de tijdlijn staan ze als groene (IN), gele (ACCENT) en oranje (UIT) blokken, 
 - **Hele laag verschuiven**: sleep de balk van een laag in de tijdlijn. Alle keyframes en de binnenkomst/uitgang gaan mee.
 - Het **eindframe** ligt vóór de eerste uitgang. De laatste loop stopt daar, zodat het eindbeeld en de backup-afbeelding alles tonen.
 
-### Groepen (pre-comps) en scènes
+### Werken op het canvas
+
+- **Gereedschap** staat links in de balk:
+  - **V** selecteren
+  - **T** tekst: klik op het canvas
+  - **R** rechthoek en **E** ellips: sleep, met Shift voor een vierkant of cirkel
+  - **G** pen tool: klik voor punten en sleep voor een bocht. Klik op het eerste punt om de vorm te sluiten. Enter of de rechtermuisknop geeft een open lijn, Esc stopt.
+- **Tekst bewerken:** dubbelklik op een tekstlaag (of Enter) en typ direct op het canvas. Esc of Cmd/Ctrl+Enter bevestigt.
+- **Anchor point:** het kruisje in het midden van een geselecteerde laag is het draaipunt voor schaal en rotatie.
+  - Sleep het naar een andere plek; het klikt vast op hoeken, randen en midden. De laag verspringt niet, net als met Pan Behind in AE.
+  - Je kunt het ook instellen via het 3×3-raster in de inspector.
+- **Vormen:** kies rechthoek of ellips, zet vulling en lijn los aan of uit (met kleur en dikte), en stel bij een rechthoek de hoekradius in. *Rond* maakt er een pil-vorm van. Pen-vormen schalen mee als je de laag groter maakt.
+- **Rechtermuisknop** op een laag (canvas of tijdlijn) geeft onder meer:
+  - *Voeg toe aan nieuwe compositie*
+  - knippen, kopiëren, plakken, dupliceren
+  - naar voren of achteren
+  - achter elkaar zetten, in- en uitpunt
+  - verbergen, vergrendelen, animatie verwijderen, verwijderen
+
+  Op een lege plek: plakken of een nieuwe laag.
+- **Kopiëren en plakken** (Cmd/Ctrl+C, X, V) werkt binnen het project, ook tussen formaten en composities. In tekstvelden werkt het gewone kopiëren en plakken van het systeem.
+
+### Keyframe-assistent (Easy Ease)
+
+Selecteer keyframes met een klik op ◆; Shift-klik voegt er meer aan toe. Kies daarna, via de rechtermuisknop, de knoppen in de tijdlijn of de toetsen:
+
+| | |
+|---|---|
+| **Easy Ease** (F9) | rustig aankomen én vertrekken |
+| **Easy Ease In** (Shift+F9) | rustig aankomen bij de keyframe |
+| **Easy Ease Out** (Cmd/Ctrl+Shift+F9) | rustig vertrekken uit de keyframe |
+| **Lineair** | geen easing |
+
+Per keyframe kun je daarnaast een andere curve kiezen (bijvoorbeeld overshoot, elastisch of stuiter).
+
+### Composities openen in een eigen tab
+
+Dubbelklik op een compositie, op het canvas of in de tijdlijn, en hij opent als eigen tab boven de tijdlijn, zoals een pre-comp in After Effects.
+
+- De tijdlijn toont dan alleen de lagen in die compositie.
+- Op het canvas klik je alleen die lagen aan. De compositie zelf heeft een groene stippellijn.
+- Nieuwe lagen, getekende vormen en geplakte lagen komen in die compositie terecht.
+- Met het formaat-tabblad (bijvoorbeeld 300×600) ga je terug; met × sluit je een tab.
+
+### Composities (pre-comps) en scènes
 
 Groepen werken zoals pre-comps in After Effects.
 

@@ -3,8 +3,11 @@ import { Maximize, Minus, Plus, Star } from 'lucide-react'
 import { layerStateAt } from '@shared/anim'
 import { buildBanner } from '@shared/build'
 import type { Composition, Layer, Project } from '@shared/types'
-import { applyLibrary } from '../lib/actions'
+import { anchorOf } from '@shared/geometry'
+import type { PenPoint } from '@shared/path'
 import { activeAt, findDeep, localTime } from '@shared/tree'
+import { addPenShape, addShapeRect, addTextAt, applyLibrary, openComp, setAnchor } from '../lib/actions'
+import { openEmptyMenu, openLayerMenu } from '../lib/menus'
 import { assetUrl, currentComp, setLayerValue, updateLayer, useStore } from '../store'
 import { DRAG_TYPE } from './Library'
 
@@ -117,40 +120,70 @@ function Overview() {
   )
 }
 
-/** Positie van een laag op het canvas, ook als hij in (geneste) groepen zit. */
+/** Een laag op het canvas: positie van het anchor point in de wereld, totale schaal en rotatie. */
 interface Box {
   layer: Layer
-  cx: number
-  cy: number
+  ax: number
+  ay: number
+  /** Anchor point in canvas-coördinaten. */
+  wx: number
+  wy: number
   scale: number
   rotation: number
-  /** Gezamenlijke schaal van de bovenliggende groepen (voor slepen). */
+  /** Schaal en rotatie van de bovenliggende composities (voor slepen). */
   parentScale: number
-  depth: number
+  parentRot: number
+  ancestors: Layer[]
 }
+
+type Mapper = (x: number, y: number) => [number, number]
+const rad = (d: number) => (d * Math.PI) / 180
 
 function boxesAt(layers: Layer[], t: number): Box[] {
   const out: Box[] = []
-  const visit = (list: Layer[], lt: number, map: (x: number, y: number) => [number, number], ps: number, pr: number, depth: number) => {
+  const visit = (list: Layer[], lt: number, map: Mapper, ps: number, pr: number, ancestors: Layer[]) => {
     for (const l of list) {
       if (!l.visible || !activeAt(l, lt)) continue
       const st = layerStateAt(l, lt)
-      const [cx, cy] = map(st.x + l.width / 2, st.y + l.height / 2)
-      out.push({ layer: l, cx, cy, scale: st.scale * ps, rotation: st.rotation + pr, parentScale: ps, depth })
+      const { ax, ay } = anchorOf(l)
+      const [wx, wy] = map(st.x + ax * l.width, st.y + ay * l.height)
+      out.push({ layer: l, ax, ay, wx, wy, scale: st.scale * ps, rotation: st.rotation + pr, parentScale: ps, parentRot: pr, ancestors })
       if (l.children) {
-        const gs = st.scale * ps
-        const ox = st.x
-        const oy = st.y
-        const hw = l.width / 2
-        const hh = l.height / 2
-        const inner = (x: number, y: number) => map(ox + hw + (x - hw) * st.scale, oy + hh + (y - hh) * st.scale)
-        visit(l.children, lt - (l.start ?? 0), inner, gs, st.rotation + pr, depth + 1)
+        const r = rad(st.rotation)
+        const ox = st.x + ax * l.width
+        const oy = st.y + ay * l.height
+        const inner: Mapper = (x, y) => {
+          const dx = (x - ax * l.width) * st.scale
+          const dy = (y - ay * l.height) * st.scale
+          return map(ox + dx * Math.cos(r) - dy * Math.sin(r), oy + dx * Math.sin(r) + dy * Math.cos(r))
+        }
+        visit(l.children, lt - (l.start ?? 0), inner, st.scale * ps, st.rotation + pr, [...ancestors, l])
       }
     }
   }
-  visit(layers, t, (x, y) => [x, y], 1, 0, 0)
+  visit(layers, t, (x, y) => [x, y], 1, 0, [])
   return out
 }
+
+/** Canvaspunt → coördinaat binnen het kader van de laag (0..breedte, 0..hoogte). */
+function toLocal(b: Box, x: number, y: number): [number, number] {
+  const r = rad(-b.rotation)
+  const dx = (x - b.wx) / (b.scale || 1e-6)
+  const dy = (y - b.wy) / (b.scale || 1e-6)
+  return [dx * Math.cos(r) - dy * Math.sin(r) + b.ax * b.layer.width, dx * Math.sin(r) + dy * Math.cos(r) + b.ay * b.layer.height]
+}
+
+const inside = (b: Box, x: number, y: number) => {
+  const [u, v] = toLocal(b, x, y)
+  return u >= 0 && u <= b.layer.width && v >= 0 && v <= b.layer.height
+}
+
+type Drag =
+  | { kind: 'move'; x: number; y: number; start: { id: string; x: number; y: number; ps: number; pr: number }[] }
+  | { kind: 'resize'; x: number; y: number; id: string; w: number; h: number; ratio: number; box: Box }
+  | { kind: 'anchor'; box: Box }
+  | { kind: 'draw'; tool: 'rect' | 'ellipse'; x: number; y: number; x2: number; y2: number }
+  | { kind: 'pen-handle'; index: number }
 
 function SingleViewer() {
   const project = useStore((s) => s.project)!
@@ -159,44 +192,28 @@ function SingleViewer() {
   const time = useStore((s) => s.time)
   const rev = useStore((s) => s.assetsRev)
   const selection = useStore((s) => s.selection)
+  const tool = useStore((s) => s.tool)
+  const activeTab = useStore((s) => s.activeTab)
+  const editingText = useStore((s) => s.editingText)
   const [hover, setHover] = useState<string | null>(null)
-  const drag = useRef<
-    | { kind: 'move'; x: number; y: number; start: { id: string; x: number; y: number; ps: number }[] }
-    | { kind: 'resize'; x: number; y: number; id: string; w: number; h: number; ratio: number; ps: number }
-    | null
-  >(null)
+  const [, force] = useState(0)
+  const drag = useRef<Drag | null>(null)
+  const pen = useRef<PenPoint[]>([])
+  const [penCursor, setPenCursor] = useState<[number, number] | null>(null)
 
   const boxes = boxesAt(comp.layers, time)
   const boxOf = (id: string) => boxes.find((b) => b.layer.id === id)
+  const ctxGroup = activeTab ? findDeep(comp.layers, activeTab)?.layer : null
+  // Alleen lagen in de lijst waarin je werkt zijn klikbaar (formaat of geopende compositie).
+  const ctxList = ctxGroup?.children ?? comp.layers
+  const candidates = boxes.filter((b) => !b.layer.locked && ctxList.includes(b.layer))
 
-  const toComp = (e: { clientX: number; clientY: number; currentTarget: EventTarget }) => {
-    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  const toComp = (e: { clientX: number; clientY: number }) => {
+    const r = overlayRef.current!.getBoundingClientRect()
     return { x: (e.clientX - r.left) / zoom, y: (e.clientY - r.top) / zoom }
   }
-
-  const inside = (b: Box, x: number, y: number) => {
-    const w = (b.layer.width * b.scale) / 2
-    const h = (b.layer.height * b.scale) / 2
-    return x >= b.cx - w && x <= b.cx + w && y >= b.cy - h && y <= b.cy + h
-  }
-
-  /**
-   * Klikken pakt de bovenste laag op het hoogste niveau (een groep als geheel).
-   * Ben je al "in" een groep (een laag erin geselecteerd), of dubbelklik je, dan
-   * pak je de lagen binnen die groep.
-   */
-  const hitTest = (x: number, y: number, deep = false): Layer | null => {
-    const sel = selection[0] ? findDeep(comp.layers, selection[0]) : null
-    const ctx = sel?.ancestors.length ? sel.ancestors[sel.ancestors.length - 1] : null
-    const candidates = boxes.filter((b) => !b.layer.locked)
-    if (deep || ctx) {
-      // Lagen in de huidige groep (of diepste niveau bij dubbelklik), bovenste eerst
-      const inner = candidates
-        .filter((b) => (deep ? b.depth > 0 : ctx && findDeep(ctx.children ?? [], b.layer.id)?.list === ctx.children))
-        .filter((b) => b.layer.type !== 'group' || !deep)
-      for (const b of inner) if (inside(b, x, y)) return b.layer
-    }
-    for (const b of candidates) if (b.depth === 0 && inside(b, x, y)) return b.layer
+  const hitTest = (x: number, y: number): Layer | null => {
+    for (const b of candidates) if (inside(b, x, y)) return b.layer
     return null
   }
 
@@ -206,28 +223,74 @@ function SingleViewer() {
         const f = findDeep(comp.layers, id)
         const b = boxOf(id)
         if (!f || !b || f.layer.locked) return null
-        const lt = localTime(time, f.ancestors)
-        const st = layerStateAt(f.layer, lt)
+        const st = layerStateAt(f.layer, localTime(time, f.ancestors))
         const anim = (q: 'x' | 'y') => !!f.layer.tracks[q]?.length
-        return { id, x: anim('x') ? st.x : f.layer.x, y: anim('y') ? st.y : f.layer.y, ps: b.parentScale }
+        return { id, x: anim('x') ? st.x : f.layer.x, y: anim('y') ? st.y : f.layer.y, ps: b.parentScale, pr: b.parentRot }
       })
-      .filter((x): x is { id: string; x: number; y: number; ps: number } => !!x)
+      .filter((x): x is { id: string; x: number; y: number; ps: number; pr: number } => !!x)
     drag.current = { kind: 'move', x: p.x, y: p.y, start }
   }
 
+  const finishPen = (closed: boolean) => {
+    if (pen.current.length >= 2) addPenShape(pen.current, closed)
+    pen.current = []
+    setPenCursor(null)
+    force((n) => n + 1)
+  }
+
+  // Pen tool: Enter = open vorm afronden, Escape = annuleren
+  useEffect(() => {
+    if (tool !== 'pen') return
+    const k = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') finishPen(false)
+      if (e.key === 'Escape') {
+        pen.current = []
+        setPenCursor(null)
+        useStore.getState().setTool('select')
+      }
+    }
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tool])
+
   const onDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return
+    const s = useStore.getState()
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
     const p = toComp(e)
-    const hit = hitTest(p.x, p.y, e.detail >= 2)
-    const s = useStore.getState()
+
+    if (tool === 'rect' || tool === 'ellipse') {
+      drag.current = { kind: 'draw', tool, x: p.x, y: p.y, x2: p.x, y2: p.y }
+      return
+    }
+    if (tool === 'text') {
+      addTextAt(p.x, p.y)
+      return
+    }
+    if (tool === 'pen') {
+      const first = pen.current[0]
+      if (first && pen.current.length >= 2 && Math.hypot(first.x - p.x, first.y - p.y) < 8 / zoom) {
+        finishPen(true)
+        return
+      }
+      pen.current = [...pen.current, { x: Math.round(p.x), y: Math.round(p.y) }]
+      drag.current = { kind: 'pen-handle', index: pen.current.length - 1 }
+      force((n) => n + 1)
+      return
+    }
+
+    // Selecteren
+    const hit = hitTest(p.x, p.y)
     if (!hit) {
       s.select([])
+      s.setEditingText(null)
       return
     }
     let sel = selection
     if (e.shiftKey) sel = selection.includes(hit.id) ? selection.filter((i) => i !== hit.id) : [...selection, hit.id]
     else if (!selection.includes(hit.id)) sel = [hit.id]
+    if (editingText && editingText !== hit.id) s.setEditingText(null)
     s.select(sel)
     startMove(sel, p)
   }
@@ -235,80 +298,140 @@ function SingleViewer() {
   const onMove = (e: React.PointerEvent) => {
     const p = toComp(e)
     const d = drag.current
+    if (tool === 'pen') setPenCursor([p.x, p.y])
     if (!d) {
-      setHover(hitTest(p.x, p.y)?.id ?? null)
+      if (tool === 'select') setHover(hitTest(p.x, p.y)?.id ?? null)
       return
     }
-    if (d.kind === 'move') {
-      for (const st of d.start) {
-        const dx = Math.round((p.x - d.x) / st.ps)
-        const dy = Math.round((p.y - d.y) / st.ps)
-        setLayerValue(st.id, 'x', st.x + dx, 'move')
-        setLayerValue(st.id, 'y', st.y + dy, 'move')
+    switch (d.kind) {
+      case 'move':
+        for (const st of d.start) {
+          // Verschuiving omrekenen naar de ruimte van de compositie waar de laag in zit
+          const r = rad(-st.pr)
+          const wx = (p.x - d.x) / st.ps
+          const wy = (p.y - d.y) / st.ps
+          setLayerValue(st.id, 'x', Math.round(st.x + wx * Math.cos(r) - wy * Math.sin(r)), 'move')
+          setLayerValue(st.id, 'y', Math.round(st.y + wx * Math.sin(r) + wy * Math.cos(r)), 'move')
+        }
+        break
+      case 'resize': {
+        const [u, v] = toLocal(d.box, p.x, p.y)
+        const w = Math.max(4, Math.round(u))
+        const h = e.shiftKey ? Math.round(w / d.ratio) : Math.max(4, Math.round(v))
+        updateLayer(d.id, (l) => void Object.assign(l, { width: w, height: h }), 'resize')
+        break
       }
-    } else {
-      const w = Math.max(4, Math.round(d.w + (p.x - d.x) / d.ps))
-      const h = e.shiftKey ? Math.round(w / d.ratio) : Math.max(4, Math.round(d.h + (p.y - d.y) / d.ps))
-      updateLayer(
-        d.id,
-        (l) => {
-          l.width = w
-          l.height = h
-        },
-        'resize'
-      )
+      case 'anchor': {
+        const [u, v] = toLocal(d.box, p.x, p.y)
+        let ax = u / d.box.layer.width
+        let ay = v / d.box.layer.height
+        // Klikt vast op hoeken, randen en midden
+        for (const s of [0, 0.5, 1]) {
+          if (Math.abs(ax - s) < 0.06) ax = s
+          if (Math.abs(ay - s) < 0.06) ay = s
+        }
+        setAnchor(d.box.layer.id, ax, ay, 'anchor')
+        break
+      }
+      case 'draw':
+        d.x2 = p.x
+        d.y2 = e.shiftKey ? d.y + Math.sign(p.y - d.y || 1) * Math.abs(p.x - d.x) : p.y
+        force((n) => n + 1)
+        break
+      case 'pen-handle': {
+        const pt = pen.current[d.index]
+        if (Math.hypot(p.x - pt.x, p.y - pt.y) > 3 / zoom) {
+          pen.current[d.index] = { ...pt, hx: Math.round(p.x), hy: Math.round(p.y) }
+          force((n) => n + 1)
+        }
+        break
+      }
     }
+  }
+
+  const onUp = () => {
+    const d = drag.current
+    drag.current = null
+    if (d?.kind === 'draw') {
+      const x = Math.min(d.x, d.x2)
+      const y = Math.min(d.y, d.y2)
+      const w = Math.abs(d.x2 - d.x)
+      const h = Math.abs(d.y2 - d.y)
+      // Alleen klikken (niet slepen): standaardmaat
+      if (w < 4 && h < 4) addShapeRect(d.tool, d.x - 50, d.y - 50, 100, 100)
+      else addShapeRect(d.tool, x, y, w, h)
+    }
+  }
+
+  /** Dubbelklik: compositie openen in een eigen tab, of tekst op het canvas bewerken. */
+  const onDouble = (e: React.MouseEvent) => {
+    if (tool !== 'select') return
+    const p = toComp(e)
+    const hit = hitTest(p.x, p.y)
+    if (!hit) return
+    const s = useStore.getState()
+    if (hit.type === 'group') openComp(hit.id)
+    else if (hit.type === 'text') {
+      s.select([hit.id])
+      s.setEditingText(hit.id)
+    }
+  }
+
+  const onContext = (e: React.MouseEvent) => {
+    if (tool === 'pen') {
+      e.preventDefault()
+      finishPen(false)
+      return
+    }
+    const hit = hitTest(...(Object.values(toComp(e)) as [number, number]))
+    if (hit) openLayerMenu(e, hit.id)
+    else openEmptyMenu(e)
   }
 
   const startResize = (e: React.PointerEvent, b: Box) => {
     e.stopPropagation()
-    const overlay = (e.currentTarget as HTMLElement).closest('.overlay') as HTMLElement
-    overlay.setPointerCapture(e.pointerId)
-    const r = overlay.getBoundingClientRect()
-    drag.current = {
-      kind: 'resize',
-      x: (e.clientX - r.left) / zoom,
-      y: (e.clientY - r.top) / zoom,
-      id: b.layer.id,
-      w: b.layer.width,
-      h: b.layer.height,
-      ratio: b.layer.width / b.layer.height,
-      ps: b.parentScale
-    }
+    overlayRef.current!.setPointerCapture(e.pointerId)
+    const p = toComp(e)
+    drag.current = { kind: 'resize', x: p.x, y: p.y, id: b.layer.id, w: b.layer.width, h: b.layer.height, ratio: b.layer.width / b.layer.height, box: b }
+  }
+  const startAnchor = (e: React.PointerEvent, b: Box) => {
+    e.stopPropagation()
+    overlayRef.current!.setPointerCapture(e.pointerId)
+    drag.current = { kind: 'anchor', box: b }
   }
 
-  const box = (b: Box, cls: string, handle: boolean) => {
-    const l = b.layer
-    return (
-      <div
-        key={cls + l.id}
-        className={`sel ${cls}${l.type === 'group' ? ' group' : ''}`}
-        style={{
-          width: l.width * zoom,
-          height: l.height * zoom,
-          transform: `translate(${(b.cx - l.width / 2) * zoom}px,${(b.cy - l.height / 2) * zoom}px) rotate(${b.rotation}deg) scale(${b.scale})`
-        }}
-      >
-        {handle && (
-          <>
-            <div className="size-label">
-              {l.type === 'group' ? `${l.name} · ` : ''}
-              {Math.round(l.width)} × {Math.round(l.height)}
-            </div>
-            <div className="handle" onPointerDown={(e) => startResize(e, b)} />
-          </>
-        )}
-      </div>
-    )
-  }
+  /** Kader van een laag: exact gedraaid en geschaald rond het anchor point. */
+  const frameStyle = (b: Box): React.CSSProperties => ({
+    width: b.layer.width * zoom,
+    height: b.layer.height * zoom,
+    transformOrigin: `${b.ax * 100}% ${b.ay * 100}%`,
+    transform: `translate(${(b.wx - b.ax * b.layer.width) * zoom}px,${(b.wy - b.ay * b.layer.height) * zoom}px) rotate(${b.rotation}deg) scale(${b.scale})`
+  })
+
+  const box = (b: Box, cls: string, handles: boolean) => (
+    <div key={cls + b.layer.id} className={`sel ${cls}${b.layer.type === 'group' ? ' group' : ''}`} style={frameStyle(b)}>
+      {handles && (
+        <>
+          <div className="size-label" style={{ transform: `scale(${1 / (b.scale || 1)})`, transformOrigin: '0 100%' }}>
+            {b.layer.type === 'group' ? `${b.layer.name} · ` : ''}
+            {Math.round(b.layer.width)} × {Math.round(b.layer.height)}
+          </div>
+          <div className="handle" style={{ transform: `scale(${1 / (b.scale || 1)})` }} onPointerDown={(e) => startResize(e, b)} />
+        </>
+      )}
+    </div>
+  )
 
   const selected = selection.map(boxOf).filter((b): b is Box => !!b)
   const hovered = hover && !selection.includes(hover) ? boxOf(hover) : undefined
+  const single = selected.length === 1 && !selected[0].layer.locked ? selected[0] : null
+  const editBox = editingText ? boxOf(editingText) : undefined
+  const d = drag.current
   const setZoom = useStore.getState().setZoom
+  const overlayRef = useRef<HTMLDivElement>(null)
 
-  // Bij openen of wisselen van formaat: passend inzoomen (max. 100%).
-  const viewerRef = useRef<HTMLDivElement>(null)
   // "Passend" blijft actief tot je zelf zoomt; dan volgt het canvas ook als je panelen versleept.
+  const viewerRef = useRef<HTMLDivElement>(null)
   const fitMode = useRef(true)
   const fit = () => {
     const el = viewerRef.current
@@ -330,17 +453,23 @@ function SingleViewer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comp.id, comp.width, comp.height])
 
+  const ctxBox = ctxGroup ? boxOf(ctxGroup.id) : undefined
+  const penPts = pen.current
+
   return (
-    <div ref={viewerRef} className="viewer" onWheel={(e) => (e.ctrlKey || e.metaKey) && zoomTo(zoom * (e.deltaY < 0 ? 1.1 : 0.9))}>
+    <div ref={viewerRef} className={`viewer tool-${tool}`} onWheel={(e) => (e.ctrlKey || e.metaKey) && zoomTo(zoom * (e.deltaY < 0 ? 1.1 : 0.9))}>
       <div className="stage-wrap">
         <div className="stage" style={{ width: comp.width * zoom, height: comp.height * zoom }}>
           <BannerFrame project={project} comp={comp} time={time} zoom={zoom} rev={rev} />
           <div
+            ref={overlayRef}
             className="overlay"
             onPointerDown={onDown}
             onPointerMove={onMove}
-            onPointerUp={() => (drag.current = null)}
+            onPointerUp={onUp}
             onPointerLeave={() => setHover(null)}
+            onContextMenu={onContext}
+            onDoubleClick={onDouble}
             onDragOver={(e) => {
               if (!e.dataTransfer.types.includes(DRAG_TYPE)) return
               e.preventDefault()
@@ -361,11 +490,55 @@ function SingleViewer() {
               else useStore.getState().setStatus('Laat de animatie los op een laag.', 'error')
             }}
           >
+            {ctxBox && <div className="sel context" style={frameStyle(ctxBox)} />}
             {hovered && box(hovered, 'hover', false)}
-            {selected.map((b) => box(b, '', selected.length === 1 && !b.layer.locked))}
+            {selected.map((b) => box(b, '', !!single && b === single))}
+            {single && tool === 'select' && !editBox && (
+              <div
+                className="anchor"
+                title="Anchor point: sleep om het draaipunt te verplaatsen"
+                style={{ left: single.wx * zoom, top: single.wy * zoom }}
+                onPointerDown={(e) => startAnchor(e, single)}
+              />
+            )}
+            {d?.kind === 'draw' && (
+              <div
+                className={`draw-preview ${d.tool}`}
+                style={{
+                  left: Math.min(d.x, d.x2) * zoom,
+                  top: Math.min(d.y, d.y2) * zoom,
+                  width: Math.abs(d.x2 - d.x) * zoom,
+                  height: Math.abs(d.y2 - d.y) * zoom
+                }}
+              />
+            )}
+            {tool === 'pen' && penPts.length > 0 && (
+              <svg className="pen-preview" width={comp.width * zoom} height={comp.height * zoom}>
+                <path
+                  d={penPreviewPath([...penPts, ...(penCursor && !drag.current ? [{ x: penCursor[0], y: penCursor[1] }] : [])], zoom)}
+                  fill="none"
+                />
+                {penPts.map((p, i) => (
+                  <g key={i}>
+                    {p.hx != null && (
+                      <>
+                        <line x1={(2 * p.x - p.hx) * zoom} y1={(2 * p.y - p.hy!) * zoom} x2={p.hx * zoom} y2={p.hy! * zoom} className="pen-handle-line" />
+                        <circle cx={p.hx * zoom} cy={p.hy! * zoom} r={3} className="pen-handle" />
+                      </>
+                    )}
+                    <rect x={p.x * zoom - 4} y={p.y * zoom - 4} width={8} height={8} className={`pen-point${i === 0 && penPts.length > 1 ? ' first' : ''}`} />
+                  </g>
+                ))}
+              </svg>
+            )}
+            {editBox && <TextEditor box={editBox} zoom={zoom} project={project} />}
           </div>
         </div>
       </div>
+      {tool === 'pen' && (
+        <div className="tool-hint">Klik voor punten, sleep voor een bocht. Klik op het eerste punt om te sluiten, Enter of rechtermuisknop voor een open lijn, Esc om te stoppen.</div>
+      )}
+      {ctxGroup && <div className="tool-hint top">Compositie "{ctxGroup.name}" geopend: je bewerkt de lagen hierin. Klik op het formaat-tabblad onder om terug te gaan.</div>}
       <div className="floating">
         <button className="icon sm" title="Uitzoomen" onClick={() => zoomTo(zoom / 1.25)}>
           <Minus size={14} />
@@ -382,5 +555,69 @@ function SingleViewer() {
         </button>
       </div>
     </div>
+  )
+}
+
+function penPreviewPath(pts: PenPoint[], z: number) {
+  if (!pts.length) return ''
+  const P = (x: number, y: number) => `${x * z} ${y * z}`
+  let d = `M${P(pts[0].x, pts[0].y)}`
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1]
+    const b = pts[i]
+    if (a.hx == null && b.hx == null) d += `L${P(b.x, b.y)}`
+    else {
+      const o = a.hx != null ? [a.hx, a.hy!] : [a.x, a.y]
+      const n = b.hx != null ? [2 * b.x - b.hx, 2 * b.y - b.hy!] : [b.x, b.y]
+      d += `C${P(o[0], o[1])} ${P(n[0], n[1])} ${P(b.x, b.y)}`
+    }
+  }
+  return d
+}
+
+/** Tekst direct op het canvas bewerken (dubbelklik op een tekstlaag). */
+function TextEditor({ box, zoom, project }: { box: Box; zoom: number; project: Project }) {
+  const l = box.layer
+  const t = l.text!
+  const [value, setValue] = useState(t.content)
+  const ref = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => {
+    ref.current?.focus()
+    ref.current?.select()
+  }, [])
+  const font = project.fonts.find((f) => f.id === t.fontId)
+  const commit = () => {
+    if (value !== t.content) updateLayer(l.id, (x) => void (x.text!.content = value))
+    useStore.getState().setEditingText(null)
+  }
+  return (
+    <textarea
+      ref={ref}
+      className="text-editor"
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={commit}
+      onPointerDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        e.stopPropagation()
+        if (e.key === 'Escape' || (e.key === 'Enter' && (e.metaKey || e.ctrlKey))) {
+          e.preventDefault()
+          ;(e.target as HTMLTextAreaElement).blur()
+        }
+      }}
+      style={{
+        width: l.width * zoom,
+        height: l.height * zoom,
+        transformOrigin: `${box.ax * 100}% ${box.ay * 100}%`,
+        transform: `translate(${(box.wx - box.ax * l.width) * zoom}px,${(box.wy - box.ay * l.height) * zoom}px) rotate(${box.rotation}deg) scale(${box.scale})`,
+        fontFamily: font?.system ? font.family : font ? `${font.family}, Arial` : 'Arial, Helvetica, sans-serif',
+        fontSize: t.size * zoom,
+        fontWeight: t.weight,
+        lineHeight: t.lineHeight,
+        letterSpacing: t.letterSpacing * zoom,
+        textAlign: t.align,
+        color: t.color
+      }}
+    />
   )
 }

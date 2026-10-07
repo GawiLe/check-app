@@ -2,9 +2,14 @@ import { createLayer, deriveComposition, newId } from '@shared/factory'
 import { applyLibraryItem, applyUserPreset, LIBRARY, presetFromLayer } from '@shared/library'
 import { mergeTracks, PRESETS } from '@shared/presets'
 import { resetCompOverrides, resetOverrides } from '@shared/sync'
-import { cloneLayer, findDeep, groupLayers, localTime, sequenceLayers, ungroup } from '@shared/tree'
+import { allLayers, cloneLayer, findDeep, groupLayers, localTime, sequenceLayers, ungroup } from '@shared/tree'
+import { layerStateAt } from '@shared/anim'
+import { moveAnchor } from '@shared/geometry'
+import { applyKeyAssist, type KeyAssist } from '@shared/keys'
+import { penToPath, type PenPoint } from '@shared/path'
+import { ANIM_PROPS } from '@shared/types'
 import type { ExportTarget, Layer, LayerType } from '@shared/types'
-import { assetUrl, currentComp, findComp, findLayer, updateLayer, useStore } from '../store'
+import { assetUrl, contextOf, currentComp, findComp, findLayer, layerLocalTime, updateLayer, useStore, type SelectedKey } from '../store'
 
 const S = () => useStore.getState()
 
@@ -63,12 +68,65 @@ export async function save() {
 export function addLayer(type: LayerType, init?: (l: Layer) => void) {
   const comp = currentComp(S())
   if (!comp) return
-  const layer = createLayer(type, comp)
+  const { compId, activeTab } = S()
+  const ctx = contextOf(S().project!, compId, activeTab)
+  const layer = createLayer(type, ctx.group ?? comp)
   init?.(layer)
-  const { compId } = S()
-  S().update((p) => findComp(p, compId).layers.unshift(layer))
+  S().update((p) => void contextOf(p, compId, activeTab).list.unshift(layer))
   S().select([layer.id])
   return layer
+}
+
+/** Canvas-coördinaat → coördinaat binnen de geopende compositie (zonder schaal/rotatie van de groepen). */
+export function toContext(x: number, y: number) {
+  const { project, compId, activeTab } = S()
+  const ctx = contextOf(project!, compId, activeTab)
+  return ctx.ancestors.reduce((p, g) => ({ x: p.x - g.x, y: p.y - g.y }), { x, y })
+}
+
+/** Vorm tekenen met het rechthoek- of ellipsgereedschap. */
+export function addShapeRect(kind: 'rect' | 'ellipse', x: number, y: number, w: number, h: number) {
+  const p0 = toContext(x, y)
+  const l = addLayer('shape', (l) => {
+    l.name = kind === 'ellipse' ? 'Ellips' : 'Rechthoek'
+    l.shape!.kind = kind
+    Object.assign(l, { x: Math.round(p0.x), y: Math.round(p0.y), width: Math.max(4, Math.round(w)), height: Math.max(4, Math.round(h)) })
+  })
+  S().setTool('select')
+  return l
+}
+
+/** Vorm van de pen tool. */
+export function addPenShape(points: PenPoint[], closed: boolean) {
+  const pts = points.map((pt) => {
+    const a = toContext(pt.x, pt.y)
+    const h = pt.hx != null ? toContext(pt.hx, pt.hy!) : null
+    return { x: a.x, y: a.y, ...(h ? { hx: h.x, hy: h.y } : {}) }
+  })
+  const path = penToPath(pts, closed)
+  if (!path) return
+  addLayer('shape', (l) => {
+    l.name = closed ? 'Vorm' : 'Lijn'
+    Object.assign(l, { x: path.x, y: path.y, width: path.w, height: path.h })
+    l.shape!.kind = 'path'
+    l.shape!.path = { d: path.d, w: path.w, h: path.h, closed }
+    if (!closed) {
+      l.shape!.strokeWidth = 3
+      l.shape!.strokeColor = '#111111'
+    }
+  })
+  S().setTool('select')
+}
+
+/** Tekstgereedschap: nieuwe tekst op de klikplek, meteen bewerken. */
+export function addTextAt(x: number, y: number) {
+  const p0 = toContext(x, y)
+  const l = addLayer('text', (l) => {
+    Object.assign(l, { x: Math.round(p0.x), y: Math.round(p0.y), width: 200, height: 40 })
+    l.text!.content = 'Tekst'
+  })
+  S().setTool('select')
+  if (l) S().setEditingText(l.id)
 }
 
 export async function addImageLayer(path: string) {
@@ -170,17 +228,114 @@ export function moveLayer(layerId: string, dir: -1 | 1) {
   })
 }
 
-/** Selectie groeperen tot één groep (pre-comp), zoals Cmd+G. */
+/** Selectie onderbrengen in een nieuwe compositie (precompose / Cmd+G). */
 export function groupSelection() {
-  const { selection, compId } = S()
-  if (!selection.length) return
+  const { selection, compId, project } = S()
+  if (!selection.length || !project) return
+  const n = allLayers(findComp(project, compId).layers).filter((l) => l.type === 'group').length + 1
   let gid: string | null = null
   S().update((p) => {
-    const g = groupLayers(findComp(p, compId), selection, selection.length > 1 ? 'Groep' : 'Groep 1')
+    const g = groupLayers(findComp(p, compId), selection, `Comp ${n}`)
     gid = g?.id ?? null
   })
   if (gid) S().select([gid])
-  S().setStatus('Gegroepeerd. Animeer de groep als geheel, of klap hem open in de tijdlijn.')
+  S().setStatus('Toegevoegd aan een nieuwe compositie. Dubbelklik om hem te openen.')
+}
+
+/** Compositie openen in een eigen tab bij de tijdlijn (zoals dubbelklik op een pre-comp in AE). */
+export function openComp(id: string) {
+  const l = findLayer(S().project!, S().compId, id)
+  if (l?.type !== 'group') return
+  S().openTab(id)
+}
+
+// ---------- Klembord ----------
+
+export function copySelection() {
+  const { selection, project, compId } = S()
+  if (!selection.length || !project) return
+  const layers = selection.map((id) => findLayer(project, compId, id)).filter((l): l is Layer => !!l)
+  S().setClipboard(layers.map((l) => structuredClone(l)))
+  S().setStatus(`${layers.length} laag/lagen gekopieerd`)
+}
+
+export function cutSelection() {
+  copySelection()
+  deleteSelection()
+}
+
+/** Plakken in de lijst waar je nu werkt (formaat of geopende compositie), op dezelfde plek. */
+export function pasteClipboard() {
+  const { clipboard, compId, activeTab } = S()
+  if (!clipboard.length) return
+  const copies = clipboard.map(cloneLayer)
+  S().update((p) => void contextOf(p, compId, activeTab).list.unshift(...copies))
+  S().select(copies.map((c) => c.id))
+}
+
+// ---------- Volgorde en animatie ----------
+
+export function moveToEdge(layerId: string, where: 'front' | 'back') {
+  const { compId } = S()
+  S().update((p) => {
+    const f = findDeep(findComp(p, compId).layers, layerId)
+    if (!f) return
+    const [l] = f.list.splice(f.index, 1)
+    if (where === 'front') f.list.unshift(l)
+    else f.list.push(l)
+  })
+}
+
+/** Alle animatie van de selectie verwijderen (keyframes, binnenkomst, accent, uitgang). */
+export function removeAnimation() {
+  for (const id of S().selection)
+    updateLayer(id, (l) => {
+      for (const p of ANIM_PROPS) {
+        const kfs = l.tracks[p]
+        if (kfs?.length) l[p] = kfs[kfs.length - 1].v
+      }
+      l.tracks = {}
+      l.intro = l.outro = l.emphasis = null
+    })
+}
+
+// ---------- Keyframe-assistent ----------
+
+/** Easy Ease / In / Out / Lineair op de geselecteerde keyframes. */
+export function keyAssist(mode: KeyAssist) {
+  const { selectedKeys, compId } = S()
+  if (!selectedKeys.length) {
+    S().setStatus('Selecteer eerst keyframes (klik op ◆, Shift-klik voor meer).', 'error')
+    return
+  }
+  S().update((p) => {
+    const byTrack = new Map<string, SelectedKey[]>()
+    for (const k of selectedKeys) {
+      const key = `${k.layerId}|${k.prop}`
+      byTrack.set(key, [...(byTrack.get(key) ?? []), k])
+    }
+    for (const keys of byTrack.values()) {
+      const l = findLayer(p, compId, keys[0].layerId)
+      const kfs = l?.tracks[keys[0].prop]
+      if (l && kfs)
+        l.tracks[keys[0].prop] = applyKeyAssist(
+          kfs,
+          keys.map((k) => k.t),
+          mode
+        )
+    }
+  })
+  const label = { easy: 'Easy Ease', in: 'Easy Ease In', out: 'Easy Ease Out', linear: 'Lineair' }[mode]
+  S().setStatus(`${label} op ${selectedKeys.length} keyframe(s)`)
+}
+
+/** Anchor point zetten zonder dat de laag verspringt. */
+export function setAnchor(layerId: string, ax: number, ay: number, coalesce?: string) {
+  const { project, compId, time } = S()
+  const l = findLayer(project!, compId, layerId)
+  if (!l) return
+  const st = layerStateAt(l, layerLocalTime(project!, compId, layerId, time))
+  updateLayer(layerId, (x) => moveAnchor(x, Math.min(1, Math.max(0, ax)), Math.min(1, Math.max(0, ay)), st.scale, st.rotation), coalesce)
 }
 
 export function ungroupSelection() {

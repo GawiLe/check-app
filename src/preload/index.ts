@@ -32,6 +32,7 @@ const api: BannerStudioApi = {
   fontCatalog: call('fontCatalog'),
   installWebFont: call('installWebFont'),
   listPresets: call('listPresets'),
+  nativeEdit: call('nativeEdit'),
   savePresets: call('savePresets'),
   onFilesChanged: subscribe('bs:filesChanged') as BannerStudioApi['onFilesChanged'],
   onMenu: subscribe('bs:menu') as BannerStudioApi['onMenu']

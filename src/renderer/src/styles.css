@@ -167,7 +167,7 @@ input[type='range'] {
   pointer-events: none;
 }
 .num input {
-  padding-left: 22px;
+  padding-left: var(--lbl, 22px);
 }
 .num.wide-lbl input {
   padding-left: 34px;
@@ -1410,4 +1410,214 @@ input[type='range'] {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* ---------- Contextmenu ---------- */
+.ctx-menu {
+  position: fixed;
+  z-index: 200;
+  min-width: 230px;
+  background: var(--panel-2);
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+}
+.ctx-menu button {
+  width: 100%;
+  justify-content: space-between;
+  height: 28px;
+  font-size: 12px;
+}
+.ctx-menu button:hover:not(:disabled) {
+  background: var(--accent-bg);
+}
+.ctx-key {
+  color: var(--faint);
+  font-size: 11px;
+}
+.ctx-sep {
+  height: 1px;
+  background: var(--line-2);
+  margin: 4px 6px;
+}
+
+/* ---------- Canvas: gereedschap, anchor, tekst bewerken ---------- */
+.viewer.tool-rect .overlay,
+.viewer.tool-ellipse .overlay,
+.viewer.tool-pen .overlay {
+  cursor: crosshair;
+}
+.viewer.tool-text .overlay {
+  cursor: text;
+}
+.viewer .sel.context {
+  outline: 1px dashed rgba(63, 191, 134, 0.8);
+  pointer-events: none;
+}
+.viewer .anchor {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border: 1.5px solid var(--accent);
+  border-radius: 50%;
+  background: rgba(17, 17, 19, 0.35);
+  cursor: move;
+  z-index: 5;
+}
+.viewer .anchor::before,
+.viewer .anchor::after {
+  content: '';
+  position: absolute;
+  background: var(--accent);
+}
+.viewer .anchor::before {
+  left: 5.5px;
+  top: -4px;
+  width: 1.5px;
+  height: 20px;
+}
+.viewer .anchor::after {
+  top: 5.5px;
+  left: -4px;
+  height: 1.5px;
+  width: 20px;
+}
+.draw-preview {
+  position: absolute;
+  border: 1.5px solid var(--accent);
+  background: rgba(124, 140, 255, 0.15);
+  pointer-events: none;
+}
+.draw-preview.ellipse {
+  border-radius: 50%;
+}
+.pen-preview {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+.pen-preview path {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+.pen-point {
+  fill: #fff;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+.pen-point.first {
+  fill: var(--accent);
+}
+.pen-handle {
+  fill: var(--accent);
+}
+.pen-handle-line {
+  stroke: var(--accent);
+  stroke-width: 1;
+  opacity: 0.7;
+}
+.text-editor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 0;
+  border: none;
+  outline: 1.5px solid var(--accent);
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.94);
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+  z-index: 6;
+}
+.text-editor:hover,
+.text-editor:focus {
+  border: none;
+}
+.tool-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: var(--muted);
+  font-size: 11px;
+  max-width: 70%;
+  text-align: center;
+  pointer-events: none;
+}
+.tool-hint.top {
+  top: 12px;
+  bottom: auto;
+  border-color: rgba(63, 191, 134, 0.5);
+  color: #9fe0c0;
+}
+
+/* ---------- Tijdlijn-tabs (geopende composities) ---------- */
+.tl-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 6px 10px 0;
+  border-bottom: 1px solid var(--line);
+  background: #141416;
+  min-height: 32px;
+}
+.tl-tabs > button,
+.tl-tab {
+  height: 26px;
+  border-radius: 6px 6px 0 0;
+  color: var(--muted);
+  background: transparent;
+}
+.tl-tabs > button.on,
+.tl-tab.on {
+  background: var(--panel);
+  color: var(--text);
+}
+.tl-tab {
+  display: inline-flex;
+  align-items: center;
+}
+.tl-tab button {
+  height: 26px;
+  color: inherit;
+  padding: 0 4px 0 10px;
+}
+.tl-tab .close {
+  padding: 0 8px 0 4px;
+  color: var(--faint);
+}
+.tl-tabs-hint {
+  margin-left: auto;
+  align-self: center;
+  font-size: 11px;
+}
+.anchor-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 18px);
+  gap: 3px;
+  padding: 4px;
+  background: var(--panel-2);
+  border-radius: 6px;
+}
+.anchor-grid button {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 3px;
+  background: var(--line-2);
+}
+.anchor-grid button.on {
+  background: var(--accent);
+}
+.inspector .grid3 .seg {
+  min-width: 0;
 }
