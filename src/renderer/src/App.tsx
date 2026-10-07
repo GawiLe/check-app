@@ -132,6 +132,17 @@ export function App() {
     []
   )
 
+  // Bestanden die naast een drop-zone vallen niet in het venster openen
+  useEffect(() => {
+    const stop = (e: DragEvent) => e.dataTransfer?.types.includes('Files') && e.preventDefault()
+    window.addEventListener('dragover', stop)
+    window.addEventListener('drop', stop)
+    return () => {
+      window.removeEventListener('dragover', stop)
+      window.removeEventListener('drop', stop)
+    }
+  }, [])
+
   // Eigen presets laden (gedeeld over alle projecten)
   useEffect(() => void loadPresets(), [])
 

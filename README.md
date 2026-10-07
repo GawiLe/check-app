@@ -116,6 +116,16 @@ In de tijdlijn staan ze als groene (IN), gele (ACCENT) en oranje (UIT) blokken, 
   Op een lege plek: plakken of een nieuwe laag.
 - **Kopiëren en plakken** (Cmd/Ctrl+C, X, V) werkt binnen het project, ook tussen formaten en composities. In tekstvelden werkt het gewone kopiëren en plakken van het systeem.
 
+### Lagen ordenen en bestanden importeren
+
+- **Volgorde:** sleep een laag in de tijdlijn naar boven of onder. Een blauwe lijn laat zien waar hij komt; bij de rand scrolt de tijdlijn mee.
+  - Je kunt een laag ook in of uit een opengeklapte compositie slepen. Positie en timing worden dan omgerekend, zodat hij op dezelfde plek en hetzelfde moment blijft.
+- **SVG, PNG, JPG, GIF en WebP:** sleep ze vanuit de Finder op het canvas. Ze komen in `assets/` en worden meteen een laag op de plek waar je loslaat.
+  - Sleep je ze op het linkerpaneel, dan komen ze alleen bij de assets.
+  - Via *Assets & fonts → importeren* kan het ook.
+  - SVG blijft scherp op elk formaat en is meestal maar een paar KB.
+- **Fonts** (WOFF/WOFF2/TTF/OTF) kun je ook gewoon op het venster slepen.
+
 ### Keyframe-assistent (Easy Ease)
 
 Selecteer keyframes met een klik op ◆; Shift-klik voegt er meer aan toe. Kies daarna, via de rechtermuisknop, de knoppen in de tijdlijn of de toetsen:

@@ -25,7 +25,7 @@ import { overrideLabel } from '@shared/sync'
 import { allLayers, layerLength, shiftTiming, trimIn, trimOut } from '@shared/tree'
 import type { AnimProp, EaseName, Layer } from '@shared/types'
 import { ANIM_PROPS, EASES } from '@shared/types'
-import { applyLibrary, keyAssist, moveLayer, openComp } from '../lib/actions'
+import { applyLibrary, keyAssist, moveLayer, openComp, reorderTo } from '../lib/actions'
 import { openEmptyMenu, openKeyMenu, openLayerMenu } from '../lib/menus'
 import { contextOf, currentComp, updateComp, updateLayer, useStore } from '../store'
 import { EASE_LABEL } from './Inspector'
@@ -35,6 +35,7 @@ import { formatTime } from './ui'
 const FPS = 30
 const snap = (t: number) => Math.round(t * FPS) / FPS
 const NAME_W = 260
+const LAYER_DRAG = 'application/x-banner-layer'
 
 const PROP_LABEL: Record<AnimProp, string> = {
   x: 'Positie X',
@@ -215,12 +216,20 @@ export function Timeline() {
   // Animaties uit de bibliotheek op een laag laten vallen. Op het spoor: start waar je loslaat.
   const [dropOn, setDropOn] = useState<string | null>(null)
   const [dropAt, setDropAt] = useState<number | null>(null)
+  // Lagen verslepen: waar komt de laag terecht (boven of onder de laag onder de muis)?
+  const [dropLine, setDropLine] = useState<{ id: string; where: 'before' | 'after' } | null>(null)
   const dropProps = (layerId: string, offset: number, onTrack: boolean) => ({
     onDragOver: (e: React.DragEvent) => {
+      const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+      if (e.dataTransfer.types.includes(LAYER_DRAG)) {
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'move'
+        setDropLine({ id: layerId, where: e.clientY < r.top + r.height / 2 ? 'before' : 'after' })
+        return
+      }
       if (!e.dataTransfer.types.includes(DRAG_TYPE)) return
       e.preventDefault()
       setDropOn(layerId)
-      const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
       setDropAt(onTrack ? snap(tOf(e.clientX - r.left)) : null)
     },
     onDragLeave: () => {
@@ -228,6 +237,14 @@ export function Timeline() {
       setDropAt(null)
     },
     onDrop: (e: React.DragEvent) => {
+      const moving = e.dataTransfer.getData(LAYER_DRAG)
+      if (moving) {
+        e.preventDefault()
+        const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+        reorderTo(moving, layerId, e.clientY < r.top + r.height / 2 ? 'before' : 'after')
+        setDropLine(null)
+        return
+      }
       const id = e.dataTransfer.getData(DRAG_TYPE)
       if (!id) return
       e.preventDefault()
@@ -237,6 +254,7 @@ export function Timeline() {
       setDropAt(null)
     }
   })
+
 
   /** Keyframes van één eigenschap: eigen keyframes (sleepbaar) en die uit binnenkomst/accent/uitgang (hol). */
   const propDiamonds = (l: Layer, prop: AnimProp, offset: number) => {
@@ -299,7 +317,14 @@ export function Timeline() {
     rows.push(
       <div
         key={l.id + 'n'}
-        className={`tl-name${active ? ' active' : ''}${l.visible ? '' : ' hidden'}${dropOn === l.id ? ' drop-hint' : ''}`}
+        className={`tl-name${active ? ' active' : ''}${l.visible ? '' : ' hidden'}${dropOn === l.id ? ' drop-hint' : ''}${dropLine?.id === l.id ? ` drop-${dropLine.where}` : ''}`}
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData(LAYER_DRAG, l.id)
+          e.dataTransfer.effectAllowed = 'move'
+          if (!selection.includes(l.id)) s().select([l.id])
+        }}
+        onDragEnd={() => setDropLine(null)}
         style={pad}
         onClick={select}
         onDoubleClick={() => (l.type === 'group' ? openComp(l.id) : setExpanded(l.id, !open))}
@@ -346,7 +371,7 @@ export function Timeline() {
       </div>,
       <div
         key={l.id + 't'}
-        className={`tl-track${dropOn === l.id ? ' drop-hint' : ''}`}
+        className={`tl-track${dropOn === l.id ? ' drop-hint' : ''}${dropLine?.id === l.id ? ` drop-${dropLine.where}` : ''}`}
         onContextMenu={(e) => openLayerMenu(e, l.id)}
         {...dropProps(l.id, offset, true)}
       >
@@ -514,7 +539,17 @@ export function Timeline() {
         </button>
         <input type="range" min={40} max={320} value={pps} onChange={(e) => setPps(+e.target.value)} style={{ width: 90 }} title="Zoom tijdlijn" />
       </div>
-      <div className="body" onContextMenu={(e) => e.target === e.currentTarget && openEmptyMenu(e)}>
+      <div
+        className="body"
+        onContextMenu={(e) => e.target === e.currentTarget && openEmptyMenu(e)}
+        onDragOver={(e) => {
+          // Automatisch meescrollen als je een laag naar de rand sleept
+          const el = e.currentTarget
+          const r = el.getBoundingClientRect()
+          if (e.clientY < r.top + 40) el.scrollTop -= 12
+          else if (e.clientY > r.bottom - 30) el.scrollTop += 12
+        }}
+      >
         <div className="grid" style={{ gridTemplateColumns: `${NAME_W}px ${width}px` }}>
           <div className="tl-head names">LAGEN</div>
           <div className="tl-head">

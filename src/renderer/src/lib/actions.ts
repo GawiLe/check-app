@@ -2,7 +2,7 @@ import { createLayer, deriveComposition, newId } from '@shared/factory'
 import { applyLibraryItem, applyUserPreset, LIBRARY, presetFromLayer } from '@shared/library'
 import { mergeTracks, PRESETS } from '@shared/presets'
 import { resetCompOverrides, resetOverrides } from '@shared/sync'
-import { allLayers, cloneLayer, findDeep, groupLayers, localTime, sequenceLayers, ungroup } from '@shared/tree'
+import { allLayers, cloneLayer, findDeep, groupLayers, localTime, reorderLayer, sequenceLayers, ungroup } from '@shared/tree'
 import { layerStateAt } from '@shared/anim'
 import { moveAnchor } from '@shared/geometry'
 import { applyKeyAssist, type KeyAssist } from '@shared/keys'
@@ -129,7 +129,7 @@ export function addTextAt(x: number, y: number) {
   if (l) S().setEditingText(l.id)
 }
 
-export async function addImageLayer(path: string) {
+export async function addImageLayer(path: string, at?: { x: number; y: number }) {
   const comp = currentComp(S())
   if (!comp) return
   const img = new Image()
@@ -147,8 +147,14 @@ export async function addImageLayer(path: string) {
     l.image!.src = path
     l.width = Math.round(w * s)
     l.height = Math.round(h * s)
-    l.x = Math.round((comp.width - l.width) / 2)
-    l.y = Math.round((comp.height - l.height) / 2)
+    if (at) {
+      const p0 = toContext(at.x, at.y)
+      l.x = Math.round(p0.x - l.width / 2)
+      l.y = Math.round(p0.y - l.height / 2)
+    } else {
+      l.x = Math.round((comp.width - l.width) / 2)
+      l.y = Math.round((comp.height - l.height) / 2)
+    }
   })
 }
 
@@ -590,4 +596,36 @@ export async function deletePreset(id: string) {
   const list = S().presets.filter((p) => p.id !== id)
   await window.bs.savePresets(list)
   S().setPresets(list)
+}
+
+/** Laag slepen in de tijdlijn: vóór of na een andere laag (ook naar een andere compositie). */
+export function reorderTo(id: string, targetId: string, where: 'before' | 'after') {
+  const { compId } = S()
+  let ok = false
+  S().update((p) => {
+    ok = reorderLayer(findComp(p, compId), id, targetId, where)
+  })
+  if (!ok && id !== targetId) S().setStatus('Een compositie kan niet in zichzelf.', 'error')
+}
+
+/** Bestanden uit de Finder: afbeeldingen/SVG worden lagen (op de plek van loslaten), fonts gaan naar het project. */
+export async function importDroppedFiles(files: FileList, at?: { x: number; y: number }, asLayers = true) {
+  const { dir } = S()
+  if (!dir || !files.length) return
+  const paths = [...files].map((f) => window.bs.pathForFile(f)).filter(Boolean)
+  try {
+    const res = await window.bs.importPaths(dir, paths)
+    await refreshAssets()
+    if (res.fonts.length) S().update((p) => void p.fonts.push(...res.fonts))
+    let i = 0
+    if (asLayers) for (const a of res.assets) await addImageLayer(a, at ? { x: at.x + i * 12, y: at.y + i++ * 12 } : undefined)
+    const parts = [
+      res.assets.length ? `${res.assets.length} afbeelding(en)` : '',
+      res.fonts.length ? `${res.fonts.length} font(s)` : ''
+    ].filter(Boolean)
+    if (parts.length) S().setStatus(`${parts.join(' en ')} toegevoegd`)
+    if (res.skipped.length) S().setStatus(`Niet ondersteund: ${res.skipped.map((p) => p.split(/[\\/]/).pop()).join(', ')}`, 'error')
+  } catch (e) {
+    fail(e)
+  }
 }

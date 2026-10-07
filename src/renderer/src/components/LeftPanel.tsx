@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ImagePlus, Type, X } from 'lucide-react'
 import { Library } from './Library'
-import { addImageLayer, importFonts, importImages } from '../lib/actions'
+import { addImageLayer, importDroppedFiles, importFonts, importImages } from '../lib/actions'
 import { assetUrl, useStore } from '../store'
 import { Section } from './ui'
 
@@ -13,7 +13,16 @@ export function LeftPanel() {
   const [tab, setTab] = useState<'library' | 'assets'>('library')
 
   return (
-    <div className="panel left">
+    <div
+      className="panel left"
+      onDragOver={(e) => e.dataTransfer.types.includes('Files') && e.preventDefault()}
+      onDrop={(e) => {
+        if (!e.dataTransfer.files.length) return
+        e.preventDefault()
+        // In het paneel: alleen in het project zetten (afbeeldingen worden geen laag)
+        void importDroppedFiles(e.dataTransfer.files, undefined, false)
+      }}
+    >
       <div className="left-tabs">
         <button className={tab === 'library' ? 'on' : ''} onClick={() => setTab('library')}>
           Animaties

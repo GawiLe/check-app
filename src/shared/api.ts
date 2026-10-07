@@ -65,6 +65,10 @@ export interface BannerStudioApi {
   installWebFont(dir: string, font: WebFont, weight: number, style: 'normal' | 'italic'): Promise<FontAsset>
   listPresets(): Promise<UserPreset[]>
   nativeEdit(cmd: 'cut' | 'copy' | 'paste' | 'selectAll'): Promise<void>
+  /** Bestanden (bijv. uit de Finder gesleept) in het project zetten: afbeeldingen/SVG → assets/, fonts → fonts/. */
+  importPaths(dir: string, paths: string[]): Promise<{ assets: string[]; fonts: FontAsset[]; skipped: string[] }>
+  /** Pad van een gesleept bestand (synchroon, in de preload). */
+  pathForFile(file: File): string
   savePresets(list: UserPreset[]): Promise<void>
   onFilesChanged(cb: () => void): () => void
   onMenu(cb: (action: string) => void): () => void

@@ -186,3 +186,38 @@ export function cloneLayer(l: Layer): Layer {
   renew(c)
   return c
 }
+
+/** Som van posities en in-punten van de bovenliggende composities. */
+function ancestorOffset(ancestors: Layer[]) {
+  return ancestors.reduce((a, g) => ({ x: a.x + g.x, y: a.y + g.y, t: a.t + (g.start ?? 0) }), { x: 0, y: 0, t: 0 })
+}
+
+/**
+ * Laag verslepen in de lagenlijst: vóór of na een andere laag. Mag ook naar een
+ * andere compositie; positie en timing worden dan omgerekend zodat de laag op
+ * dezelfde plek en hetzelfde moment blijft staan.
+ */
+export function reorderLayer(comp: Composition, id: string, targetId: string, where: 'before' | 'after'): boolean {
+  if (id === targetId) return false
+  const src = findDeep(comp.layers, id)
+  const dst = findDeep(comp.layers, targetId)
+  if (!src || !dst) return false
+  // Niet in zichzelf of een eigen kind plaatsen
+  if (dst.ancestors.some((a) => a.id === id)) return false
+  const layer = src.layer
+  if (src.list !== dst.list) {
+    const a = ancestorOffset(src.ancestors)
+    const b = ancestorOffset(dst.ancestors)
+    const dx = a.x - b.x
+    const dy = a.y - b.y
+    layer.x = round(layer.x + dx, 1)
+    layer.y = round(layer.y + dy, 1)
+    if (layer.tracks.x) layer.tracks.x = layer.tracks.x.map((k) => ({ ...k, v: round(k.v + dx, 1) }))
+    if (layer.tracks.y) layer.tracks.y = layer.tracks.y.map((k) => ({ ...k, v: round(k.v + dy, 1) }))
+    shiftTiming(layer, a.t - b.t, false)
+  }
+  src.list.splice(src.index, 1)
+  const ti = dst.list.indexOf(dst.layer)
+  dst.list.splice(where === 'before' ? ti : ti + 1, 0, layer)
+  return true
+}

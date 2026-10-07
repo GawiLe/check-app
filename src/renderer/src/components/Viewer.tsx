@@ -6,7 +6,7 @@ import type { Composition, Layer, Project } from '@shared/types'
 import { anchorOf } from '@shared/geometry'
 import type { PenPoint } from '@shared/path'
 import { activeAt, findDeep, localTime } from '@shared/tree'
-import { addPenShape, addShapeRect, addTextAt, applyLibrary, openComp, setAnchor } from '../lib/actions'
+import { addPenShape, addShapeRect, addTextAt, applyLibrary, importDroppedFiles, openComp, setAnchor } from '../lib/actions'
 import { openEmptyMenu, openLayerMenu } from '../lib/menus'
 import { assetUrl, currentComp, setLayerValue, updateLayer, useStore } from '../store'
 import { DRAG_TYPE } from './Library'
@@ -471,6 +471,11 @@ function SingleViewer() {
             onContextMenu={onContext}
             onDoubleClick={onDouble}
             onDragOver={(e) => {
+              if (e.dataTransfer.types.includes('Files')) {
+                e.preventDefault()
+                e.dataTransfer.dropEffect = 'copy'
+                return
+              }
               if (!e.dataTransfer.types.includes(DRAG_TYPE)) return
               e.preventDefault()
               e.dataTransfer.dropEffect = 'copy'
@@ -479,6 +484,11 @@ function SingleViewer() {
             }}
             onDragLeave={() => setHover(null)}
             onDrop={(e) => {
+              if (e.dataTransfer.files.length) {
+                e.preventDefault()
+                void importDroppedFiles(e.dataTransfer.files, toComp(e))
+                return
+              }
               const id = e.dataTransfer.getData(DRAG_TYPE)
               if (!id) return
               e.preventDefault()

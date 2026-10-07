@@ -122,6 +122,15 @@ const handlers: Handlers = {
   },
 
   listAssets: (dir) => listAssets(dir),
+
+  async importPaths(dir, paths) {
+    const img = paths.filter((p) => /\.(png|jpe?g|gif|svg|webp)$/i.test(p))
+    const fnt = paths.filter((p) => /\.(woff2?|ttf|otf)$/i.test(p))
+    const assets = await copyIntoProject(dir, 'assets', img)
+    const fontFiles = await copyIntoProject(dir, 'fonts', fnt)
+    const fonts = await Promise.all(fontFiles.map((f) => describeFont(dir, f)))
+    return { assets, fonts, skipped: paths.filter((p) => !img.includes(p) && !fnt.includes(p)) }
+  },
   generateWriteOn: (dir, fontFile, text, size) => textToGlyphPaths(dir, fontFile, text, size),
   exportBanners: (req) => exportBanners(req),
 
@@ -230,6 +239,8 @@ async function createWindow() {
     webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false, contextIsolation: true }
   })
   win.on('closed', () => (win = null))
+  // Een bestand dat naast het canvas wordt losgelaten mag de app niet wegnavigeren
+  win.webContents.on('will-navigate', (e) => e.preventDefault())
   if (process.env.ELECTRON_RENDERER_URL) await win.loadURL(process.env.ELECTRON_RENDERER_URL)
   else await win.loadFile(join(__dirname, '../renderer/index.html'))
 }

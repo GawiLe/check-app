@@ -1621,3 +1621,14 @@ input[type='range'] {
 .inspector .grid3 .seg {
   min-width: 0;
 }
+
+/* Lagen verslepen in de tijdlijn */
+.tl-name[draggable='true'] {
+  cursor: grab;
+}
+.drop-before {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+.drop-after {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}

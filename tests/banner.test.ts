@@ -502,3 +502,29 @@ describe('vormen', () => {
     expect(html).toMatch(/border:2px solid/)
   })
 })
+
+describe('lagen verslepen', () => {
+  it('verandert de volgorde binnen een lijst', async () => {
+    const { reorderLayer } = await import('../src/shared/tree')
+    const comp = createStarterProject().compositions[0]
+    const names = () => comp.layers.map((l) => l.name)
+    const [first, , third] = comp.layers
+    reorderLayer(comp, first.id, third.id, 'after')
+    expect(names().indexOf(first.name)).toBe(2)
+  })
+  it('naar een andere compositie: blijft op dezelfde plek en hetzelfde moment', async () => {
+    const { reorderLayer, groupLayers, shiftTiming, findDeep } = await import('../src/shared/tree')
+    const comp = createStarterProject().compositions[0]
+    const cta = comp.layers.find((l) => l.name === 'CTA')!
+    const sub = comp.layers.find((l) => l.name === 'Subline')!
+    const g = groupLayers(comp, [cta.id])!
+    shiftTiming(g, 1)
+    const before = { x: sub.x, y: sub.y, t: sub.intro!.start }
+    reorderLayer(comp, sub.id, cta.id, 'before')
+    const f = findDeep(comp.layers, sub.id)!
+    expect(f.ancestors[0].id).toBe(g.id)
+    expect(sub.x + g.x).toBeCloseTo(before.x)
+    expect(sub.y + g.y).toBeCloseTo(before.y)
+    expect(sub.intro!.start + g.start!).toBeCloseTo(before.t)
+  })
+})

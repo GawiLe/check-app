@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { BannerStudioApi } from '@shared/api'
 
 const call =
@@ -33,6 +33,8 @@ const api: BannerStudioApi = {
   installWebFont: call('installWebFont'),
   listPresets: call('listPresets'),
   nativeEdit: call('nativeEdit'),
+  importPaths: call('importPaths'),
+  pathForFile: (file: File) => webUtils.getPathForFile(file),
   savePresets: call('savePresets'),
   onFilesChanged: subscribe('bs:filesChanged') as BannerStudioApi['onFilesChanged'],
   onMenu: subscribe('bs:menu') as BannerStudioApi['onMenu']
