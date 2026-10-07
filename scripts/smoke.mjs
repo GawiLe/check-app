@@ -33,6 +33,22 @@ await page.reload()
 await page.locator('.welcome .list-item').first().click()
 await page.waitForSelector('.app')
 
+// 0. De preview draait echt (eigen document via bsproj:// met eigen CSP)
+await check('preview rendert de banner', async () => {
+  for (let i = 0; i < 40; i++) {
+    const f = page.frames().find((fr) => fr.url().startsWith('bsproj://bs-preview/'))
+    if (f && (await f.evaluate(() => document.body.classList.contains('r') && document.querySelectorAll('.L').length > 3).catch(() => false))) return true
+    await page.waitForTimeout(150)
+  }
+  return false
+})
+await check('editor heeft strenge CSP (geen inline scripts)', async () =>
+  page.evaluate(() => {
+    const m = document.querySelector('meta[http-equiv="Content-Security-Policy"]').content
+    return /script-src 'self';/.test(m)
+  })
+)
+
 // 1. Rechtermuisknop: CTA + CTA tekst → nieuwe compositie
 await row('CTA tekst').click()
 await row('CTA').click({ modifiers: ['Shift'] })

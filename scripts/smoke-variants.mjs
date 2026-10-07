@@ -10,6 +10,10 @@ await mkdir(shots, { recursive: true })
 const svg = (w, h, c) => `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="${c}"/></svg>`
 await writeFile(`${dir}/assets/zomer.svg`, svg(120, 30, '#ff9900'))
 await writeFile(`${shots}/winter.svg`, svg(120, 30, '#3399ff'))
+// Een ánder project dat toevallig dezelfde mapnaam heeft als een variant: mag niet overschreven worden
+const stranger = join(dirname(dir), `${basename(dir)}-zomer`)
+await mkdir(stranger, { recursive: true })
+await writeFile(join(stranger, 'project.bsproj'), JSON.stringify({ name: 'Ander project' }))
 
 const app = await electron.launch({ args: ['--no-sandbox', '.'], env: { ...process.env, BS_USER_DATA: shots + '/userdata' } })
 const page = await app.firstWindow()
@@ -72,8 +76,11 @@ await page.waitForSelector('.variant-results .result', { timeout: 120000 })
 await page.waitForTimeout(300)
 await shot('v3-resultaat')
 const parent = dirname(dir)
-const zomer = join(parent, `${basename(dir)}-zomer`)
+const zomer = join(parent, `${basename(dir)}-zomer-2`)
 const winter = join(parent, `${basename(dir)}-winter`)
+await check('vreemde map met dezelfde naam niet overschreven (variant naar -zomer-2)', async () =>
+  JSON.parse(await readFile(join(stranger, 'project.bsproj'), 'utf8')).name === 'Ander project'
+)
 await check('twee projectmappen naast het origineel', async () => existsSync(join(zomer, 'project.bsproj')) && existsSync(join(winter, 'project.bsproj')))
 await check('Zomer: andere headline en logo in alle formaten', async () => {
   const p = await readProject(zomer)
@@ -104,6 +111,15 @@ await check('export Zomer bevat de nieuwe tekst en het nieuwe logo', async () =>
 await check('origineel ongewijzigd (alleen de variantinstellingen erbij)', async () => {
   const p = await readProject(dir)
   return p.compositions[0].layers.find((l) => l.name === 'Headline').text.content === headline0 && p.variants?.variants.length === 2
+})
+
+// Opnieuw aanmaken werkt dezelfde mappen bij (geen -3 of winter-2)
+await page.locator('.modal .actions button', { hasText: 'Terug' }).click()
+await page.getByRole('button', { name: /2 variant\(en\) aanmaken/ }).click()
+await page.waitForSelector('.variant-results .result', { timeout: 120000 })
+await check('opnieuw aanmaken: zelfde mappen bijgewerkt', async () => {
+  const names = (await readdir(parent)).filter((n) => n.startsWith(basename(dir) + '-'))
+  return names.sort().join() === [`${basename(dir)}-winter`, `${basename(dir)}-zomer`, `${basename(dir)}-zomer-2`].sort().join()
 })
 
 // 5. Variant openen vanuit het resultaat

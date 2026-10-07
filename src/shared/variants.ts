@@ -41,6 +41,7 @@ export function variantFields(project: Project): VariantField[] {
 export function applyVariant(project: Project, variant: Variant, fields: string[]): Project {
   const p: Project = structuredClone(project)
   delete p.variants
+  delete p.variantOf
   p.name = `${project.name} – ${variant.name}`
   const chosen = new Set(fields)
   for (const c of p.compositions)

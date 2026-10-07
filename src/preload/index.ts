@@ -22,6 +22,7 @@ const api: BannerStudioApi = {
   generateWriteOn: call('generateWriteOn'),
   exportBanners: call('exportBanners'),
   createVariants: call('createVariants'),
+  setPreview: call('setPreview'),
   revealInFolder: call('revealInFolder'),
   listBoilerplates: call('listBoilerplates'),
   saveBoilerplate: call('saveBoilerplate'),

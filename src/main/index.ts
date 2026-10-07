@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, shell } from 'electron'
 import { watch, type FSWatcher } from 'node:fs'
 import { readFile } from 'node:fs/promises'
-import { extname, join } from 'node:path'
+import { extname, join, resolve } from 'node:path'
 import { inside } from './paths'
 import type { BannerStudioApi, Settings } from '@shared/api'
 import type { Project } from '@shared/types'
@@ -40,6 +40,14 @@ if (process.env.BS_USER_DATA) app.setPath('userData', process.env.BS_USER_DATA)
 let win: BrowserWindow | null = null
 let currentDir: string | null = null
 let watcher: FSWatcher | null = null
+
+// Preview van de banner: eigen document met een eigen, strenge CSP (alleen het eigen inline-script,
+// geen netwerk; afbeeldingen en fonts alleen uit het project). Zo erft hij niets van de editor.
+const PREVIEW_HOST = 'bs-preview'
+const previews = ['', '']
+let previewRev = 0
+const PREVIEW_CSP =
+  "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src bsproj: data:; font-src bsproj: data:; media-src 'none'; connect-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'"
 
 const FONT_MIME: Record<string, string> = { '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.otf': 'font/otf' }
 
@@ -131,6 +139,11 @@ const handlers: Handlers = {
   generateWriteOn: (dir, fontFile, text, size) => textToGlyphPaths(dir, fontFile, text, size),
   exportBanners: (req) => exportBanners(req),
   createVariants: (req) => createVariants(req),
+  async setPreview(slot, html) {
+    const i = slot === 1 ? 1 : 0
+    previews[i] = String(html)
+    return `bsproj://${PREVIEW_HOST}/${i}?v=${++previewRev}`
+  },
 
   async revealInFolder(path) {
     shell.showItemInFolder(path)
@@ -173,8 +186,22 @@ const handlers: Handlers = {
   }
 }
 
+// Functies die in een projectmap schrijven of lezen: alleen in het project dat nu open is
+// (de map komt uit het venster en wordt dus niet blind vertrouwd).
+const DIR_ARG = new Set(['saveProject', 'importImages', 'importFonts', 'listAssets', 'importPaths', 'generateWriteOn', 'saveBoilerplate', 'installWebFont'])
+const DIR_REQ = new Set(['exportBanners', 'createVariants'])
+function assertOpenProject(dir: unknown) {
+  if (typeof dir !== 'string' || !currentDir || resolve(dir) !== resolve(currentDir)) throw new Error('Deze map is niet het geopende project.')
+}
+
 for (const [name, fn] of Object.entries(handlers)) {
-  ipcMain.handle(`bs:${name}`, async (_e, ...args) => (fn as (...a: unknown[]) => unknown)(...args))
+  ipcMain.handle(`bs:${name}`, async (e, ...args) => {
+    // Alleen het hoofdvenster zelf, nooit een (preview-)frame of een ander venster
+    if (!win || e.sender !== win.webContents || e.senderFrame !== win.webContents.mainFrame) throw new Error('Niet toegestaan.')
+    if (DIR_ARG.has(name)) assertOpenProject(args[0])
+    if (DIR_REQ.has(name)) assertOpenProject((args[0] as { dir?: unknown } | undefined)?.dir)
+    return (fn as (...a: unknown[]) => unknown)(...args)
+  })
 }
 
 function buildMenu() {
@@ -266,6 +293,10 @@ app.whenReady().then(async () => {
     if (!currentDir) return new Response('Geen project', { status: 404 })
     try {
       const url = new URL(req.url)
+      if (url.hostname === PREVIEW_HOST)
+        return new Response(previews[url.pathname === '/1' ? 1 : 0], {
+          headers: { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': PREVIEW_CSP, 'cache-control': 'no-store' }
+        })
       const rel = decodeURIComponent(`${url.hostname}${url.pathname}`)
       const file = inside(currentDir, rel)
       const ext = extname(file).toLowerCase()

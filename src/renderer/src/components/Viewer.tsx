@@ -35,8 +35,10 @@ function BannerFrame(props: { project: Project; comp: Composition; time: number;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.fonts, project.name, project.clickTag, comp, rev])
 
+  const seq = useRef(0)
   useEffect(() => {
-    const t = setTimeout(() => {
+    const t = setTimeout(async () => {
+      const mine = ++seq.current
       const next = 1 - active.current
       const f = frames[next].current
       if (!f) return
@@ -51,7 +53,9 @@ function BannerFrame(props: { project: Project; comp: Composition; time: number;
           active.current = next
         }, 40)
       }
-      f.srcdoc = html
+      // Via bsproj:// (eigen document met eigen CSP) in plaats van srcdoc, dat de CSP van de editor zou erven
+      const url = await window.bs.setPreview(next, html)
+      if (mine === seq.current) f.src = url
     }, 30)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -67,6 +67,8 @@ export interface BannerStudioApi {
   ): Promise<Pick<WriteOnProps, 'glyphs' | 'viewBox'> & { width: number; height: number }>
   exportBanners(req: ExportRequest): Promise<ExportResult[]>
   createVariants(req: VariantRequest): Promise<VariantResult[]>
+  /** Preview-HTML klaarzetten; geeft de bsproj://-URL voor het preview-iframe terug. */
+  setPreview(slot: number, html: string): Promise<string>
   revealInFolder(path: string): Promise<void>
   listBoilerplates(): Promise<Boilerplate[]>
   saveBoilerplate(dir: string, project: Project, name: string): Promise<Boilerplate>
