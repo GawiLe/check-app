@@ -35,6 +35,7 @@ export async function fontCatalog(): Promise<{ fonts: WebFont[]; online: boolean
 
 /** Download één gewicht/stijl als WOFF2 naar fonts/ in het project. */
 export async function installWebFont(dir: string, font: WebFont, weight: number, style: 'normal' | 'italic'): Promise<FontAsset> {
+  if (!/^[a-z0-9-]+$/.test(font.id) || !Number.isInteger(weight)) throw new Error('Ongeldige fontnaam.')
   const name = `${font.id}-${weight}${style === 'italic' ? '-italic' : ''}.woff2`
   const rel = `fonts/${name}`
   if (!existsSync(join(dir, rel))) {

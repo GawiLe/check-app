@@ -35,7 +35,16 @@ export const escapeHtml = (s: string): string =>
 /** Houd CSS-waarden veilig: geen tekens waarmee je uit een declaratie kunt breken. */
 export const cssValue = (s: string): string => s.replace(/[<>{};"\\]/g, '')
 
-const n = (v: number): string => String(round(v, 2))
+const n = (v: number): string => {
+  const r = round(Number(v), 2)
+  return String(Number.isFinite(r) ? r : 0)
+}
+/** Alleen bekende waarden uit het projectbestand in CSS/HTML; al het andere wordt de standaard. */
+const oneOf = <T extends string>(v: unknown, allowed: readonly T[], fallback: T): T => (allowed.includes(v as T) ? (v as T) : fallback)
+const weightOf = (w: unknown) => {
+  const v = Math.round(Number(w) / 100) * 100
+  return Number.isFinite(v) && v >= 100 && v <= 900 ? v : 400
+}
 
 export function usedFontIds(comp: Composition): string[] {
   const ids = new Set<string>()
@@ -99,7 +108,7 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
   project.fonts.forEach((f, i) => {
     if (f.system || !fontIds.includes(f.id) || !opts.fontSrc[f.id]) return
     css.push(
-      `@font-face{font-family:f${i};src:${opts.fontSrc[f.id]};font-weight:${f.weight};font-style:${f.style};font-display:block}`
+      `@font-face{font-family:f${i};src:${opts.fontSrc[f.id]};font-weight:${weightOf(f.weight)};font-style:${oneOf(f.style, ['normal', 'italic'] as const, 'normal')};font-display:block}`
     )
   })
 
@@ -137,9 +146,9 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
           rules.push(
             `font-family:${fontStack(project.fonts, t.fontId)}`,
             `font-size:${n(t.size)}px`,
-            `font-weight:${t.weight}`,
+            `font-weight:${weightOf(t.weight)}`,
             `color:${cssValue(t.color)}`,
-            `text-align:${t.align}`,
+            `text-align:${oneOf(t.align, ['left', 'center', 'right'] as const, 'left')}`,
             `line-height:${n(t.lineHeight)}`,
             `letter-spacing:${n(t.letterSpacing)}px`,
             'white-space:pre-wrap'
@@ -151,7 +160,7 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
           const img = l.image!
           if (img.src) {
             assets.push(img.src)
-            inner = `<img ${polite ? 'data-src' : 'src'}="${escapeHtml(opts.assetUrl(img.src))}" alt="" style="width:100%;height:100%;object-fit:${img.fit};display:block">`
+            inner = `<img ${polite ? 'data-src' : 'src'}="${escapeHtml(opts.assetUrl(img.src))}" alt="" style="width:100%;height:100%;object-fit:${oneOf(img.fit, ['contain', 'cover', 'fill'] as const, 'contain')};display:block">`
           }
           break
         }

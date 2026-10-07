@@ -1,3 +1,4 @@
+import { safeName } from './paths'
 import { app, safeStorage } from 'electron'
 import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
@@ -137,6 +138,7 @@ export async function listBoilerplates(): Promise<Boilerplate[]> {
 
 export async function boilerplateSource(id: string | null): Promise<{ project: Project; dir?: string }> {
   if (!id || id === BUILTIN_STARTER) return { project: createStarterProject() }
+  if (!safeName(id)) throw new Error('Ongeldige boilerplate.')
   const dir = join(bpRoot(), id)
   return { project: (await readProject(dir)).project, dir }
 }
@@ -148,7 +150,7 @@ export async function saveBoilerplate(dir: string, project: Project, name: strin
 }
 
 export async function deleteBoilerplate(id: string): Promise<void> {
-  if (id.startsWith('builtin:') || id.includes('..') || id.includes('/')) return
+  if (id.startsWith('builtin:') || !safeName(id)) return
   await rm(join(bpRoot(), id), { recursive: true, force: true })
 }
 

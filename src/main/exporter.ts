@@ -5,7 +5,8 @@ import { pathToFileURL } from 'node:url'
 import { zipSync } from 'fflate'
 import type { ExportRequest } from '@shared/api'
 import { buildBanner, charsPerFont } from '@shared/build'
-import { fontsInline, TARGETS } from '@shared/specs'
+import { fontsInline, TARGET_IDS, TARGETS } from '@shared/specs'
+import { inside } from './paths'
 import type { Composition, ExportResult, ExportTarget, Project } from '@shared/types'
 import { initialLoad, validateBanner } from '@shared/validate'
 import { subsetToWoff2 } from './fonts'
@@ -98,7 +99,7 @@ async function exportOne(
     const m = src.match(/^url\((f\d+\.woff2)\)/)
     if (m && !built.fontIds.includes(fid)) delete files[m[1]]
   }
-  for (const p of built.assets) files[assetNames[p]] = await readFile(join(dir, p))
+  for (const p of built.assets) files[assetNames[p]] = await readFile(inside(dir, p))
   files['index.html'] = new TextEncoder().encode(built.html)
   for (const [n, text] of Object.entries(built.extraFiles)) files[n] = new TextEncoder().encode(text)
 
@@ -131,7 +132,7 @@ async function exportOne(
   for (const f of project.fonts) {
     const buf = fonts[f.id]
     if (!buf || !built.fontIds.includes(f.id)) continue
-    const orig = await stat(join(dir, f.file)).then((st) => st.size).catch(() => 0)
+    const orig = await stat(inside(dir, f.file)).then((st) => st.size).catch(() => 0)
     const n = new Set(chars[f.id]).size
     const kbs = (b: number) => `${(b / 1024).toFixed(1)} KB`
     const at = issues.findIndex((i) => i.rule === 'ok')
@@ -180,12 +181,16 @@ export async function renderBackup(indexHtml: string, comp: Composition, outFile
 }
 
 export async function exportBanners(req: ExportRequest): Promise<ExportResult[]> {
+  // Cache alleen binnen één export: een vervangen fontbestand moet de volgende keer opnieuw worden verkleind
+  subsetCache.clear()
   const results: ExportResult[] = []
+  // Alleen bekende platforms: de naam wordt een mapnaam die vóór het schrijven wordt leeggemaakt
+  const targets = req.targets.filter((t) => TARGET_IDS.includes(t))
   for (const id of req.compositionIds) {
     const comp = req.project.compositions.find((c) => c.id === id)
     if (!comp) continue
     const fonts = await prepareFonts(req.dir, req.project, comp)
-    for (const target of req.targets) results.push(await exportOne(req.dir, req.project, comp, target, fonts))
+    for (const target of targets) results.push(await exportOne(req.dir, req.project, comp, target, fonts))
   }
   await writeFile(join(req.dir, 'export', 'rapport.json'), JSON.stringify(results, null, 2))
   return results

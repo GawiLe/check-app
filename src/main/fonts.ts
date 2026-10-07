@@ -1,5 +1,5 @@
+import { inside } from './paths'
 import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
 import * as opentypeNs from 'opentype.js'
 import subsetFont from 'subset-font'
 import fontverter from 'fontverter'
@@ -19,7 +19,7 @@ function parse(buf: Buffer): opentype.Font {
 
 /** Leest familienaam, gewicht en stijl uit een font-bestand (woff, woff2, ttf, otf). */
 export async function describeFont(dir: string, file: string): Promise<FontAsset> {
-  const font = parse(await toSfnt(await readFile(join(dir, file))))
+  const font = parse(await toSfnt(await readFile(inside(dir, file))))
   // opentype.js 2.x groepeert namen per platform; 1.x had ze plat.
   type NameTable = Record<string, Record<string, string> | undefined>
   const all = font.names as unknown as Record<string, NameTable | undefined> & NameTable
@@ -34,7 +34,7 @@ export async function describeFont(dir: string, file: string): Promise<FontAsset
 
 /** Subset naar alleen de gebruikte tekens, als WOFF2. Spatie wordt altijd meegenomen. */
 export async function subsetToWoff2(dir: string, file: string, chars: string): Promise<Buffer> {
-  const buf = await readFile(join(dir, file))
+  const buf = await readFile(inside(dir, file))
   return subsetFont(buf, chars + ' ', { targetFormat: 'woff2' })
 }
 
@@ -48,7 +48,7 @@ export async function textToGlyphPaths(
   text: string,
   size: number
 ): Promise<{ glyphs: WriteOnGlyph[]; viewBox: [number, number, number, number]; width: number; height: number }> {
-  const font = parse(await toSfnt(await readFile(join(dir, file))))
+  const font = parse(await toSfnt(await readFile(inside(dir, file))))
   const lineHeight = size * 1.15
   const glyphs: WriteOnGlyph[] = []
   let x1 = Infinity

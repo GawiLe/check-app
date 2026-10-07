@@ -43,10 +43,30 @@ function resolvePaint(value: string, root: SVGSVGElement): string | null {
   return toHex(value)
 }
 
+/**
+ * Maakt een SVG-document onschadelijk vóórdat het in de editor wordt gezet: geen scripts,
+ * event-handlers (onload, onerror …), externe of javascript:-links, iframes of ingebedde HTML.
+ * Een SVG uit een onbekende bron mag in de editor nooit code uitvoeren.
+ */
+export function sanitizeSvg(doc: Document): void {
+  for (const el of [...doc.querySelectorAll('script, foreignObject, iframe, embed, object, audio, video, animate, set, animateMotion, animateTransform')]) el.remove()
+  for (const el of [doc.documentElement, ...doc.documentElement.querySelectorAll('*')]) {
+    for (const attr of [...el.attributes]) {
+      const name = attr.name.toLowerCase()
+      const value = attr.value.trim().toLowerCase()
+      const isLink = name === 'href' || name.endsWith(':href') || name === 'src'
+      if (name.startsWith('on') || (isLink && !value.startsWith('#')) || /javascript:|data:text\/html/.test(value)) el.removeAttribute(attr.name)
+    }
+  }
+}
+
 export function parseSvg(text: string): SvgParse {
   const doc = new DOMParser().parseFromString(text, 'image/svg+xml')
   const src = doc.documentElement
   if (src.nodeName.toLowerCase() !== 'svg' || doc.querySelector('parsererror')) throw new Error('Dit is geen geldig SVG-bestand.')
+  // Niet-vertaalbare onderdelen tellen vóór het opschonen (voor de melding "… overgeslagen")
+  const unsupported = [...doc.querySelectorAll('text, image, use, foreignObject')].filter((el) => !el.closest(SKIP_PARENTS)).map((el) => el.nodeName)
+  sanitizeSvg(doc)
   const host = document.createElement('div')
   host.style.cssText = 'position:fixed;left:-20000px;top:0;opacity:0;pointer-events:none'
   const svg = document.importNode(src, true) as unknown as SVGSVGElement
@@ -59,8 +79,7 @@ export function parseSvg(text: string): SvgParse {
   document.body.appendChild(host)
   try {
     const shapes: SvgShape[] = []
-    const skipped: string[] = []
-    for (const el of svg.querySelectorAll('text, image, use, foreignObject')) if (!el.closest(SKIP_PARENTS)) skipped.push(el.nodeName)
+    const skipped: string[] = unsupported
     const els = svg.querySelectorAll<SVGGraphicsElement>('path, rect, circle, ellipse, line, polyline, polygon')
     let n = 0
     for (const el of els) {

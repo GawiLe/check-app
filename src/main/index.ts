@@ -1,7 +1,8 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, shell } from 'electron'
 import { watch, type FSWatcher } from 'node:fs'
 import { readFile } from 'node:fs/promises'
-import { extname, join, normalize, resolve, sep } from 'node:path'
+import { extname, join } from 'node:path'
+import { inside } from './paths'
 import type { BannerStudioApi, Settings } from '@shared/api'
 import type { Project } from '@shared/types'
 import { aiAnimate } from './ai'
@@ -59,11 +60,6 @@ function setProjectDir(dir: string) {
   win?.setTitle(`Banner Studio — ${dir}`)
 }
 
-function inside(dir: string, rel: string): string {
-  const full = resolve(dir, normalize(rel))
-  if (!full.startsWith(resolve(dir) + sep)) throw new Error('Pad buiten de projectmap.')
-  return full
-}
 
 type Handlers = { [K in keyof BannerStudioApi]?: (...a: Parameters<BannerStudioApi[K]>) => ReturnType<BannerStudioApi[K]> | Awaited<ReturnType<BannerStudioApi[K]>> }
 
@@ -256,6 +252,8 @@ async function createWindow() {
   win.on('closed', () => (win = null))
   // Een bestand dat naast het canvas wordt losgelaten mag de app niet wegnavigeren
   win.webContents.on('will-navigate', (e) => e.preventDefault())
+  // Nooit nieuwe vensters vanuit de app of de preview (banner-code kan window.open aanroepen)
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   if (process.env.ELECTRON_RENDERER_URL) await win.loadURL(process.env.ELECTRON_RENDERER_URL)
   else await win.loadFile(join(__dirname, '../renderer/index.html'))
 }

@@ -846,3 +846,70 @@ describe('fonts en Azerion', () => {
     expect(bad.filter((i) => i.level === 'error').map((i) => i.rule).sort()).toEqual(['bestandstype', 'gewicht'])
   })
 })
+
+describe('veiligheid', () => {
+  it('SVG-import: geen scripts, event-handlers of externe links', async () => {
+    const { sanitizeSvg } = await import('../src/renderer/src/lib/svgimport')
+    const dom = new JSDOM('')
+    const doc = new dom.window.DOMParser().parseFromString(
+      `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" onload="alert(1)">
+        <script>alert(2)</script>
+        <defs><linearGradient id="g"><stop offset="0" stop-color="#f00"/></linearGradient></defs>
+        <image href="x" onerror="alert(3)"/>
+        <a xlink:href="javascript:alert(4)"><rect width="10" height="10" fill="url(#g)"/></a>
+        <use href="#g"/><foreignObject><div onclick="x"/></foreignObject>
+      </svg>`,
+      'image/svg+xml'
+    )
+    sanitizeSvg(doc as unknown as Document)
+    const out = doc.documentElement.outerHTML
+    expect(out).not.toMatch(/onload|onerror|onclick|<script|javascript:|foreignObject|href="x"/i)
+    expect(out).toContain('fill="url(#g)"')
+    expect(out).toContain('href="#g"')
+  })
+
+  it('export: velden uit een projectbestand kunnen de HTML niet openbreken', () => {
+    const p = createStarterProject('<script>alert(1)</script>')
+    p.clickTag = 'https://x.nl/"</script><script>alert(2)</script>'
+    const ls = p.compositions[0].layers
+    const t = ls.find((l) => l.type === 'text')!
+    Object.assign(t.text!, { align: 'left"><img src=x onerror=alert(3)>', weight: '700;}</style><script>alert(4)</script>', content: '</div><script>alert(5)</script>' })
+    t.name = '<img src=x onerror=alert(6)>'
+    const img = createLayer('image', p.compositions[0])
+    img.image!.src = 'assets/a.png'
+    img.image!.fit = 'contain;"><script>alert(7)</script>' as never
+    ls.push(img)
+    const s = createLayer('shape', p.compositions[0])
+    s.shape!.fill = 'red;}</style><script>alert(8)</script>'
+    ls.push(s)
+    const { html } = build(p)
+    const dom = new JSDOM(html)
+    expect(dom.window.document.querySelectorAll('script').length).toBe(2) // clickTag + runtime
+    expect(dom.window.document.querySelectorAll('img[onerror], [onerror]').length).toBe(0)
+    expect(html).not.toMatch(/<script>alert/)
+  })
+})
+
+describe('paden binnen de projectmap', () => {
+  it('weigert .., absolute paden en symlinks naar buiten', async () => {
+    const { inside, safeName } = await import('../src/main/paths')
+    const { mkdtempSync, mkdirSync, symlinkSync, writeFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const { tmpdir } = await import('node:os')
+    const root = mkdtempSync(join(tmpdir(), 'bs-'))
+    const proj = join(root, 'project')
+    mkdirSync(join(proj, 'assets'), { recursive: true })
+    writeFileSync(join(root, 'geheim.txt'), 'x')
+    writeFileSync(join(proj, 'assets', 'a.png'), 'x')
+    symlinkSync(join(root, 'geheim.txt'), join(proj, 'assets', 'link.png'))
+    expect(inside(proj, 'assets/a.png')).toBe(join(proj, 'assets', 'a.png'))
+    expect(() => inside(proj, '../geheim.txt')).toThrow()
+    expect(() => inside(proj, 'assets/../../geheim.txt')).toThrow()
+    expect(() => inside(proj, join(root, 'geheim.txt'))).toThrow()
+    expect(() => inside(proj, 'assets/link.png')).toThrow()
+    expect(safeName('mijn-boilerplate-1')).toBe(true)
+    expect(safeName('..')).toBe(false)
+    expect(safeName('a/../b')).toBe(false)
+    expect(safeName('a\\..\\b')).toBe(false)
+  })
+})

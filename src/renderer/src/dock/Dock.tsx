@@ -46,10 +46,15 @@ function SplitView({ node, render }: { node: SplitNode; render: (id: PanelId) =>
     const up = () => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+      window.removeEventListener('blur', up)
       document.body.classList.remove('dock-resizing', 'dock-resizing-row', 'dock-resizing-col')
     }
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
+    // Ook opruimen als de muis buiten het venster wordt losgelaten of de app de focus verliest
+    window.addEventListener('pointercancel', up)
+    window.addEventListener('blur', up)
   }
   return (
     <div ref={ref} className={`dock-split dock-${node.dir}`}>

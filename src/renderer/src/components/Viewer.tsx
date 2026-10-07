@@ -302,8 +302,13 @@ function SingleViewer() {
 
   const onMove = (e: React.PointerEvent) => {
     const p = toComp(e)
-    const d = drag.current
+    let d = drag.current
     if (tool === 'pen') setPenCursor([p.x, p.y])
+    // Knop is al los (bijv. losgelaten buiten het venster): sleepactie afbreken in plaats van te blijven volgen
+    if (d && e.buttons === 0) {
+      cancelDrag()
+      d = null
+    }
     if (!d) {
       if (tool === 'select') setHover(hitTest(p.x, p.y)?.id ?? null)
       return
@@ -352,6 +357,13 @@ function SingleViewer() {
         break
       }
     }
+  }
+
+  /** Sleepactie afbreken zonder iets toe te passen (focus kwijt, pointer geannuleerd). */
+  const cancelDrag = () => {
+    if (!drag.current) return
+    drag.current = null
+    force((n) => n + 1)
   }
 
   const onUp = () => {
@@ -472,6 +484,8 @@ function SingleViewer() {
             onPointerDown={onDown}
             onPointerMove={onMove}
             onPointerUp={onUp}
+            onPointerCancel={cancelDrag}
+            onLostPointerCapture={cancelDrag}
             onPointerLeave={() => setHover(null)}
             onContextMenu={onContext}
             onDoubleClick={onDouble}

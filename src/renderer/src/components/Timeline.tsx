@@ -154,9 +154,14 @@ export function Timeline() {
     const up = () => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+      window.removeEventListener('blur', up)
     }
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
+    // Ook opruimen als de muis buiten het venster wordt losgelaten of de app de focus verliest
+    window.addEventListener('pointercancel', up)
+    window.addEventListener('blur', up)
   }
 
   /** Hele laag in de tijd verschuiven (balk slepen), of in/uit trimmen (randen slepen). */
