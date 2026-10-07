@@ -12,6 +12,28 @@ Google Web Designer-exports laden standaard een eigen runtime, webcomponents, po
 
 De demo-banner (300×600, eigen font, logo, write-on, 6 geanimeerde lagen) is als ZIP **8 KB**.
 
+## Installeren op een (nieuwe) Mac
+
+Eenmalig per Mac, in Terminal:
+
+1. **Git** (Apple-ontwikkelaarstools): `xcode-select --install` en volg het venster. Staat het er al, dan meldt Terminal dat.
+2. **Node.js 22 (LTS)**: download en installeer het pakket van nodejs.org. Controleer met `node -v` (moet v22 of hoger zijn).
+3. **Code ophalen** (de repository is privé, dus GitHub vraagt om in te loggen: gebruikersnaam + een *personal access token* als wachtwoord, of log eerst in met GitHub Desktop):
+   ```bash
+   git clone -b claude/banner-studio https://github.com/GawiLe/check-app.git ~/banner-studio
+   ```
+4. **Installeren en starten:**
+   ```bash
+   cd ~/banner-studio
+   npm install
+   npm run dev
+   ```
+   Bij "Electron failed to install correctly": `node node_modules/electron/install.js` en daarna weer `npm run dev`.
+
+Daarna is bijwerken altijd: `cd ~/banner-studio`, `git pull`, `npm install`, `npm run dev`.
+
+Instellingen (recente projecten, API-sleutel, eigen presets, boilerplates) staan per Mac en gaan niet mee. Projectmappen kun je gewoon kopiëren of via een gedeelde map openen.
+
 ## Starten
 
 ```bash
