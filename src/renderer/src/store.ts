@@ -9,7 +9,7 @@ import { findDeep, localTime } from '@shared/tree'
 import type { AnimProp, Composition, ExportResult, Layer, Project } from '@shared/types'
 import { ANIM_PROPS } from '@shared/types'
 
-export type Dialog = null | 'new' | 'export' | 'settings' | 'saveBoilerplate' | 'addFormat' | 'replaceImage'
+export type Dialog = null | 'new' | 'export' | 'settings' | 'saveBoilerplate' | 'addFormat' | 'replaceImage' | 'variants'
 
 export interface SelectedKey {
   layerId: string

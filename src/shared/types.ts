@@ -244,6 +244,8 @@ export interface Project {
    * Ontbreekt = aan.
    */
   embedFonts?: boolean
+  /** Varianten van dit project (template): welke velden variabel zijn en de waarden per variant. */
+  variants?: VariantSet
   fonts: FontAsset[]
   baseCompositionId: string
   compositions: Composition[]
@@ -265,4 +267,18 @@ export interface ExportResult {
   files: { name: string; bytes: number }[]
   backup: string | null
   issues: ValidationIssue[]
+}
+
+/** Eén variant: alleen de velden die anders zijn dan het origineel staan erin. */
+export interface Variant {
+  id: string
+  name: string
+  /** Veldsleutel (zie shared/variants.ts) → nieuwe waarde (tekst, of assets/… voor een afbeelding). */
+  values: Record<string, string>
+}
+
+export interface VariantSet {
+  /** Gekozen variabele velden. */
+  fields: string[]
+  variants: Variant[]
 }

@@ -53,6 +53,7 @@ export function App() {
         if (action === 'save') void save()
         if (action === 'export') s.setDialog('export')
         if (action === 'saveBoilerplate') s.setDialog('saveBoilerplate')
+        if (action === 'variants') s.setDialog('variants')
         if (action === 'duplicate' && !isTyping()) duplicateSelection()
         if (action === 'group' && !isTyping()) groupSelection()
         if (action === 'ungroup' && !isTyping()) ungroupSelection()

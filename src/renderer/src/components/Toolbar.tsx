@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   BookmarkPlus,
+  Copy,
   FilePlus2,
   FolderOpen,
   ImagePlus,
@@ -126,6 +127,9 @@ export function Toolbar() {
         <WindowMenu />
         <button className="icon" title="Opslaan als boilerplate" onClick={() => s().setDialog('saveBoilerplate')}>
           <BookmarkPlus size={16} />
+        </button>
+        <button className="icon" title="Varianten: dit bestand als template, met per variant andere teksten en afbeeldingen" onClick={() => s().setDialog('variants')}>
+          <Copy size={16} />
         </button>
         <button className="icon" title="Instellingen" onClick={() => s().setDialog('settings')}>
           <Settings size={16} />

@@ -7,6 +7,7 @@ import type { BannerStudioApi, Settings } from '@shared/api'
 import type { Project } from '@shared/types'
 import { aiAnimate } from './ai'
 import { exportBanners, MIME } from './exporter'
+import { createVariants } from './variants'
 import { describeFont, textToGlyphPaths } from './fonts'
 import { fontCatalog, installWebFont } from './webfonts'
 import {
@@ -129,6 +130,7 @@ const handlers: Handlers = {
   },
   generateWriteOn: (dir, fontFile, text, size) => textToGlyphPaths(dir, fontFile, text, size),
   exportBanners: (req) => exportBanners(req),
+  createVariants: (req) => createVariants(req),
 
   async revealInFolder(path) {
     shell.showItemInFolder(path)
@@ -189,6 +191,7 @@ function buildMenu() {
           { label: 'Opslaan', accelerator: 'CmdOrCtrl+S', click: send('save') },
           { type: 'separator' },
           { label: 'Opslaan als boilerplate…', click: send('saveBoilerplate') },
+          { label: 'Varianten (template)…', click: send('variants') },
           { label: 'Exporteren…', accelerator: 'CmdOrCtrl+E', click: send('export') },
           { type: 'separator' },
           isMac ? { role: 'close' } : { role: 'quit', label: 'Afsluiten' }

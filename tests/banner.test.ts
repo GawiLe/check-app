@@ -913,3 +913,59 @@ describe('paden binnen de projectmap', () => {
     expect(safeName('a\\..\\b')).toBe(false)
   })
 })
+
+describe('varianten (template)', () => {
+  const setup = () => {
+    const p = createStarterProject('Makro')
+    const base = p.compositions[0]
+    const img = createLayer('image', base)
+    img.image!.src = 'assets/achtergrond.jpg'
+    img.name = 'achtergrond.jpg'
+    base.layers.push(img)
+    for (const c of p.compositions) for (const l of c.layers) l.linkId ??= l.id
+    p.compositions.push(deriveComposition(base, 300, 250))
+    return p
+  }
+
+  it('vindt teksten en afbeeldingen in de basis', async () => {
+    const { variantFields } = await import('../src/shared/variants')
+    const f = variantFields(setup())
+    expect(f.some((x) => x.kind === 'text' && x.label === 'Headline')).toBe(true)
+    expect(f.find((x) => x.kind === 'image')?.value).toBe('assets/achtergrond.jpg')
+  })
+
+  it('past een variant toe op alle formaten; lege of niet-gekozen velden blijven gelijk', async () => {
+    const { variantFields, applyVariant } = await import('../src/shared/variants')
+    const p = setup()
+    const f = variantFields(p)
+    const head = f.find((x) => x.label === 'Headline')!
+    const sub = f.find((x) => x.label === 'Subline')!
+    const bg = f.find((x) => x.kind === 'image')!
+    const v = { id: 'v1', name: 'Zomer', values: { [head.key]: 'Zomeractie!', [sub.key]: '', [bg.key]: 'assets/zomer.jpg' } }
+    const out = applyVariant(p, v, [head.key, sub.key, bg.key])
+    expect(out.name).toBe('Makro – Zomer')
+    expect(out.variants).toBeUndefined()
+    for (const c of out.compositions) {
+      expect(c.layers.find((l) => l.name === 'Headline')!.text!.content).toBe('Zomeractie!')
+      expect(c.layers.find((l) => l.name === 'Subline')!.text!.content).toBe(p.compositions[0].layers.find((l) => l.name === 'Subline')!.text!.content)
+      const im = c.layers.find((l) => l.type === 'image')!
+      expect(im.image!.src).toBe('assets/zomer.jpg')
+      expect(im.name).toBe('zomer.jpg')
+    }
+    // Opmaak blijft gelijk
+    const a = p.compositions[1].layers.find((l) => l.type === 'image')!
+    const b = out.compositions[1].layers.find((l) => l.type === 'image')!
+    expect([b.x, b.y, b.width, b.height]).toEqual([a.x, a.y, a.width, a.height])
+    // Niet gekozen = niet wijzigen, ook als er een waarde staat
+    expect(applyVariant(p, v, [sub.key]).compositions[0].layers.find((l) => l.name === 'Headline')!.text!.content).not.toBe('Zomeractie!')
+    // Origineel onaangetast
+    expect(p.compositions[0].layers.find((l) => l.name === 'Headline')!.text!.content).not.toBe('Zomeractie!')
+  })
+
+  it('mapnamen naast het project', async () => {
+    const { variantFolderName } = await import('../src/shared/variants')
+    expect(variantFolderName('makro-q3', 'Zomer actie €5!')).toBe('makro-q3-zomer-actie-5')
+    expect(variantFolderName('makro-q3', 'Énergie')).toBe('makro-q3-energie')
+    expect(variantFolderName('makro-q3', '///')).toBe('makro-q3-variant')
+  })
+})

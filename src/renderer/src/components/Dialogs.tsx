@@ -7,6 +7,7 @@ import { FolderOpen, Image as ImageIcon, Shapes } from 'lucide-react'
 import { assetUrl, currentComp, useStore } from '../store'
 import { findDeep } from '@shared/tree'
 import { Modal, Row } from './ui'
+import { VariantsDialog } from './Variants'
 
 const kb = (b: number) => `${(b / 1024).toFixed(1)} KB`
 
@@ -26,6 +27,8 @@ export function Dialogs() {
       return <SaveBoilerplateDialog onClose={close} />
     case 'replaceImage':
       return <ReplaceImageDialog onClose={close} />
+    case 'variants':
+      return <VariantsDialog onClose={close} />
     default:
       return null
   }

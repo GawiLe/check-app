@@ -38,6 +38,19 @@ export interface ExportRequest {
   targets: ExportTarget[]
 }
 
+export interface VariantRequest {
+  dir: string
+  project: Project
+  /** Meteen exporteren naar deze platforms (leeg = alleen de projectmappen maken). */
+  exportTargets: ExportTarget[] | null
+}
+
+export interface VariantResult {
+  name: string
+  dir: string
+  exports: ExportResult[]
+}
+
 /** Het API-oppervlak dat de preload aan de renderer geeft (`window.bs`). */
 export interface BannerStudioApi {
   newProject(boilerplateId: string | null, name: string): Promise<OpenedProject | null>
@@ -53,6 +66,7 @@ export interface BannerStudioApi {
     size: number
   ): Promise<Pick<WriteOnProps, 'glyphs' | 'viewBox'> & { width: number; height: number }>
   exportBanners(req: ExportRequest): Promise<ExportResult[]>
+  createVariants(req: VariantRequest): Promise<VariantResult[]>
   revealInFolder(path: string): Promise<void>
   listBoilerplates(): Promise<Boilerplate[]>
   saveBoilerplate(dir: string, project: Project, name: string): Promise<Boilerplate>

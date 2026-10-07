@@ -287,6 +287,16 @@ Een write-on laag zet tekst uit je eigen font om naar SVG-paden per letter. De e
 | Cmd/Ctrl+S, +E | opslaan, exporteren |
 | Cmd/Ctrl+scroll | inzoomen in de viewer |
 
+### Varianten (template)
+
+Maak van één bestand meerdere varianten, bijvoorbeeld per actie, seizoen of product: werkbalk → knop *Varianten* (of menu Bestand → *Varianten (template)…*).
+
+1. **Velden kiezen:** vink aan welke teksten en afbeeldingen/SVG's per variant anders kunnen zijn. Een veld geldt voor alle formaten tegelijk.
+2. **Varianten invullen:** een kolom per variant (naam aanpasbaar, dupliceren, verwijderen). Vul alleen in wat anders is; een leeg vak houdt het origineel. Bij een afbeelding kies je uit de assets of *Uploaden uit map…*.
+3. **Aanmaken:** elke variant wordt een eigen projectmap naast het origineel (`<project>-<variant>`) met dezelfde assets en fonts, en wordt (optioneel) meteen geëxporteerd naar de gekozen platforms. Opnieuw aanmaken werkt de bestaande variantmappen bij.
+
+Opmaak, positie en animatie blijven in alle varianten gelijk; een nieuwe afbeelding valt in het kader van het origineel. De keuzes en waarden worden in het project bewaard, zodat je later een variant toevoegt of aanpast en opnieuw aanmaakt. Een variantmap is een gewoon project: openen, bijwerken en los exporteren kan altijd.
+
 ## Export en validatie
 
 | | CM360 | Google Ads | Ad Manager | Adform | Azerion | Generiek IAB |
