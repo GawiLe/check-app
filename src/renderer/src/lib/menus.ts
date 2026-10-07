@@ -17,6 +17,7 @@ import {
   sequenceSelection,
   setAnchor,
   setInOut,
+  toggleExit,
   ungroupSelection,
   uploadAndReplace
 } from './actions'
@@ -70,6 +71,7 @@ export function openLayerMenu(e: React.MouseEvent, layerId: string) {
     sep,
     ...(single
       ? ([
+          { label: l.exit ? 'Eigen klikgebied uitzetten' : 'Eigen klikgebied (clickTag) maken', onClick: () => toggleExit(l.id) },
           { label: 'Anchor point naar midden', onClick: () => setAnchor(l.id, 0.5, 0.5) },
           { label: l.visible ? 'Verbergen' : 'Tonen', onClick: () => updateLayer(l.id, (x) => void (x.visible = !x.visible)) },
           { label: l.locked ? 'Ontgrendelen' : 'Vergrendelen', onClick: () => updateLayer(l.id, (x) => void (x.locked = !x.locked)) }

@@ -167,6 +167,11 @@ export interface Layer {
   revealMode: RevealMode
   /** Is deze laag de (zichtbare) CTA-knop? Krijgt een hover-effect bij export. */
   cta: boolean
+  /**
+   * Eigen klikgebied (optioneel): deze laag krijgt een eigen clickTag (clickTag1, clickTag2 …) die
+   * vóór de algemene klik (de hele banner) gaat. Lege url = dezelfde URL als de algemene clickTag.
+   */
+  exit?: { url: string } | null
   tracks: Tracks
   intro?: Motion | null
   outro?: Motion | null
@@ -221,7 +226,7 @@ export interface FontAsset {
   style: 'normal' | 'italic'
 }
 
-export type ExportTarget = 'cm360' | 'google-ads' | 'gam' | 'generic'
+export type ExportTarget = 'cm360' | 'google-ads' | 'gam' | 'adform' | 'generic'
 
 export interface Project {
   version: number

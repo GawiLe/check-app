@@ -22,7 +22,7 @@ import {
 } from './lib/actions'
 import { contextOf, currentComp, layerLocalTime, setLayerValue, useStore } from './store'
 import { allLayers, findDeep } from '@shared/tree'
-import { layerStateAt } from '@shared/anim'
+import { restStateAt } from '@shared/anim'
 import { endFrameTime } from '@shared/motion'
 import { FilePlus2, FolderOpen } from 'lucide-react'
 import { useDock } from './dock/store'
@@ -196,7 +196,7 @@ export function App() {
           const dx = e.key === 'ArrowLeft' ? -d : e.key === 'ArrowRight' ? d : 0
           const dy = e.key === 'ArrowUp' ? -d : e.key === 'ArrowDown' ? d : 0
           for (const l of allLayers(comp.layers).filter((x) => s.selection.includes(x.id) && !x.locked)) {
-            const st = layerStateAt(l, layerLocalTime(s.project!, s.compId, l.id, s.time))
+            const st = restStateAt(l, layerLocalTime(s.project!, s.compId, l.id, s.time))
             if (dx) setLayerValue(l.id, 'x', st.x + dx, 'nudge')
             if (dy) setLayerValue(l.id, 'y', st.y + dy, 'nudge')
           }

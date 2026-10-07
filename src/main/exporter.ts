@@ -85,6 +85,7 @@ async function exportOne(
   }
   for (const p of built.assets) files[assetNames[p]] = await readFile(join(dir, p))
   files['index.html'] = new TextEncoder().encode(built.html)
+  for (const [n, text] of Object.entries(built.extraFiles)) files[n] = new TextEncoder().encode(text)
 
   for (const [n, data] of Object.entries(files)) await writeFile(join(outDir, n), data)
 
@@ -94,9 +95,11 @@ async function exportOne(
 
   let backup: string | null = null
   let backupBytes: number | null = null
-  if (spec.backupImage) {
+  // Backup-afbeelding van het eindframe, met dezelfde naam als de zip: CM360 koppelt hem dan bij
+  // het (bulk)uploaden automatisch aan de juiste creative. Ook voor Google Ads, handig als statische variant.
+  {
     try {
-      backup = join(targetDir, `${name}_backup.jpg`)
+      backup = join(targetDir, `${name}.jpg`)
       await renderBackup(join(outDir, 'index.html'), comp, backup)
       backupBytes = (await stat(backup)).size
     } catch (err) {

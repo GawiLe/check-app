@@ -22,7 +22,7 @@ import {
   Undo2,
   Upload
 } from 'lucide-react'
-import { addLayer, importImages, openProject, regenerateWriteOn, renameComposition, save } from '../lib/actions'
+import { addClickArea, addLayer, importImages, openProject, regenerateWriteOn, renameComposition, save } from '../lib/actions'
 import { InlineRename } from './ui'
 import { ALL_PANELS, PANEL_TITLE, visiblePanels } from '../dock/model'
 import { useDock } from '../dock/store'
@@ -178,6 +178,10 @@ function AddMenu() {
           </button>
           <button onClick={pick(importImages)}>
             <ImagePlus size={14} /> Afbeelding importeren…
+          </button>
+          <div className="ctx-sep" />
+          <button onClick={pick(() => void addClickArea())} title="Eigen klik-URL (clickTag1, clickTag2 …) boven de algemene klik op de hele banner">
+            <MousePointerClick size={14} /> Klikgebied
           </button>
         </div>
       )}

@@ -111,6 +111,14 @@ Alle panelen (Canvas, Code, Tijdlijn, Animaties, Assets & fonts, Ontwerp, Animat
 
 Bovenin het canvas kies je **Ontwerp**, **Code** of **Beide** (naast elkaar). De code is precies de HTML die geëxporteerd wordt, live bijgewerkt: *Leesbaar* (opgemaakt) of *Exact* (zoals in de zip), per platform, met de grootte en een kopieerknop. Er is ook een los paneel *Code* dat je overal neer kunt zetten.
 
+### Uitlijnen en verdelen
+
+Bovenin het paneel *Ontwerp* staan de knoppen voor links, midden, rechts, boven, midden en onder, en voor horizontaal en verticaal verdelen (gelijke tussenruimte). Kies *Selectie* (op elkaar) of *Banner*. Eén laag wordt altijd op de banner uitgelijnd. Er wordt uitgelijnd op de rustpositie, dus een binnenkomst-animatie telt niet mee.
+
+### Hele pixels
+
+Posities, maten en rotatie zijn altijd hele getallen, schaal en dekking hele procenten. Dat geldt voor slepen, typen, uitlijnen, keyframes en geïmporteerde projecten. Zo staat elke laag in rust precies op de pixelgrid, zonder wazige randen.
+
 ### Hernoemen
 
 Lagen: selecteer en druk **Enter**, dubbelklik op de naam in de tijdlijn, of rechtermuisknop → *Naam wijzigen*. Composities: Enter of rechtermuisknop (dubbelklik opent ze). Formaten en compositie-tabs: dubbelklik op het tabblad.
@@ -276,19 +284,27 @@ Een write-on laag zet tekst uit je eigen font om naar SVG-paden per letter. De e
 
 ## Export en validatie
 
-| | CM360 | Google Ads | Ad Manager | Generiek IAB |
-|---|---|---|---|---|
-| clickTag (`var clickTag` + `window.open(window.clickTag)`) | ✓ | ✓ | ✓ | ✓ |
-| `<meta name="ad.size">` | ✓ | ✓ | ✓ | ✓ |
-| Fonts | los `.woff2` | inline base64 (losse fonts niet toegestaan) | los `.woff2` | los `.woff2` |
-| Max. ZIP | 10 MB (IAB-advies 150 KB) | 150 KB | 1 MB | 200 KB |
-| Max. bestanden | 100 | 40 | 100 | 100 |
-| Animatie | 30 s, 3 loops | 30 s, 3 loops | 30 s, 3 loops | 15 s, 3 loops |
-| Backup-JPG (eindframe, ≤40 KB) | ✓ | – | ✓ | ✓ |
+| | CM360 | Google Ads | Ad Manager | Adform | Generiek IAB |
+|---|---|---|---|---|---|
+| Klik | `var clickTag` + `window.open(window.clickTag)` | idem | idem | `dhtml.getVar('clickTAG')` + `manifest.json` | idem als CM360 |
+| Klikgebieden | `clickTag1`, `clickTag2` … | gaan naar de ene URL van de advertentie | `clickTag1` … | `clickTAG1` … | `clickTag1` … |
+| `<meta name="ad.size">` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Fonts | los `.woff2` | inline base64 (losse fonts niet toegestaan) | los `.woff2` | los `.woff2` | los `.woff2` |
+| Max. ZIP | 10 MB (IAB-advies 150 KB) | 150 KB | 1 MB | 10 MB (IAB-advies 150 KB) | 200 KB |
+| Max. bestanden | 100 | 40 | 100 | 100 | 100 |
+| Animatie | 30 s, 3 loops | 30 s, 3 loops | 30 s, 3 loops | 30 s, 3 loops | 15 s, 3 loops |
+| Backup-JPG (eindframe, ≤40 KB) | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+**Backup-afbeelding:** van het eindframe, als `<naam>.jpg` naast `<naam>.zip` (bijv. `campagne_300x600.zip` + `campagne_300x600.jpg`). Met dezelfde naam koppelt CM360 hem bij het uploaden aan de juiste creative.
+
+**Klikgebieden (optioneel):** standaard is de hele banner één klikveld (`clickTag`). Via *+ Laag → Klikgebied* (een onzichtbare rechthoek) of rechtermuisknop → *Eigen klikgebied* op een bestaande laag geef je een deel van de banner een eigen URL. Klikgebieden liggen altijd boven de algemene klik, ook als er een andere laag overheen ligt. Op het canvas zie je ze als geel gestippeld kader met hun nummer.
+
+**DV360:** banners die via DV360 worden ingekocht en via CM360 worden uitgeleverd: kies CM360. Rechtstreeks in DV360 uploaden werkt met dezelfde standaard HTML5-zip. Alleen voor Studio/rich media (Enabler) is iets anders nodig.
 
 De validator controleert per banner:
 
-- de `ad.size`-meta en de clickTag (gedeclareerd én gebruikt);
+- de `ad.size`-meta en de clickTag (gedeclareerd én gebruikt, ook per klikgebied; voor Adform `manifest.json` en `Adform.DHTML.js`);
+- of de fallback-clickTag nog de voorbeeld-URL is;
 - of er externe requests in zitten;
 - gewicht, aantal bestanden en toegestane bestandstypen;
 - bestandsnamen;

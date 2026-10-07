@@ -8,6 +8,7 @@ import { GROUP_LABEL, groupProps, layerGroups, type PropGroupId } from '@shared/
 import { findDeep, layerLength, trimIn, trimOut } from '@shared/tree'
 import { PRESETS } from '@shared/presets'
 import { TARGET_IDS, TARGETS } from '@shared/specs'
+import { exitLayers } from '@shared/build'
 import type { AnimProp, EaseName, Emphasis, EmphasisType, Layer, Motion, RevealMode } from '@shared/types'
 import { EASES } from '@shared/types'
 import {
@@ -29,6 +30,7 @@ import {
   ungroupSelection
 } from '../lib/actions'
 import { currentComp, layerLocalTime, setLayerValue, toggleStopwatch, updateComp, updateLayer, useStore } from '../store'
+import { AlignBar } from './AlignBar'
 import { FontPicker } from './FontPicker'
 import { Num, Row, Scrub, Section, Switch, TextInput } from './ui'
 
@@ -58,6 +60,7 @@ export function DesignPanel() {
   return (
     <div className="panel-scroll">
       <FormatNotice />
+      {count > 0 && <AlignBar count={count} />}
       {layer ? <LayerDesign layer={layer} /> : count > 1 ? <Multi n={count} /> : <CompDesign />}
     </div>
   )
@@ -524,7 +527,37 @@ function LayerDesign({ layer }: { layer: Layer }) {
           <Switch checked={layer.cta} onChange={(v) => up((l) => void (l.cta = v))} />
         </Row>
       </Section>
+      <ExitSection layer={layer} />
     </>
+  )
+}
+
+/** Klikgebied: optioneel een eigen clickTag voor deze laag, boven de algemene klik op de hele banner. */
+function ExitSection({ layer }: { layer: Layer }) {
+  const comp = useStore(currentComp)!
+  const fallback = useStore((s) => s.project!.clickTag)
+  const n = exitLayers(comp).findIndex((l) => l.id === layer.id) + 1
+  const up = (fn: (l: Layer) => void) => updateLayer(layer.id, fn)
+  return (
+    <Section title="Klikgebied">
+      <Row label="Eigen klik">
+        <Switch checked={!!layer.exit} onChange={(v) => up((l) => (v ? void (l.exit = { url: '' }) : void delete l.exit))} />
+        {layer.exit && n > 0 && <span className="faint">clickTag{n}</span>}
+      </Row>
+      {layer.exit ? (
+        <>
+          <Row label="URL">
+            <TextInput value={layer.exit.url} placeholder={fallback || 'https://'} onCommit={(v) => up((l) => void (l.exit = { url: v.trim() }))} />
+          </Row>
+          <div className="hint-text">
+            Klikken op deze laag opent clickTag{n || '?'} in plaats van de algemene clickTag. Ligt boven de rest, ook als er een andere laag overheen ligt. Leeg = de algemene URL. De echte URL vul je
+            in het ad-server in; dit is de fallback.
+          </div>
+        </>
+      ) : (
+        <div className="hint-text">Standaard is de hele banner één klikveld. Zet dit aan voor een eigen klik-URL op deze laag (bijv. een tweede knop).</div>
+      )}
+    </Section>
   )
 }
 
@@ -565,8 +598,8 @@ function TransformRows({ layer, showSize = true }: { layer: Layer; showSize?: bo
       <div className="trow">
         {kf('position')}
         <span className="label">Positie</span>
-        <Num label="X" value={st.x} animated={animated('position')} onChange={set('x')} />
-        <Num label="Y" value={st.y} animated={animated('position')} onChange={set('y')} />
+        <Num label="X" value={Math.round(st.x)} animated={animated('position')} onChange={set('x')} />
+        <Num label="Y" value={Math.round(st.y)} animated={animated('position')} onChange={set('y')} />
       </div>
       {showSize && (
         <div className="trow">
@@ -600,7 +633,7 @@ function TransformRows({ layer, showSize = true }: { layer: Layer; showSize?: bo
       <div className="trow">
         {kf('scale')}
         <span className="label">Schaal</span>
-        <Num label="X%" value={Math.round(st.scale * 1000) / 10} animated={animated('scale')} min={0} max={2000} decimals={1} onChange={(v, co) => set('scale')(v / 100, co)} />
+        <Num label="X%" value={Math.round(st.scale * 100)} animated={animated('scale')} min={0} max={2000} decimals={0} onChange={(v, co) => set('scale')(v / 100, co)} />
         {link(scaleLinked, scaleLinked ? 'Schaal X en Y gekoppeld (klik om los te maken)' : 'Schaal X en Y los (klik om te koppelen)', () =>
           up((l) => {
             if (l.scaleLinked === false) {
@@ -618,18 +651,18 @@ function TransformRows({ layer, showSize = true }: { layer: Layer; showSize?: bo
         )}
         <Num
           label="Y%"
-          value={Math.round(st.scaleY * 1000) / 10}
+          value={Math.round(st.scaleY * 100)}
           animated={animated('scale')}
           min={0}
           max={2000}
-          decimals={1}
+          decimals={0}
           onChange={(v, co) => set(scaleLinked ? 'scale' : 'scaleY')(v / 100, co)}
         />
       </div>
       <div className="trow">
         {kf('rotation')}
         <span className="label">Rotatie</span>
-        <Num label="°" value={st.rotation} animated={animated('rotation')} onChange={set('rotation')} />
+        <Num label="°" value={Math.round(st.rotation)} animated={animated('rotation')} onChange={set('rotation')} />
       </div>
       <div className="trow">
         {kf('opacity')}

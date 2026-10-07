@@ -3,8 +3,9 @@ import { applyLibraryItem, applyUserPreset, LIBRARY, presetFromLayer } from '@sh
 import { mergeTracks, PRESETS } from '@shared/presets'
 import { resetCompOverrides, resetOverrides } from '@shared/sync'
 import { allLayers, cloneLayer, findDeep, groupLayers, localTime, reorderLayer, sequenceLayers, ungroup } from '@shared/tree'
-import { layerStateAt } from '@shared/anim'
-import { moveAnchor } from '@shared/geometry'
+import { layerStateAt, restStateAt } from '@shared/anim'
+import { layerCorners, moveAnchor } from '@shared/geometry'
+import { alignDeltas, distributeDeltas, unionBox, type AlignMode, type Axis, type Box } from '@shared/align'
 import { applyKeyAssist, type KeyAssist } from '@shared/keys'
 import { groupOf, groupProps } from '@shared/propgroups'
 import { penToPath, type PenPoint } from '@shared/path'
@@ -12,7 +13,7 @@ import { ANIM_PROPS } from '@shared/types'
 import type { ExportTarget, Layer, LayerType } from '@shared/types'
 import { parseSvg, shapesToLayers } from './svgimport'
 import { round } from '@shared/anim'
-import { assetUrl, contextOf, currentComp, findComp, findLayer, layerLocalTime, updateLayer, useStore, type SelectedKey, type SvgMode } from '../store'
+import { assetUrl, contextOf, currentComp, findComp, findLayer, layerLocalTime, setLayerValue, updateLayer, useStore, type SelectedKey, type SvgMode } from '../store'
 
 const S = () => useStore.getState()
 
@@ -78,6 +79,29 @@ export function addLayer(type: LayerType, init?: (l: Layer) => void) {
   S().update((p) => void contextOf(p, compId, activeTab).list.unshift(layer))
   S().select([layer.id])
   return layer
+}
+
+/** Klikgebied: onzichtbare rechthoek bovenaan met een eigen clickTag (ligt boven de algemene klik). */
+export function addClickArea() {
+  const comp = currentComp(S())
+  if (!comp) return
+  const n = allLayers(comp.layers).filter((l) => l.exit).length + 1
+  return addLayer('shape', (l) => {
+    l.name = `Klikgebied ${n}`
+    l.shape!.fillEnabled = false
+    l.shape!.strokeWidth = 0
+    l.exit = { url: '' }
+    Object.assign(l, { width: 200, height: 60 })
+    l.x = Math.round(((S().activeTab ? l.width : comp.width) - l.width) / 2)
+  })
+}
+
+/** Klikgebied aan/uit voor een bestaande laag (bijv. de CTA-knop). */
+export function toggleExit(layerId: string) {
+  updateLayer(layerId, (l) => {
+    if (l.exit) delete l.exit
+    else l.exit = { url: '' }
+  })
 }
 
 /** Canvas-coördinaat → coördinaat binnen de geopende compositie (zonder schaal/rotatie van de groepen). */
@@ -795,4 +819,70 @@ export function renameComposition(id: string, name: string) {
     const c = p.compositions.find((x) => x.id === id)
     if (c) c.name = name
   })
+}
+
+/**
+ * Rustpositie van een laag op de huidige tijd: eigen waarden en keyframes, zónder binnenkomst,
+ * accent en uitgang (anders lijn je een laag uit die net nog binnenvliegt of onzichtbaar klein is).
+ */
+function restState(l: Layer) {
+  const st = S()
+  const t = layerLocalTime(st.project!, st.compId, l.id, st.time)
+  return restStateAt(l, t)
+}
+
+/** Zichtbaar kader van een laag in rust (in de ruimte van zijn ouder). */
+function visibleBox(l: Layer): Box {
+  const v = restState(l)
+  const pts = layerCorners(v.x, v.y, l.width, l.height, l.anchorX ?? 0.5, l.anchorY ?? 0.5, v.scale, v.rotation, v.scaleY).corners
+  const xs = pts.map((p) => p[0])
+  const ys = pts.map((p) => p[1])
+  return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) }
+}
+
+/** Geselecteerde, niet-vergrendelde lagen, gegroepeerd per ouder (uitlijnen werkt binnen één ruimte). */
+function selectionByParent() {
+  const st = S()
+  const comp = currentComp(st)
+  if (!comp) return []
+  const groups = new Map<string, { layers: Layer[]; container: Box }>()
+  for (const id of st.selection) {
+    const f = findDeep(comp.layers, id)
+    if (!f || f.layer.locked) continue
+    const parent = f.ancestors[f.ancestors.length - 1]
+    const key = parent?.id ?? ''
+    if (!groups.has(key)) groups.set(key, { layers: [], container: { x: 0, y: 0, w: parent?.width ?? comp.width, h: parent?.height ?? comp.height } })
+    groups.get(key)!.layers.push(f.layer)
+  }
+  return [...groups.values()]
+}
+
+function shiftLayers(layers: Layer[], deltas: { dx: number; dy: number }[]) {
+  layers.forEach((l, i) => {
+    const { dx, dy } = deltas[i]
+    if (!dx && !dy) return
+    const v = restState(l)
+    if (dx) setLayerValue(l.id, 'x', Math.round(v.x + dx), 'align')
+    if (dy) setLayerValue(l.id, 'y', Math.round(v.y + dy), 'align')
+  })
+}
+
+/**
+ * Uitlijnen. `to`: 'selection' = op elkaar (de buitenste laag blijft staan),
+ * 'canvas' = op de banner (of de compositie waar de lagen in zitten). Eén laag gaat altijd op de banner.
+ */
+export function alignSelection(mode: AlignMode, to: 'selection' | 'canvas' = 'selection') {
+  for (const g of selectionByParent()) {
+    const boxes = g.layers.map(visibleBox)
+    const ref = to === 'canvas' || boxes.length === 1 ? g.container : unionBox(boxes)
+    shiftLayers(g.layers, alignDeltas(boxes, mode, ref))
+  }
+}
+
+/** Verdelen met gelijke tussenruimte (vanaf 3 lagen; op de banner al vanaf 1). */
+export function distributeSelection(axis: Axis, to: 'selection' | 'canvas' = 'selection') {
+  for (const g of selectionByParent()) {
+    const boxes = g.layers.map(visibleBox)
+    shiftLayers(g.layers, distributeDeltas(boxes, axis, to === 'canvas' ? g.container : undefined))
+  }
 }

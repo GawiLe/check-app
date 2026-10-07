@@ -1,3 +1,4 @@
+import { snapProject } from '@shared/pixels'
 import { create } from 'zustand'
 import { baseValue, layerStateAt, upsertKeyframe } from '@shared/anim'
 import { groupOf, groupProps } from '@shared/propgroups'
@@ -147,7 +148,7 @@ export const useStore = create<State>((set, get) => ({
   openProject: (dir, project) =>
     set({
       dir,
-      project: normalizeProject(project),
+      project: snapProject(normalizeProject(project)),
       compId: project.baseCompositionId ?? project.compositions[0]?.id ?? null,
       selection: [],
       selectedKey: null,
@@ -168,8 +169,10 @@ export const useStore = create<State>((set, get) => ({
     if (!project) return
     const next = structuredClone(project)
     fn(next)
+    snapProject(next)
     const { compId } = get()
     if (compId && !skipSync) syncFormats(project, next, compId)
+    snapProject(next)
     const now = Date.now()
     const merge = coalesce && lastCoalesce && lastCoalesce.key === coalesce && now - lastCoalesce.at < 1000
     set({

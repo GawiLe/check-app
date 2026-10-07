@@ -697,3 +697,116 @@ describe('codeweergave', () => {
     expect(highlight('  html,body {')).toBe('  <span class="c-sel">html,body</span> {')
   })
 })
+
+describe('uitlijnen en verdelen', () => {
+  it('lijnt uit op de selectie en op de banner, in hele pixels', async () => {
+    const { alignDeltas, unionBox } = await import('../src/shared/align')
+    const boxes = [
+      { x: 10, y: 10, w: 50, h: 20 },
+      { x: 100, y: 40, w: 31, h: 31 }
+    ]
+    expect(alignDeltas(boxes, 'left', unionBox(boxes))).toEqual([{ dx: 0, dy: 0 }, { dx: -90, dy: 0 }])
+    expect(alignDeltas(boxes, 'bottom', unionBox(boxes))).toEqual([{ dx: 0, dy: 41 }, { dx: 0, dy: 0 }])
+    const banner = { x: 0, y: 0, w: 300, h: 600 }
+    const c = alignDeltas(boxes, 'hcenter', banner)
+    expect(c.every((d) => Number.isInteger(d.dx))).toBe(true)
+    expect(boxes[1].x + c[1].dx).toBe(135) // (300-31)/2 = 134,5 → hele pixel
+  })
+  it('verdeelt met gelijke tussenruimte; buitenste blijven staan', async () => {
+    const { distributeDeltas } = await import('../src/shared/align')
+    const boxes = [
+      { x: 0, y: 0, w: 20, h: 10 },
+      { x: 200, y: 0, w: 20, h: 10 },
+      { x: 30, y: 0, w: 40, h: 10 }
+    ]
+    const d = distributeDeltas(boxes, 'h')
+    expect(d[0].dx).toBe(0)
+    expect(d[1].dx).toBe(0)
+    expect(boxes[2].x + d[2].dx).toBe(90) // ruimte (220-80)/2 = 70 → 20+70
+    const banner = distributeDeltas([{ x: 5, y: 0, w: 100, h: 10 }], 'h', { x: 0, y: 0, w: 300, h: 600 })
+    expect(banner[0].dx).toBe(95) // gecentreerd: (300-100)/2
+  })
+})
+
+describe('hele pixels', () => {
+  it('rondt posities, maten, rotatie en keyframes af; schaal en dekking op hele procenten', async () => {
+    const { snapProject } = await import('../src/shared/pixels')
+    const p = createStarterProject('Pixels')
+    const l = p.compositions[0].layers[0]
+    Object.assign(l, { x: 10.4, y: 20.6, width: 99.5, height: 0.2, rotation: 12.7, scale: 1.2345, opacity: 0.505 })
+    l.tracks.x = [{ t: 0, v: 3.3, e: 'linear' }, { t: 1, v: 7.8, e: 'linear' }]
+    l.tracks.scale = [{ t: 0, v: 0.333, e: 'linear' }]
+    snapProject(p)
+    expect([l.x, l.y, l.width, l.height, l.rotation]).toEqual([10, 21, 100, 1, 13])
+    expect(l.scale).toBe(1.23)
+    expect(l.opacity).toBe(0.51)
+    expect(l.tracks.x.map((k) => k.v)).toEqual([3, 8])
+    expect(l.tracks.scale[0].v).toBe(0.33)
+  })
+})
+
+describe('klikgebieden', () => {
+  const setup = () => {
+    const p = createStarterProject('Klik')
+    p.clickTag = 'https://www.makro.nl'
+    const layers = p.compositions[0].layers
+    layers[0].exit = { url: 'https://www.makro.nl/actie' }
+    layers[1].exit = { url: '' } // leeg = zelfde als algemeen
+    return p
+  }
+  const run = (html: string, extra?: (w: Window & Record<string, unknown>) => void) => {
+    const dom = new JSDOM(html, { runScripts: 'dangerously', pretendToBeVisual: true, url: 'https://ads.example/index.html' })
+    const w = dom.window as unknown as Window & Record<string, unknown>
+    const opened: string[] = []
+    w.open = ((u: string) => void opened.push(u)) as never
+    extra?.(w)
+    return { w, opened, doc: w.document }
+  }
+
+  it('standaard: één klikveld, geen klikgebieden', () => {
+    const { html } = build(createStarterProject('x'))
+    expect(html).not.toContain('clickTag1')
+    expect(html).not.toContain('.X{')
+  })
+
+  it('CM360: clickTag1, clickTag2 boven de algemene klik', () => {
+    const p = setup()
+    const { html } = build(p)
+    expect(html).toContain('var clickTag1 = "https://www.makro.nl/actie";')
+    expect(html).toContain('var clickTag2 = "https://www.makro.nl";')
+    expect(html).toContain('.L{pointer-events:none}.X{pointer-events:auto;cursor:pointer}')
+    const { opened, doc } = run(html)
+    const exits = doc.querySelectorAll('.X')
+    expect(exits.length).toBe(2)
+    ;(exits[exits.length - 1] as HTMLElement).click() // bovenste laag staat als laatste in de HTML
+    expect(opened).toEqual(['https://www.makro.nl/actie'])
+    const issues = validateBanner({ target: 'cm360', comp: p.compositions[0], html, files: [{ name: 'index.html', bytes: 1 }], zipBytes: 1000, politeLoad: true } as never)
+    expect(issues.filter((i) => i.level === 'error')).toEqual([])
+  })
+
+  it('ad-server-URL per klikgebied via de querystring', () => {
+    const { html } = build(setup())
+    const dom = new JSDOM(html, { runScripts: 'dangerously', pretendToBeVisual: true, url: 'https://x.nl/i.html?clickTag=https%3A%2F%2Fa.nl&clickTag1=https%3A%2F%2Fb.nl' })
+    const w = dom.window as unknown as Record<string, string>
+    expect([w.clickTag, w.clickTag1, w.clickTag2]).toEqual(['https://a.nl', 'https://b.nl', 'https://www.makro.nl'])
+  })
+
+  it('Adform: manifest.json, Adform.DHTML.js en dhtml.getVar', () => {
+    const p = setup()
+    const out = buildBanner(p, p.compositions[0], { mode: 'export', target: 'adform', assetUrl: (x) => x, fontSrc: {} })
+    const manifest = JSON.parse(out.extraFiles['manifest.json'])
+    expect(manifest.clicktags).toEqual({ clickTAG: 'https://www.makro.nl', clickTAG1: 'https://www.makro.nl/actie', clickTAG2: 'https://www.makro.nl' })
+    expect(manifest.width).toBe('300')
+    expect(out.html).toContain(`Adform.DHTML.js?bv='+Math.random())+'"><\\/script>')`)
+    expect(out.html).not.toContain('var clickTag')
+    const { opened, doc } = run(out.html.replace(/<script>document\.write[^]*?<\/script>/, ''), (w) => {
+      w.dhtml = { getVar: (n: string, f: string) => (n === 'landingPageTarget' ? '_blank' : `adform:${n}:${f}`) }
+    })
+    ;(doc.getElementById('ad') as HTMLElement).click()
+    const exits = doc.querySelectorAll('.X')
+    ;(exits[exits.length - 1] as HTMLElement).click()
+    expect(opened).toEqual(['adform:clickTAG:https://www.makro.nl', 'adform:clickTAG1:https://www.makro.nl/actie'])
+    const issues = validateBanner({ target: 'adform', comp: p.compositions[0], html: out.html, files: [{ name: 'index.html', bytes: 1 }, { name: 'manifest.json', bytes: 1 }], zipBytes: 1000, politeLoad: true } as never)
+    expect(issues.filter((i) => i.level === 'error')).toEqual([])
+  })
+})

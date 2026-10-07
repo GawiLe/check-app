@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Copy } from 'lucide-react'
 import { buildBanner } from '@shared/build'
-import { TARGETS } from '@shared/specs'
+import { TARGET_IDS, TARGETS } from '@shared/specs'
 import type { ExportTarget } from '@shared/types'
 import { highlight, prettyBanner } from '../lib/codeformat'
 import { currentComp, useStore } from '../store'
@@ -36,7 +36,7 @@ export function CodeView() {
           </button>
         </div>
         <select value={target} onChange={(e) => setTarget(e.target.value as ExportTarget)} style={{ width: 'auto' }}>
-          {project.targets.concat(['cm360', 'google-ads', 'gam', 'generic'].filter((t) => !project.targets.includes(t as ExportTarget)) as ExportTarget[]).map((t) => (
+          {project.targets.concat((TARGET_IDS as string[]).filter((t) => !project.targets.includes(t as ExportTarget)) as ExportTarget[]).map((t) => (
             <option key={t} value={t}>
               {TARGETS[t].label}
             </option>

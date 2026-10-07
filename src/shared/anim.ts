@@ -87,3 +87,8 @@ export function lastKeyTime(layers: Layer[]): number {
   for (const l of layers) for (const k of Object.values(l.tracks)) for (const kf of k ?? []) max = Math.max(max, kf.t)
   return max
 }
+
+/** Rustwaarden op tijd t: eigen waarden en keyframes, zonder binnenkomst, accent en uitgang. */
+export function restStateAt(layer: Layer, t: number): LayerState {
+  return layerStateAt({ ...layer, intro: null, outro: null, emphasis: null }, t)
+}

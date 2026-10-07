@@ -85,6 +85,19 @@ export const TARGETS: Record<ExportTarget, TargetSpec> = {
     backupImage: true,
     notes: 'HTML5-creative; clickTag wordt bij upload als variabele herkend.'
   },
+  adform: {
+    id: 'adform',
+    label: 'Adform',
+    maxZipBytes: 10 * 1024 * 1024,
+    initialLoadBytes: IAB_INITIAL,
+    maxFiles: 100,
+    allowedExtensions: ['html', 'css', 'js', 'json', 'gif', 'png', 'jpg', 'jpeg', 'svg', 'webp', 'woff', 'woff2'],
+    inlineFonts: false,
+    maxAnimationSeconds: 30,
+    maxLoops: 3,
+    backupImage: true,
+    notes: 'Met manifest.json en Adform.DHTML.js; klik-URLs (clickTAG) vul je in Adform in.'
+  },
   generic: {
     id: 'generic',
     label: 'Generiek IAB',

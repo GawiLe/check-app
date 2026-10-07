@@ -2113,3 +2113,53 @@ pre.code.wrap {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ---------- Uitlijnen en verdelen ---------- */
+.align-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.align-buttons {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+.align-buttons .vsep {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--line-2);
+}
+.align-to button {
+  height: 22px;
+  font-size: 11px;
+  padding: 0 8px;
+}
+
+/* ---------- Klikgebieden op het canvas ---------- */
+.exit-frame {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border: 1.5px dashed rgba(255, 196, 0, 0.9);
+  background: repeating-linear-gradient(45deg, rgba(255, 196, 0, 0.1) 0 6px, transparent 6px 12px);
+  pointer-events: none;
+}
+.exit-frame span {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  transform-origin: 100% 100%;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #1a1400;
+  background: rgba(255, 196, 0, 0.95);
+  border-radius: 3px 3px 0 0;
+  white-space: nowrap;
+}

@@ -1,7 +1,7 @@
 import { baseValue, easeIndex, round } from './anim'
 import { effectiveLayer, endFrameTime } from './motion'
 import { minifiedRuntime, WIPE_INDEX } from './runtime'
-import { allLayers } from './tree'
+import { allLayers, walk } from './tree'
 import { anchorOf } from './geometry'
 import type { AnimProp, Composition, ExportTarget, FontAsset, Layer, Project } from './types'
 
@@ -23,6 +23,8 @@ export interface BuildOutput {
   assets: string[]
   /** Font-ids die echt gebruikt worden. */
   fontIds: string[]
+  /** Extra bestanden voor in de zip (bijv. manifest.json voor Adform). */
+  extraFiles: Record<string, string>
 }
 
 const PROP_KEY: Record<AnimProp, string> = { x: 'x', y: 'y', scale: 's', scaleY: 'q', rotation: 'r', opacity: 'o', reveal: 'v' }
@@ -91,6 +93,8 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
   const body: string[] = []
   const assets: string[] = []
   const fontIds = usedFontIds(comp)
+  // Klikgebieden: genummerd van boven naar onder in de lagenlijst (clickTag1, clickTag2 …)
+  const click = clickSetup(project, comp, opts)
 
   project.fonts.forEach((f, i) => {
     if (f.system || !fontIds.includes(f.id) || !opts.fontSrc[f.id]) return
@@ -106,6 +110,7 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
     '.L{position:absolute;left:0;top:0;transform-origin:50% 50%;visibility:hidden}',
     '.r .L{visibility:visible}'
   )
+  if (click.exitOf.size) css.push('.L{pointer-events:none}.X{pointer-events:auto;cursor:pointer}')
 
   const polite = opts.mode === 'export' && project.politeLoad
   let counter = 0
@@ -180,7 +185,8 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
 
       if (l.cta) css.push(`#ad:hover #${id}{filter:brightness(1.12)}`, `#${id}{transition:filter .2s}`)
       css.push(`#${id}{${rules.join(';')}}`)
-      out.push(`<div id="${id}" class="L">${inner}</div>`)
+      const exitNo = click.exitOf.get(raw.id)
+      out.push(exitNo ? `<div id="${id}" class="L X"${click.exitAttr(exitNo)}>${inner}</div>` : `<div id="${id}" class="L">${inner}</div>`)
 
       if (animated) {
         const b: Record<string, number> = {}
@@ -225,30 +231,88 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
     L: animatedEntries
   }
 
-  const clickUrl = JSON.stringify(project.clickTag || 'https://www.example.com').replace(/</g, '\\u003c')
-  const click =
-    opts.mode === 'export'
-      ? `<a id="ad" href="javascript:window.open(window.clickTag)">`
-      : `<a id="ad" href="javascript:void(0)">`
-
   const html =
     '<!DOCTYPE html>' +
     '<html lang="nl"><head><meta charset="utf-8">' +
     `<meta name="ad.size" content="width=${W},height=${H}">` +
     `<title>${escapeHtml(project.name)} ${W}x${H}</title>` +
-    // clickTag zoals Google het voorschrijft: de URL hier is de fallback. Het ad-server (CM360, Google Ads, GAM)
-    // overschrijft hem bij het uitserveren; komt de klik-URL als ?clickTag=… binnen (generieke IAB-servers),
-    // dan wordt die gebruikt. Alleen http(s) wordt geaccepteerd.
-    `<script>var clickTag = ${clickUrl};` +
-    '(function(){try{var m=/[?&]clicktag=([^&#]+)/i.exec(location.search),u=m&&decodeURIComponent(m[1]);if(u&&/^https?:/i.test(u))clickTag=u}catch(e){}})();' +
-    '</script>' +
+    click.head +
     `<style>${css.join('')}</style>` +
     '</head><body>' +
-    click +
+    click.anchor +
     body.join('') +
     '</a>' +
     `<script>${minifiedRuntime()}${JSON.stringify(data)});</script>` +
     '</body></html>'
 
-  return { html, assets: [...new Set(assets)], fontIds }
+  return { html, assets: [...new Set(assets)], fontIds, extraFiles: click.files }
+}
+
+/** Klikgebieden in exportvolgorde: van boven naar onder in de lagenlijst (clickTag1, clickTag2 …). */
+export function exitLayers(comp: Composition): Layer[] {
+  const out: Layer[] = []
+  walk(comp.layers, (l, anc) => {
+    if (l.exit && l.visible && anc.every((a) => a.visible)) out.push(l)
+  })
+  return out
+}
+
+const jsString = (v: string) => JSON.stringify(v).replace(/</g, '\\u003c')
+
+/**
+ * Klik-afhandeling per platform.
+ *
+ * - CM360, Google Ads, Ad Manager, generiek: `var clickTag = "…"` zoals Google het voorschrijft. De URL is
+ *   de fallback; het ad-server overschrijft hem bij het uitserveren. Komt een klik-URL als `?clickTag=…`
+ *   binnen (generieke ad-servers), dan wordt die gebruikt (alleen http/https).
+ * - Adform: `dhtml.getVar('clickTAG', fallback)` met Adform.DHTML.js en een manifest.json.
+ *
+ * De hele banner is het algemene klikveld. Klikgebieden (lagen met `exit`) liggen daarboven: alleen zij
+ * vangen klikken op, al het andere laat de klik door naar de banner.
+ */
+function clickSetup(project: Project, comp: Composition, opts: BuildOptions) {
+  const fallback = project.clickTag || 'https://www.example.com'
+  const exits = exitLayers(comp)
+  const exitOf = new Map(exits.map((l, i) => [l.id, i + 1]))
+  const exitUrl = (n: number) => exits[n - 1].exit!.url.trim() || fallback
+  const preview = opts.mode !== 'export'
+
+  if (opts.target === 'adform') {
+    const names = ['clickTAG', ...exits.map((_, i) => `clickTAG${i + 1}`)]
+    const urls = [fallback, ...exits.map((_, i) => exitUrl(i + 1))]
+    const manifest = {
+      version: '1.0',
+      title: `${project.name} ${comp.width}x${comp.height}`,
+      description: '',
+      width: String(comp.width),
+      height: String(comp.height),
+      events: { enabled: 1, list: {} },
+      clicktags: Object.fromEntries(names.map((n, i) => [n, urls[i]])),
+      source: 'index.html'
+    }
+    const fn = (n: string, u: string) =>
+      `window.open(window.dhtml?dhtml.getVar(${jsString(n)},${jsString(u)}):${jsString(u)},window.dhtml?dhtml.getVar('landingPageTarget','_blank'):'_blank')`
+    return {
+      exitOf,
+      head: preview
+        ? ''
+        : `<script>document.write('<script src="'+(window.API_URL||'https://s1.adform.net/banners/scripts/rmb/Adform.DHTML.js?bv='+Math.random())+'"><\\/script>');</script>`,
+      anchor: preview ? '<a id="ad" href="javascript:void(0)">' : `<a id="ad" href="javascript:void(0)" onclick="${escapeHtml(fn('clickTAG', fallback))};return false">`,
+      exitAttr: (n: number) => (preview ? '' : ` onclick="event.stopPropagation();${escapeHtml(fn(`clickTAG${n}`, exitUrl(n)))};return false"`),
+      files: { 'manifest.json': JSON.stringify(manifest, null, 2) } as Record<string, string>
+    }
+  }
+
+  const names = ['clickTag', ...exits.map((_, i) => `clickTag${i + 1}`)]
+  const vars = names.map((n, i) => `var ${n} = ${jsString(i ? exitUrl(i) : fallback)};`).join('')
+  return {
+    exitOf,
+    head:
+      `<script>${vars}` +
+      `(function(){var q=location.search,n=${JSON.stringify(names)},i,m,u;for(i=0;i<n.length;i++)try{m=new RegExp('[?&]'+n[i]+'=([^&#]+)','i').exec(q);u=m&&decodeURIComponent(m[1]);if(u&&/^https?:/i.test(u))window[n[i]]=u}catch(e){}})();` +
+      '</script>',
+    anchor: preview ? '<a id="ad" href="javascript:void(0)">' : '<a id="ad" href="javascript:window.open(window.clickTag)">',
+    exitAttr: (n: number) => (preview ? '' : ` onclick="event.preventDefault();event.stopPropagation();window.open(window.clickTag${n})"`),
+    files: {} as Record<string, string>
+  }
 }

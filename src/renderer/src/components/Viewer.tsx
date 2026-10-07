@@ -1,6 +1,7 @@
+import { exitLayers } from '@shared/build'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Maximize, Minus, Plus, Star } from 'lucide-react'
-import { layerStateAt } from '@shared/anim'
+import { layerStateAt, restStateAt } from '@shared/anim'
 import { buildBanner } from '@shared/build'
 import type { Composition, Layer, Project } from '@shared/types'
 import { anchorOf } from '@shared/geometry'
@@ -227,7 +228,7 @@ function SingleViewer() {
         const f = findDeep(comp.layers, id)
         const b = boxOf(id)
         if (!f || !b || f.layer.locked) return null
-        const st = layerStateAt(f.layer, localTime(time, f.ancestors))
+        const st = restStateAt(f.layer, localTime(time, f.ancestors))
         const anim = (q: 'x' | 'y') => !!f.layer.tracks[q]?.length
         return { id, x: anim('x') ? st.x : f.layer.x, y: anim('y') ? st.y : f.layer.y, ps: b.parentScale, pr: b.parentRot }
       })
@@ -505,6 +506,17 @@ function SingleViewer() {
             }}
           >
             {ctxBox && <div className="sel context" style={frameStyle(ctxBox)} />}
+            {/* Klikgebieden: altijd zichtbaar als gestippeld kader met hun clickTag-nummer */}
+            {exitLayers(comp).map((l, i) => {
+              const b = boxes.find((x) => x.layer.id === l.id)
+              return (
+                b && (
+                  <div key={'x' + l.id} className="exit-frame" style={frameStyle(b)}>
+                    <span style={{ transform: `scale(${1 / (b.scale || 1)},${1 / (b.scaleY || 1)})` }}>clickTag{i + 1}</span>
+                  </div>
+                )
+              )
+            })}
             {hovered && box(hovered, 'hover', false)}
             {selected.map((b) => box(b, '', !!single && b === single))}
             {single && tool === 'select' && !editBox && (

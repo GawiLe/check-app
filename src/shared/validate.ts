@@ -37,14 +37,28 @@ export function validateBanner(input: ValidationInput): ValidationIssue[] {
     add('error', 'ad.size', `ad.size (${meta[1]}x${meta[2]}) komt niet overeen met ${comp.width}x${comp.height}.`)
 
   // clickTag
-  if (!/var clickTag\s*=\s*"https?:\/\/[^"]+"/.test(html))
-    add('error', 'clickTag', 'clickTag is niet gedeclareerd met een geldige http(s)-URL.')
-  if (!/window\.open\(window\.clickTag\)/.test(html)) add('error', 'clickTag', 'clickTag wordt niet gebruikt in de klik-actie.')
-  if (/var clickTag\s*=\s*"https?:\/\/(www\.)?example\.(com|org|nl)/i.test(html))
+  const exits = [...html.matchAll(/class="L X"/g)].length
+  if (input.target === 'adform') {
+    if (!/Adform\.DHTML\.js/.test(html)) add('error', 'clickTag', 'Adform.DHTML.js ontbreekt.')
+    if (!/dhtml\.getVar\(&quot;clickTAG&quot;/.test(html)) add('error', 'clickTag', 'clickTAG wordt niet via dhtml.getVar gebruikt in de klik-actie.')
+    if (!files.some((f) => f.name === 'manifest.json')) add('error', 'manifest', 'manifest.json ontbreekt (verplicht voor Adform).')
+    for (let i = 1; i <= exits; i++)
+      if (!html.includes(`clickTAG${i}`)) add('error', 'clickTag', `Klikgebied ${i} heeft geen clickTAG${i}.`)
+  } else {
+    if (!/var clickTag\s*=\s*"https?:\/\/[^"]+"/.test(html))
+      add('error', 'clickTag', 'clickTag is niet gedeclareerd met een geldige http(s)-URL.')
+    if (!/window\.open\(window\.clickTag\)/.test(html)) add('error', 'clickTag', 'clickTag wordt niet gebruikt in de klik-actie.')
+    for (let i = 1; i <= exits; i++)
+      if (!new RegExp(`var clickTag${i}\\s*=\\s*"https?:`).test(html) || !html.includes(`window.open(window.clickTag${i})`))
+        add('error', 'clickTag', `Klikgebied ${i}: clickTag${i} ontbreekt of wordt niet gebruikt.`)
+    if (exits && input.target === 'google-ads')
+      add('warning', 'clickTag', `Google Ads gebruikt één klik-URL (de uiteindelijke URL van de advertentie); de ${exits} extra klikgebied(en) gaan daar ook naartoe.`)
+  }
+  if (/clickTAG?\d*\s*=\s*"https?:\/\/(www\.)?example\.(com|org|nl)/i.test(html) || /&quot;https?:\/\/(www\.)?example\.(com|org|nl)/i.test(html))
     add('warning', 'clickTag', 'De fallback-clickTag is nog de voorbeeld-URL. Vul de echte landingspagina in (werkbalk of Ontwerp → Export).')
 
-  // Externe requests (alles behalve de clickTag-URL)
-  const withoutClickTag = html.replace(/var clickTag\s*=[^;]*;/, '')
+  // Externe requests (alles behalve de clickTag-URL's; het Adform-script wordt via document.write geladen)
+  const withoutClickTag = html.replace(/var clickTag\d*\s*=[^;]*;/g, '')
   const external = withoutClickTag.match(/(?:src|href)\s*=\s*["']?(?:https?:)?\/\/[^"'\s>]+/g)
   if (external) add('error', 'extern', `Externe bronnen gevonden: ${external.slice(0, 3).join(', ')}`)
 
