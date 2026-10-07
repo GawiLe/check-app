@@ -4,7 +4,6 @@ import { Dialogs, SvgChoiceDialog } from './components/Dialogs'
 import { Toolbar } from './components/Toolbar'
 import { Workspace } from './components/Workspace'
 import {
-  confirmDiscard,
   copySelection,
   cutSelection,
   keyAssist,
@@ -27,6 +26,8 @@ import { restStateAt } from '@shared/anim'
 import { endFrameTime } from '@shared/motion'
 import { FilePlus2, FolderOpen } from 'lucide-react'
 import { useDock } from './dock/store'
+import { anyDirty, closeDocument, cycleDocument, useDocs } from './lib/documents'
+import { DocTabs } from './components/DocTabs'
 import { toggleMaximizeUnderPointer } from './dock/Dock'
 import type { PanelId } from './dock/model'
 
@@ -46,8 +47,13 @@ export function App() {
     () =>
       window.bs.onMenu(async (action) => {
         const s = useStore.getState()
-        if (action === 'new') (await confirmDiscard()) && s.setDialog('new')
+        if (action === 'new') s.setDialog('new')
         if (action === 'open') void openProject()
+        if (action.startsWith('openRecent:')) void openProject(action.slice('openRecent:'.length))
+        if (action === 'closeTab') {
+          const active = useDocs.getState().active
+          if (active) void closeDocument(active)
+        }
         if (action.startsWith('panel:')) useDock.getState().show(action.slice(6) as PanelId)
         if (action === 'resetLayout') useDock.getState().reset()
         if (action === 'saveAndClose') void saveAndClose()
@@ -76,12 +82,20 @@ export function App() {
     []
   )
 
-  // Niet-opgeslagen wijzigingen doorgeven aan het hoofdproces (vraag bij sluiten/afsluiten)
+  // Niet-opgeslagen wijzigingen (in welk tabblad dan ook) doorgeven aan het hoofdproces
   useEffect(() => {
-    void window.bs.setDirty(useStore.getState().dirty)
-    return useStore.subscribe((s, prev) => {
-      if (s.dirty !== prev.dirty) void window.bs.setDirty(s.dirty)
-    })
+    let last: boolean | null = null
+    const sync = () => {
+      const d = anyDirty()
+      if (d !== last) void window.bs.setDirty((last = d))
+    }
+    sync()
+    const a = useStore.subscribe(sync)
+    const b = useDocs.subscribe(sync)
+    return () => {
+      a()
+      b()
+    }
   }, [])
 
   // Bestanden die naast een drop-zone vallen niet in het venster openen
@@ -138,6 +152,12 @@ export function App() {
       const comp = currentComp(s)
       if (!comp) return
       const frame = 1 / 30
+      // Ctrl+Tab / Ctrl+Shift+Tab: volgende/vorige project-tabblad
+      if (e.key === 'Tab' && e.ctrlKey) {
+        e.preventDefault()
+        cycleDocument(e.shiftKey ? -1 : 1)
+        return
+      }
       switch (e.key) {
         case ' ':
           e.preventDefault()
@@ -233,6 +253,7 @@ export function App() {
 
   return (
     <div className="app">
+      <DocTabs />
       <Toolbar />
       <Workspace />
       <Toast />

@@ -172,6 +172,8 @@ export interface Layer {
    * vóór de algemene klik (de hele banner) gaat. Lege url = dezelfde URL als de algemene clickTag.
    */
   exit?: { url: string } | null
+  /** Schaduwen (CSS drop-shadow, volgt de vorm van tekst, vormen en afbeeldingen). Meerdere = gestapeld. */
+  shadows?: Shadow[]
   tracks: Tracks
   intro?: Motion | null
   outro?: Motion | null
@@ -283,4 +285,14 @@ export interface VariantSet {
   /** Gekozen variabele velden. */
   fields: string[]
   variants: Variant[]
+}
+
+export interface Shadow {
+  x: number
+  y: number
+  blur: number
+  /** #rrggbb */
+  color: string
+  /** 0–1 */
+  opacity: number
 }

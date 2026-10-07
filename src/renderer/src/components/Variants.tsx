@@ -5,7 +5,7 @@ import { newId } from '@shared/factory'
 import { TARGETS } from '@shared/specs'
 import type { VariantSet } from '@shared/types'
 import { variantFields, type VariantField } from '@shared/variants'
-import { openProject, refreshAssets, save } from '../lib/actions'
+import { openInBackground, openProject, refreshAssets, save } from '../lib/actions'
 import { assetUrl, useStore } from '../store'
 import { Modal } from './ui'
 
@@ -70,8 +70,10 @@ export function VariantsDialog({ onClose }: { onClose: () => void }) {
     try {
       await save()
       const res = await window.bs.createVariants({ dir, project: useStore.getState().project!, exportTargets: exportNow ? project.targets : null })
+      // Elke variant meteen als tabblad bovenin (op de achtergrond; je blijft in het template)
+      await openInBackground(res.map((r) => r.dir))
       setResults(res)
-      useStore.getState().setStatus(`${res.length} variant(en) aangemaakt${exportNow ? ' en geëxporteerd' : ''}.`)
+      useStore.getState().setStatus(`${res.length} variant(en) aangemaakt${exportNow ? ' en geëxporteerd' : ''}; ze staan als tabbladen bovenin.`)
     } catch (e) {
       useStore.getState().setStatus(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(e), 'error')
     } finally {

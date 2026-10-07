@@ -54,7 +54,12 @@ export interface VariantResult {
 /** Het API-oppervlak dat de preload aan de renderer geeft (`window.bs`). */
 export interface BannerStudioApi {
   newProject(boilerplateId: string | null, name: string): Promise<OpenedProject | null>
-  openProject(dir?: string): Promise<OpenedProject | null>
+  /** Project openen; met `background` als tabblad op de achtergrond (het actieve project blijft actief). */
+  openProject(dir?: string, background?: boolean): Promise<OpenedProject | null>
+  /** Een geopend project (tabblad) actief maken: preview, assets en bestandsbewaking volgen het. */
+  activateProject(dir: string): Promise<void>
+  /** Tabblad gesloten: project niet langer als geopend beschouwen. */
+  closeProject(dir: string): Promise<void>
   saveProject(dir: string, project: Project): Promise<void>
   importImages(dir: string): Promise<string[]>
   importFonts(dir: string): Promise<FontAsset[]>

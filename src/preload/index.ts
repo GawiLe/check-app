@@ -15,6 +15,8 @@ const subscribe = (channel: string) => (cb: (...a: never[]) => void) => {
 const api: BannerStudioApi = {
   newProject: call('newProject'),
   openProject: call('openProject'),
+  activateProject: call('activateProject'),
+  closeProject: call('closeProject'),
   saveProject: call('saveProject'),
   importImages: call('importImages'),
   importFonts: call('importFonts'),

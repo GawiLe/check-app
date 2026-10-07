@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BookmarkPlus, Folder, Image as ImageIcon, Link2, Link2Off, ListOrdered, PenLine, RotateCcw, Sparkles, Square, Timer, Trash2, Type, Wand2, X } from 'lucide-react'
+import { BookmarkPlus, Folder, Plus, Image as ImageIcon, Link2, Link2Off, ListOrdered, PenLine, RotateCcw, Sparkles, Square, Timer, Trash2, Type, Wand2, X } from 'lucide-react'
 import { layerStateAt } from '@shared/anim'
 import { applyLibraryItem, LIBRARY, matchLibraryItem } from '@shared/library'
 import { defaultIntro, defaultOutro } from '@shared/motion'
@@ -9,7 +9,7 @@ import { findDeep, layerLength, trimIn, trimOut } from '@shared/tree'
 import { PRESETS } from '@shared/presets'
 import { TARGET_IDS, TARGETS } from '@shared/specs'
 import { exitLayers } from '@shared/build'
-import type { AnimProp, EaseName, Emphasis, EmphasisType, Layer, Motion, RevealMode } from '@shared/types'
+import type { AnimProp, EaseName, Emphasis, EmphasisType, Layer, Motion, RevealMode, Shadow } from '@shared/types'
 import { EASES } from '@shared/types'
 import {
   aiAnimate,
@@ -531,8 +531,76 @@ function LayerDesign({ layer }: { layer: Layer }) {
           <Switch checked={layer.cta} onChange={(v) => up((l) => void (l.cta = v))} />
         </Row>
       </Section>
+      <ShadowSection layer={layer} />
       <ExitSection layer={layer} />
     </>
+  )
+}
+
+const SHADOW_PRESETS: Record<string, Shadow[]> = {
+  Zacht: [{ x: 0, y: 4, blur: 12, color: '#000000', opacity: 0.25 }],
+  Hard: [{ x: 4, y: 4, blur: 0, color: '#000000', opacity: 0.4 }],
+  Dubbel: [
+    { x: 0, y: 1, blur: 2, color: '#000000', opacity: 0.3 },
+    { x: 0, y: 8, blur: 24, color: '#000000', opacity: 0.2 }
+  ],
+  Gloed: [{ x: 0, y: 0, blur: 16, color: '#ffffff', opacity: 0.8 }]
+}
+
+/** Schaduwen: één of meer (gestapeld), voor tekst, vormen, afbeeldingen en composities. */
+function ShadowSection({ layer }: { layer: Layer }) {
+  const list = layer.shadows ?? []
+  const up = (fn: (l: Layer) => void, co?: string) => updateLayer(layer.id, fn, co)
+  const set = (i: number, patch: Partial<Shadow>, co?: string) =>
+    up((l) => {
+      if (l.shadows?.[i]) Object.assign(l.shadows[i], patch)
+    }, co)
+  return (
+    <Section
+      title="Schaduw"
+      actions={
+        <button
+          className="icon sm"
+          title="Schaduw toevoegen (meerdere = gestapeld, bijv. een dubbele schaduw)"
+          onClick={() => up((l) => void (l.shadows = [...(l.shadows ?? []), { x: 0, y: 4, blur: 12, color: '#000000', opacity: 0.25 }]))}
+        >
+          <Plus size={14} />
+        </button>
+      }
+    >
+      <div className="shadow-presets">
+        {Object.entries(SHADOW_PRESETS).map(([name, preset]) => (
+          <button key={name} className="ghost sm" onClick={() => up((l) => void (l.shadows = structuredClone(preset)))}>
+            {name}
+          </button>
+        ))}
+        {list.length > 0 && (
+          <button className="ghost sm" onClick={() => up((l) => void delete l.shadows)}>
+            Geen
+          </button>
+        )}
+      </div>
+      {list.map((sh, i) => (
+        <div key={i} className="shadow-row">
+          <div className="shadow-line">
+            <Num label="X" value={sh.x} onChange={(v, co) => set(i, { x: v }, co ? `shx${i}` : undefined)} />
+            <Num label="Y" value={sh.y} onChange={(v, co) => set(i, { y: v }, co ? `shy${i}` : undefined)} />
+            <Num label="Blur" value={sh.blur} min={0} max={200} onChange={(v, co) => set(i, { blur: v }, co ? `shb${i}` : undefined)} />
+          </div>
+          <div className="shadow-line">
+            <input type="color" value={sh.color} onChange={(e) => set(i, { color: e.target.value }, `shc${i}`)} />
+            <input type="range" min={0} max={100} value={Math.round(sh.opacity * 100)} onChange={(e) => set(i, { opacity: +e.target.value / 100 }, `sho${i}`)} />
+            <span className="muted" style={{ width: 34, textAlign: 'right' }}>
+              {Math.round(sh.opacity * 100)}%
+            </span>
+            <button className="icon sm" title="Schaduw verwijderen" onClick={() => up((l) => void (l.shadows = l.shadows!.filter((_, j) => j !== i)))}>
+              <Trash2 size={13} />
+            </button>
+          </div>
+        </div>
+      ))}
+      {!list.length && <div className="hint-text">Geen schaduw. Kies een voorbeeld of voeg er een toe; met twee of meer krijg je een gestapelde (dubbele) schaduw.</div>}
+    </Section>
   )
 }
 

@@ -17,7 +17,7 @@ export interface SelectedKey {
   t: number
 }
 
-interface State {
+export interface State {
   dir: string | null
   project: Project | null
   compId: string | null

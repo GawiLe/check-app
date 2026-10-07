@@ -977,3 +977,25 @@ describe('credit', () => {
     expect(new JSDOM(html).window.document.compatMode).toBe('CSS1Compat') // geen quirks mode
   })
 })
+
+describe('schaduw', () => {
+  it('enkele en dubbele schaduw als drop-shadow, ook met CTA-hover', async () => {
+    const { shadowFilter } = await import('../src/shared/build')
+    expect(shadowFilter([{ x: 0, y: 4, blur: 12, color: '#000000', opacity: 0.25 }])).toBe('drop-shadow(0px 4px 12px rgba(0,0,0,0.25))')
+    const p = createStarterProject('Schaduw')
+    const cta = p.compositions[0].layers.find((l) => l.name === 'CTA')!
+    cta.cta = true
+    cta.shadows = [
+      { x: 0, y: 1, blur: 2, color: '#112233', opacity: 0.3 },
+      { x: 0, y: 8, blur: 24, color: '#000000', opacity: 0.2 }
+    ]
+    const { html } = build(p)
+    expect(html).toContain('filter:drop-shadow(0px 1px 2px rgba(17,34,51,0.3)) drop-shadow(0px 8px 24px rgba(0,0,0,0.2))')
+    expect(html).toMatch(/#ad:hover #a\d+\{filter:drop-shadow\(0px 1px 2px rgba\(17,34,51,0.3\)\) drop-shadow\(0px 8px 24px rgba\(0,0,0,0.2\)\) brightness\(1.12\)\}/)
+  })
+  it('vreemde kleuren of getallen uit een projectbestand breken de CSS niet', async () => {
+    const { shadowFilter } = await import('../src/shared/build')
+    const f = shadowFilter([{ x: 'x' as never, y: 2, blur: -5, color: 'red;}</style>', opacity: 2 }])
+    expect(f).toBe('drop-shadow(0px 2px 0px rgba(0,0,0,1))')
+  })
+})

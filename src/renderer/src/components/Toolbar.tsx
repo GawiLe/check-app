@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   BookmarkPlus,
+  ChevronDown,
   Copy,
   FilePlus2,
   FolderOpen,
@@ -23,7 +24,8 @@ import {
   Undo2,
   Upload
 } from 'lucide-react'
-import { addClickArea, addLayer, importImages, openProject, regenerateWriteOn, renameComposition, save } from '../lib/actions'
+import { addClickArea, addLayer, importImages, regenerateWriteOn, renameComposition, save } from '../lib/actions'
+import { OpenMenu } from './DocTabs'
 import { InlineRename } from './ui'
 import { ALL_PANELS, PANEL_TITLE, visiblePanels } from '../dock/model'
 import { useDock } from '../dock/store'
@@ -53,9 +55,10 @@ export function Toolbar() {
         <button className="icon" title="Nieuw project (Ctrl/Cmd+N)" onClick={() => s().setDialog('new')}>
           <FilePlus2 size={16} />
         </button>
-        <button className="icon" title="Open project (Ctrl/Cmd+O)" onClick={() => openProject()}>
+        <OpenMenu className="icon open-btn" title="Openen: map kiezen of een recent project (in een nieuw tabblad)">
           <FolderOpen size={16} />
-        </button>
+          <ChevronDown size={10} />
+        </OpenMenu>
         <button className="icon" title="Opslaan (Ctrl/Cmd+S)" disabled={!dirty} onClick={save}>
           <Save size={16} />
         </button>

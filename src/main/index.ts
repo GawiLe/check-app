@@ -69,7 +69,11 @@ const PREVIEW_CSP =
 
 const FONT_MIME: Record<string, string> = { '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.otf': 'font/otf' }
 
+/** Alle projecten die in tabbladen open staan (absolute paden). Het actieve is currentDir. */
+const openDirs = new Set<string>()
+
 function setProjectDir(dir: string) {
+  openDirs.add(resolve(dir))
   currentDir = dir
   watcher?.close()
   let timer: NodeJS.Timeout | undefined
@@ -83,7 +87,7 @@ function setProjectDir(dir: string) {
   } catch {
     watcher = null
   }
-  void addRecent(dir)
+  void addRecent(dir).then(() => buildMenu())
   win?.setTitle(`Bnnr Studio — ${dir}`)
 }
 
@@ -105,7 +109,15 @@ const handlers: Handlers = {
     return { dir, project }
   },
 
-  async openProject(dir) {
+  async activateProject(dir) {
+    if (!openDirs.has(resolve(dir))) throw new Error('Dit project is niet geopend.')
+    setProjectDir(dir)
+  },
+  async closeProject(dir) {
+    openDirs.delete(resolve(dir))
+  },
+
+  async openProject(dir, background) {
     if (!dir) {
       const res = await dialog.showOpenDialog(win!, {
         title: 'Open projectmap',
@@ -115,7 +127,11 @@ const handlers: Handlers = {
       dir = res.filePaths[0]
     }
     const opened = await readProject(dir)
-    setProjectDir(dir)
+    if (background) {
+      // In een tabblad op de achtergrond: wel openen, niet actief maken
+      openDirs.add(resolve(dir))
+      void addRecent(dir).then(() => buildMenu())
+    } else setProjectDir(dir)
     return opened
   },
 
@@ -216,7 +232,7 @@ const handlers: Handlers = {
 
 // Functies die in een projectmap schrijven of lezen: alleen in het project dat nu open is
 // (de map komt uit het venster en wordt dus niet blind vertrouwd).
-const DIR_ARG = new Set(['saveProject', 'importImages', 'importFonts', 'listAssets', 'importPaths', 'generateWriteOn', 'saveBoilerplate', 'installWebFont'])
+const DIR_ARG = new Set(['importImages', 'importFonts', 'listAssets', 'importPaths', 'generateWriteOn', 'saveBoilerplate', 'installWebFont'])
 const DIR_REQ = new Set(['exportBanners', 'createVariants'])
 function assertOpenProject(dir: unknown) {
   if (typeof dir !== 'string' || !currentDir || resolve(dir) !== resolve(currentDir)) throw new Error('Deze map is niet het geopende project.')
@@ -227,14 +243,17 @@ for (const [name, fn] of Object.entries(handlers)) {
     // Alleen het hoofdvenster zelf, nooit een (preview-)frame of een ander venster
     if (!win || e.sender !== win.webContents || e.senderFrame !== win.webContents.mainFrame) throw new Error('Niet toegestaan.')
     if (DIR_ARG.has(name)) assertOpenProject(args[0])
+    // Opslaan mag voor elk geopend tabblad (bijv. "alles opslaan" bij afsluiten)
+    if (name === 'saveProject' && !(typeof args[0] === 'string' && openDirs.has(resolve(args[0])))) throw new Error('Dit project is niet geopend.')
     if (DIR_REQ.has(name)) assertOpenProject((args[0] as { dir?: unknown } | undefined)?.dir)
     return (fn as (...a: unknown[]) => unknown)(...args)
   })
 }
 
-function buildMenu() {
+async function buildMenu() {
   const send = (action: string) => () => win?.webContents.send('bs:menu', action)
   const isMac = process.platform === 'darwin'
+  const recent = (await readSettings().catch(() => ({ recent: [] as string[] }))).recent ?? []
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
       ...(isMac ? [{ role: 'appMenu' as const }] : []),
@@ -243,13 +262,20 @@ function buildMenu() {
         submenu: [
           { label: 'Nieuw project…', accelerator: 'CmdOrCtrl+N', click: send('new') },
           { label: 'Open project…', accelerator: 'CmdOrCtrl+O', click: send('open') },
+          {
+            label: 'Recent openen',
+            submenu: recent.length
+              ? recent.map((d) => ({ label: d.split(/[\\/]/).pop() || d, sublabel: d, toolTip: d, click: () => win?.webContents.send('bs:menu', `openRecent:${d}`) }))
+              : [{ label: 'Nog geen recente projecten', enabled: false }]
+          },
           { label: 'Opslaan', accelerator: 'CmdOrCtrl+S', click: send('save') },
           { type: 'separator' },
           { label: 'Opslaan als boilerplate…', click: send('saveBoilerplate') },
           { label: 'Varianten (template)…', click: send('variants') },
           { label: 'Exporteren…', accelerator: 'CmdOrCtrl+E', click: send('export') },
           { type: 'separator' },
-          isMac ? { role: 'close' } : { role: 'quit', label: 'Afsluiten' }
+          { label: 'Tabblad sluiten', accelerator: 'CmdOrCtrl+W', click: send('closeTab') },
+          ...(isMac ? [] : [{ role: 'quit' as const, label: 'Afsluiten' }])
         ]
       },
       {
@@ -361,7 +387,7 @@ app.whenReady().then(async () => {
       return new Response('Niet gevonden', { status: 404 })
     }
   })
-  buildMenu()
+  void buildMenu()
   await createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) void createWindow()

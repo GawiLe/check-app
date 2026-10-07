@@ -81,6 +81,9 @@ const winter = join(parent, `${basename(dir)}-winter`)
 await check('vreemde map met dezelfde naam niet overschreven (variant naar -zomer-2)', async () =>
   JSON.parse(await readFile(join(stranger, 'project.bsproj'), 'utf8')).name === 'Ander project'
 )
+await check('varianten als tabbladen bovenin (template blijft actief)', async () =>
+  (await page.locator('.doc-tab').count()) === 3 && (await page.evaluate(() => window.__bsStore.getState().dir)) === dir
+)
 await check('twee projectmappen naast het origineel', async () => existsSync(join(zomer, 'project.bsproj')) && existsSync(join(winter, 'project.bsproj')))
 await check('Zomer: andere headline en logo in alle formaten', async () => {
   const p = await readProject(zomer)

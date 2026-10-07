@@ -1,3 +1,4 @@
+import { anyDirty, openDocument, saveAll } from './documents'
 import { createLayer, deriveComposition, newId } from '@shared/factory'
 import { applyLibraryItem, applyUserPreset, LIBRARY, presetFromLayer } from '@shared/library'
 import { mergeTracks, PRESETS } from '@shared/presets'
@@ -27,32 +28,28 @@ export async function refreshAssets() {
   if (dir) S().setAssets(await window.bs.listAssets(dir))
 }
 
-/**
- * Voor openen/nieuw: bij niet-opgeslagen wijzigingen vragen wat ermee moet.
- * true = doorgaan (opgeslagen of bewust weggegooid), false = annuleren.
- */
-export async function confirmDiscard(): Promise<boolean> {
-  if (!S().dirty) return true
-  const answer = await window.bs.askSave()
-  if (answer === 'cancel') return false
-  if (answer === 'save') {
-    await save()
-    return !S().dirty // mislukt opslaan = niet doorgaan
-  }
-  return true
+/** Opslaan (alle tabbladen) en daarna het venster sluiten (gekozen in de vraag bij sluiten). */
+export async function saveAndClose() {
+  await saveAll()
+  if (!anyDirty()) await window.bs.closeWindow()
 }
 
-/** Opslaan en daarna het venster sluiten (gekozen in de vraag bij sluiten). */
-export async function saveAndClose() {
-  await save()
-  if (!S().dirty) await window.bs.closeWindow()
+/** Projecten (bijv. net aangemaakte varianten) als tabbladen op de achtergrond openen. */
+export async function openInBackground(dirs: string[]) {
+  const active = S().dir
+  for (const dir of dirs) {
+    const opened = await window.bs.openProject(dir, true).catch(() => null)
+    if (opened) await openDocument(opened.dir, opened.project, { background: true, refresh: true })
+  }
+  if (active) await window.bs.activateProject(active)
 }
 
 export async function newProject(boilerplateId: string | null, name: string) {
   try {
     const opened = await window.bs.newProject(boilerplateId, name)
     if (!opened) return
-    S().openProject(opened.dir, opened.project)
+    // Nieuw project in een eigen tabblad
+    await openDocument(opened.dir, opened.project)
     S().setDialog(null)
     await refreshAssets()
     S().setStatus(`Project aangemaakt in ${opened.dir}`)
@@ -61,12 +58,12 @@ export async function newProject(boilerplateId: string | null, name: string) {
   }
 }
 
+/** Project openen in een tabblad (staat het al open, dan wordt het dat tabblad). */
 export async function openProject(dir?: string) {
-  if (!(await confirmDiscard())) return
   try {
     const opened = await window.bs.openProject(dir)
     if (!opened) return
-    S().openProject(opened.dir, opened.project)
+    await openDocument(opened.dir, opened.project)
     await refreshAssets()
     S().setStatus(`Geopend: ${opened.dir.split(/[\\/]/).pop()}`)
   } catch (e) {

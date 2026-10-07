@@ -2370,3 +2370,118 @@ pre.code.wrap {
 .variant-table th:last-child {
   width: 100%;
 }
+
+/* ---------- Schaduw ---------- */
+.shadow-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.shadow-row {
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+.shadow-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 3px 0;
+}
+.shadow-line .num {
+  flex: 1;
+  min-width: 0;
+}
+.shadow-line input[type='range'] {
+  flex: 1;
+}
+
+/* ---------- Project-tabbladen ---------- */
+.app > .doc-tabs {
+  flex: 0 0 32px;
+}
+.doc-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 0 8px;
+  background: #0c0c0e;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-app-region: drag;
+}
+.doc-tabs::-webkit-scrollbar {
+  display: none;
+}
+.doc-tabs > * {
+  -webkit-app-region: no-drag;
+}
+.doc-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 27px;
+  max-width: 220px;
+  padding: 0 6px 0 12px;
+  border-radius: 7px 7px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: default;
+  flex: 0 0 auto;
+}
+.doc-tab:hover {
+  background: var(--panel-2);
+  color: var(--text);
+}
+.doc-tab.on {
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+.doc-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.doc-dirty {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--warn);
+  flex: 0 0 auto;
+}
+.doc-close {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  opacity: 0.5;
+}
+.doc-tab:hover .doc-close,
+.doc-tab.on .doc-close {
+  opacity: 1;
+}
+.doc-tabs .menu-wrap {
+  align-self: center;
+}
+.open-menu {
+  min-width: 260px;
+}
+.open-menu .menu-label {
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--faint);
+}
+.open-btn {
+  width: auto !important;
+  padding: 0 4px !important;
+  gap: 1px;
+}
+.open-menu button .meta {
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  color: var(--accent);
+  background: rgba(124, 140, 255, 0.12);
+}

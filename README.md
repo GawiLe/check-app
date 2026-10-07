@@ -119,6 +119,10 @@ Bovenin het paneel *Ontwerp* staan de knoppen voor links, midden, rechts, boven,
 
 Posities, maten en rotatie zijn altijd hele getallen, schaal en dekking hele procenten. Dat geldt voor slepen, typen, uitlijnen, keyframes en geïmporteerde projecten. Zo staat elke laag in rust precies op de pixelgrid, zonder wazige randen.
 
+### Schaduw
+
+In het paneel *Ontwerp* → **Schaduw**: kies *Zacht*, *Hard*, *Dubbel* of *Gloed*, of voeg schaduwen toe met **+** (X, Y, blur, kleur, dekking). Meerdere schaduwen worden gestapeld, dus een dubbele schaduw is gewoon twee regels. Het werkt op tekst, vormen, afbeeldingen (volgt transparantie) en hele composities, en wordt geëxporteerd als CSS `filter: drop-shadow(…)`.
+
 ### Hernoemen
 
 Lagen: selecteer en druk **Enter**, dubbelklik op de naam in de tijdlijn, of rechtermuisknop → *Naam wijzigen*. Composities: Enter of rechtermuisknop (dubbelklik opent ze). Formaten en compositie-tabs: dubbelklik op het tabblad.
@@ -266,6 +270,15 @@ Animeer een laag en kies in de tab *Animatie* **Opslaan als preset**.
 ### Write-on
 
 Een write-on laag zet tekst uit je eigen font om naar SVG-paden per letter. De eigenschap **Reveal** (0→1) tekent eerst de omtrek van elke letter en vult hem daarna, letter voor letter. Met "Vulling" bepaal je hoe vroeg de vulling komt; 0 betekent alleen lijnen.
+
+### Meerdere projecten (tabbladen)
+
+Elk geopend project krijgt een tabblad bovenin het venster, zoals in een browser. Per tabblad blijft alles bewaard: ongedaan maken, selectie, tijd en zoom. Een oranje stip betekent niet-opgeslagen wijzigingen.
+
+- **Openen** (map-knop in de werkbalk of de **+** naast de tabbladen): *Map kiezen…* of een **recent project**. Staat het al open, dan ga je naar dat tabblad. Ook via menu Bestand → *Recent openen*.
+- **Varianten** die je aanmaakt verschijnen meteen als tabbladen; je blijft in het template.
+- **Sluiten:** × op het tabblad, middelklik of Cmd/Ctrl+W. Wisselen: klik of Ctrl+Tab / Ctrl+Shift+Tab.
+- Bij afsluiten met wijzigingen in meerdere tabbladen slaat *Opslaan* ze allemaal op.
 
 ### Niet-opgeslagen wijzigingen
 

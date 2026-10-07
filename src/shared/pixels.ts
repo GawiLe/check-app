@@ -44,6 +44,12 @@ export function snapLayer(l: Layer) {
   snapMotion(l.outro)
   if (l.text) l.text.size = Math.max(1, whole(l.text.size))
   if (l.shape) l.shape.radius = whole(l.shape.radius)
+  for (const sh of l.shadows ?? []) {
+    sh.x = whole(sh.x)
+    sh.y = whole(sh.y)
+    sh.blur = Math.max(0, whole(sh.blur))
+    sh.opacity = Math.min(1, Math.max(0, pct(sh.opacity)))
+  }
   if (l.children) for (const c of l.children) snapLayer(c)
 }
 

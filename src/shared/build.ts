@@ -3,7 +3,7 @@ import { effectiveLayer, endFrameTime } from './motion'
 import { minifiedRuntime, WIPE_INDEX } from './runtime'
 import { allLayers, walk } from './tree'
 import { anchorOf } from './geometry'
-import type { AnimProp, Composition, ExportTarget, FontAsset, Layer, Project } from './types'
+import type { AnimProp, Composition, ExportTarget, FontAsset, Layer, Project, Shadow } from './types'
 
 // Bouwt de banner-HTML uit een compositie. Wordt zowel door de editor (preview)
 // als door de exporter gebruikt, zodat wat je ziet ook echt is wat je exporteert.
@@ -192,7 +192,9 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
           break
       }
 
-      if (l.cta) css.push(`#ad:hover #${id}{filter:brightness(1.12)}`, `#${id}{transition:filter .2s}`)
+      const shadow = shadowFilter(l.shadows)
+      if (shadow) rules.push(`filter:${shadow}`)
+      if (l.cta) css.push(`#ad:hover #${id}{filter:${shadow ? shadow + ' ' : ''}brightness(1.12)}`, `#${id}{transition:filter .2s}`)
       css.push(`#${id}{${rules.join(';')}}`)
       const exitNo = click.exitOf.get(raw.id)
       out.push(exitNo ? `<div id="${id}" class="L X"${click.exitAttr(exitNo)}>${inner}</div>` : `<div id="${id}" class="L">${inner}</div>`)
@@ -265,6 +267,19 @@ export function exitLayers(comp: Composition): Layer[] {
     if (l.exit && l.visible && anc.every((a) => a.visible)) out.push(l)
   })
   return out
+}
+
+/** Schaduwen als CSS-filter: drop-shadow volgt de vorm (ook tekst, transparante afbeeldingen en groepen). */
+export function shadowFilter(shadows: Shadow[] | undefined): string {
+  return (shadows ?? [])
+    .filter((s) => s && Number(s.opacity) > 0)
+    .map((s) => {
+      const hex = /^#[0-9a-f]{6}$/i.test(s.color) ? s.color : '#000000'
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+      const a = Math.min(1, Math.max(0, Number(s.opacity) || 0))
+      return `drop-shadow(${n(s.x)}px ${n(s.y)}px ${n(Math.max(0, s.blur))}px rgba(${r},${g},${b},${n(a)}))`
+    })
+    .join(' ')
 }
 
 /** Bovenaan elke banner (ook in de codeweergave). Een commentaar vóór de doctype is geldig HTML5. */
