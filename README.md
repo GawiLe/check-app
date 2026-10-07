@@ -28,7 +28,7 @@ Eenmalig per Mac, in Terminal:
    npm install
    npm run dev
    ```
-   Bij "Electron failed to install correctly": `node node_modules/electron/install.js` en daarna weer `npm run dev`.
+   `npm run dev` controleert zelf of Electron goed gedownload is en haalt hem zo nodig alsnog op. Lukt dat niet (bijv. "Electron uninstall"): `rm -rf node_modules/electron`, `npm install`, `npm run dev`.
 
 Daarna is bijwerken altijd: `cd ~/banner-studio`, `git pull`, `npm install`, `npm run dev`.
 

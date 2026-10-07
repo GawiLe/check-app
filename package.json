@@ -4,12 +4,14 @@
   "description": "Desktop app voor lichte, gevalideerde HTML5/IAB display banners",
   "main": "./out/main/index.js",
   "scripts": {
+    "predev": "node scripts/ensure-electron.mjs",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "dist": "electron-vite build && electron-builder"
+    "dist": "electron-vite build && electron-builder",
+    "prestart": "node scripts/ensure-electron.mjs"
   },
   "author": "Connect Create",
   "license": "UNLICENSED",
