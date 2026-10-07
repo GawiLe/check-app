@@ -124,6 +124,13 @@ In de tijdlijn staan ze als groene (IN), gele (ACCENT) en oranje (UIT) blokken, 
   - Sleep je ze op het linkerpaneel, dan komen ze alleen bij de assets.
   - Via *Assets & fonts → importeren* kan het ook.
   - SVG blijft scherp op elk formaat en is meestal maar een paar KB.
+- **SVG: kiezen hoe hij binnenkomt.** Bij een SVG krijg je een keuzevenster:
+  - **Als afbeelding:** één lichte laag, precies zoals het bestand, die je als geheel animeert.
+  - **Als bewerkbare vormen:** elke vorm (path, rect, circle, ellipse, polygon, line) wordt een eigen laag in een nieuwe compositie, met eigen vulling, lijn en animatie. Handig om een logo in stukjes te animeren.
+    - Overgenomen worden: transformaties, kleuren uit `<style>` en classes, lijndiktes en vormen met gaten (evenodd).
+    - Van een verloop wordt alleen de eerste kleur overgenomen.
+    - Tekst, ingesloten afbeeldingen en `<use>` worden overgeslagen; die meldt de app.
+  - Met *Onthoud mijn keuze* krijg je het venster niet meer. Je zet het terug in Instellingen (*SVG importeren: elke keer vragen*).
 - **Fonts** (WOFF/WOFF2/TTF/OTF) kun je ook gewoon op het venster slepen.
 
 ### Keyframe-assistent (Easy Ease)

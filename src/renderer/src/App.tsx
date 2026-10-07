@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ContextMenu } from './components/ContextMenu'
-import { Dialogs } from './components/Dialogs'
+import { Dialogs, SvgChoiceDialog } from './components/Dialogs'
 import { Inspector } from './components/Inspector'
 import { LeftPanel } from './components/LeftPanel'
 import { Timeline } from './components/Timeline'
@@ -283,6 +283,7 @@ export function App() {
       <Toast />
       <ContextMenu />
       <Dialogs />
+      <SvgChoiceDialog />
     </div>
   )
 }

@@ -9,7 +9,9 @@ import { applyKeyAssist, type KeyAssist } from '@shared/keys'
 import { penToPath, type PenPoint } from '@shared/path'
 import { ANIM_PROPS } from '@shared/types'
 import type { ExportTarget, Layer, LayerType } from '@shared/types'
-import { assetUrl, contextOf, currentComp, findComp, findLayer, layerLocalTime, updateLayer, useStore, type SelectedKey } from '../store'
+import { parseSvg, shapesToLayers } from './svgimport'
+import { round } from '@shared/anim'
+import { assetUrl, contextOf, currentComp, findComp, findLayer, layerLocalTime, updateLayer, useStore, type SelectedKey, type SvgMode } from '../store'
 
 const S = () => useStore.getState()
 
@@ -618,13 +620,109 @@ export async function importDroppedFiles(files: FileList, at?: { x: number; y: n
     await refreshAssets()
     if (res.fonts.length) S().update((p) => void p.fonts.push(...res.fonts))
     let i = 0
-    if (asLayers) for (const a of res.assets) await addImageLayer(a, at ? { x: at.x + i * 12, y: at.y + i++ * 12 } : undefined)
+    if (asLayers) for (const a of res.assets) await addAsset(a, at ? { x: at.x + i * 12, y: at.y + i++ * 12 } : undefined)
     const parts = [
       res.assets.length ? `${res.assets.length} afbeelding(en)` : '',
       res.fonts.length ? `${res.fonts.length} font(s)` : ''
     ].filter(Boolean)
     if (parts.length) S().setStatus(`${parts.join(' en ')} toegevoegd`)
     if (res.skipped.length) S().setStatus(`Niet ondersteund: ${res.skipped.map((p) => p.split(/[\\/]/).pop()).join(', ')}`, 'error')
+  } catch (e) {
+    fail(e)
+  }
+}
+
+// ---------- SVG importeren: als afbeelding of als bewerkbare vormen ----------
+
+const SVG_MODE_KEY = 'bs-svg-mode'
+
+export function rememberedSvgMode(): SvgMode | null {
+  try {
+    const v = localStorage.getItem(SVG_MODE_KEY)
+    return v === 'image' || v === 'shapes' ? v : null
+  } catch {
+    return null
+  }
+}
+
+export function setRememberedSvgMode(mode: SvgMode | null) {
+  try {
+    if (mode) localStorage.setItem(SVG_MODE_KEY, mode)
+    else localStorage.removeItem(SVG_MODE_KEY)
+  } catch {
+    /* geen opslag */
+  }
+}
+
+/** Vraagt (met een venster) hoe een SVG geïmporteerd moet worden, tenzij de keuze is onthouden. */
+export function askSvgMode(name: string): Promise<SvgMode | null> {
+  const remembered = rememberedSvgMode()
+  if (remembered) return Promise.resolve(remembered)
+  return new Promise((resolve) =>
+    S().setSvgChoice({
+      name,
+      resolve: (mode, remember) => {
+        S().setSvgChoice(null)
+        if (mode && remember) setRememberedSvgMode(mode)
+        resolve(mode)
+      }
+    })
+  )
+}
+
+/** Asset als laag toevoegen; bij een SVG eerst kiezen: afbeelding of losse vormen. */
+export async function addAsset(path: string, at?: { x: number; y: number }) {
+  if (!/\.svg$/i.test(path)) return addImageLayer(path, at)
+  const mode = await askSvgMode(path.split('/').pop()!)
+  if (mode === 'image') return addImageLayer(path, at)
+  if (mode === 'shapes') return importSvgAsShapes(path, at)
+}
+
+/** SVG als losse, bewerkbare vormen: elke vorm een eigen laag, samen in een nieuwe compositie. */
+export async function importSvgAsShapes(path: string, at?: { x: number; y: number }) {
+  const { project, compId, activeTab, assetsRev } = S()
+  if (!project) return
+  try {
+    const text = await (await fetch(assetUrl(path, assetsRev))).text()
+    const parsed = parseSvg(text)
+    if (!parsed.shapes.length) {
+      S().setStatus('Geen vormen gevonden in deze SVG; hij is als afbeelding toegevoegd.', 'error')
+      return addImageLayer(path, at)
+    }
+    const ctx = contextOf(project, compId, activeTab)
+    const box = ctx.group ?? findComp(project, compId)
+    const k = Math.min(1, (0.8 * box.width) / parsed.width, (0.8 * box.height) / parsed.height)
+    const shapes = shapesToLayers(parsed, k)
+    const center = at ? toContext(at.x, at.y) : { x: box.width / 2, y: box.height / 2 }
+    const ox = Math.round(center.x - (parsed.width * k) / 2)
+    const oy = Math.round(center.y - (parsed.height * k) / 2)
+    const name = path.split('/').pop()!
+    const layers = shapes.map((sh) => {
+      const l = createLayer('shape', box)
+      l.name = sh.name
+      Object.assign(l, { x: round(ox + sh.x, 2), y: round(oy + sh.y, 2), width: round(sh.w, 2), height: round(sh.h, 2) })
+      Object.assign(l.shape!, {
+        kind: 'path',
+        path: { d: sh.d, w: round(sh.w, 2), h: round(sh.h, 2), closed: sh.closed },
+        fill: sh.fill ?? '#000000',
+        fillEnabled: !!sh.fill,
+        fillRule: sh.fillRule,
+        strokeColor: sh.stroke ?? '#000000',
+        strokeWidth: sh.stroke ? round(sh.strokeWidth, 2) : 0,
+        radius: 0
+      })
+      return l
+    })
+    let gid: string | null = null
+    S().update((p) => {
+      const list = contextOf(p, compId, activeTab).list
+      // In SVG ligt het laatste element bovenop; in de lagenlijst staat bovenop eerst.
+      list.unshift(...[...layers].reverse())
+      gid = groupLayers(findComp(p, compId), layers.map((l) => l.id), name)?.id ?? null
+    })
+    if (gid) S().select([gid])
+    const skipped = parsed.skipped.length ? ` (${parsed.skipped.length} element(en) zoals tekst overgeslagen)` : ''
+    S().setStatus(`${layers.length} vormen geïmporteerd in compositie "${name}"${skipped}. Dubbelklik om ze te bewerken.`)
   } catch (e) {
     fail(e)
   }

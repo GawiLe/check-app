@@ -33,6 +33,8 @@ interface State {
   tool: Tool
   /** Tekstlaag die nu op het canvas bewerkt wordt. */
   editingText: string | null
+  /** Open keuzevenster bij het importeren van een SVG. */
+  svgChoice: { name: string; resolve: (mode: SvgMode | null, remember: boolean) => void } | null
   time: number
   playing: boolean
   zoom: number
@@ -72,6 +74,7 @@ interface State {
   setActiveTab(id: string | null): void
   setTool(t: Tool): void
   setEditingText(id: string | null): void
+  setSvgChoice(c: State['svgChoice']): void
   setTime(t: number): void
   setPlaying(p: boolean): void
   setZoom(z: number): void
@@ -90,6 +93,8 @@ interface State {
 export type InspectorTab = 'design' | 'motion' | 'ai'
 
 export type Tool = 'select' | 'rect' | 'ellipse' | 'pen' | 'text'
+
+export type SvgMode = 'image' | 'shapes'
 
 export type MenuItem =
   | { label: string; shortcut?: string; onClick: () => void; disabled?: boolean; danger?: boolean }
@@ -110,6 +115,7 @@ export const useStore = create<State>((set, get) => ({
   activeTab: null,
   tool: 'select',
   editingText: null,
+  svgChoice: null,
   time: 0,
   playing: false,
   zoom: 1,
@@ -199,6 +205,7 @@ export const useStore = create<State>((set, get) => ({
   setActiveTab: (id) => set({ activeTab: id, selection: [], selectedKeys: [], selectedKey: null }),
   setTool: (t) => set({ tool: t, editingText: null }),
   setEditingText: (id) => set({ editingText: id }),
+  setSvgChoice: (c) => set({ svgChoice: c }),
   setTime: (t) => set({ time: Math.max(0, t) }),
   setPlaying: (p) => set({ playing: p }),
   setZoom: (z) => set({ zoom: Math.min(4, Math.max(0.25, z)) }),

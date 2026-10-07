@@ -310,7 +310,7 @@ export function Timeline() {
     const open = !!expanded[l.id]
     const start = offset + (l.start ?? 0)
     const barEnd = start + layerLength(l)
-    const ranged = l.start != null || l.end != null
+    const ranged = (l.start ?? 0) > 0 || l.end != null
     const select = (e: React.MouseEvent) =>
       s().select(e.shiftKey || e.metaKey ? (active ? selection.filter((x) => x !== l.id) : [...selection, l.id]) : [l.id])
     const pad = { paddingLeft: 8 + depth * 16 }

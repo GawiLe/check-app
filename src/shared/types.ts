@@ -70,6 +70,8 @@ export interface ShapeProps {
   fill: string
   /** Vulling aan/uit (ontbreekt = aan). */
   fillEnabled?: boolean
+  /** Vulregel voor vormen met gaten (uit geïmporteerde SVG). */
+  fillRule?: 'nonzero' | 'evenodd'
   radius: number
   strokeColor: string
   /** 0 = geen lijn. */

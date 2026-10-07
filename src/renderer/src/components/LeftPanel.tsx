@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ImagePlus, Type, X } from 'lucide-react'
 import { Library } from './Library'
-import { addImageLayer, importDroppedFiles, importFonts, importImages } from '../lib/actions'
+import { addAsset, importDroppedFiles, importFonts, importImages } from '../lib/actions'
 import { assetUrl, useStore } from '../store'
 import { Section } from './ui'
 
@@ -48,7 +48,7 @@ export function LeftPanel() {
             <div className="empty">Sleep afbeeldingen in de map assets/ of klik op + om te importeren.</div>
           )}
           {assets.map((a) => (
-            <div key={a} className="list-item" title="Klik om als laag toe te voegen" onClick={() => addImageLayer(a)}>
+            <div key={a} className="list-item" title="Klik om als laag toe te voegen" onClick={() => addAsset(a)}>
               <img className="thumb" src={assetUrl(a, rev)} alt="" />
               <span className="grow">{a.replace(/^assets\//, '')}</span>
             </div>

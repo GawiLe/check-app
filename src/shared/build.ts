@@ -148,7 +148,7 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
           if (sh.kind === 'path' && sh.path) {
             // Vrije vorm: SVG die meeschaalt met de laag; lijndikte blijft gelijk.
             const stroke = sh.strokeWidth > 0 ? ` stroke="${cssValue(sh.strokeColor)}" stroke-width="${n(sh.strokeWidth)}" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"` : ''
-            inner = `<svg viewBox="0 0 ${n(sh.path.w)} ${n(sh.path.h)}" width="100%" height="100%" preserveAspectRatio="none" style="overflow:visible;display:block"><path d="${escapeHtml(sh.path.d)}" fill="${sh.path.closed ? fill : 'none'}"${stroke}/></svg>`
+            inner = `<svg viewBox="0 0 ${n(sh.path.w)} ${n(sh.path.h)}" width="100%" height="100%" preserveAspectRatio="none" style="overflow:visible;display:block"><path d="${escapeHtml(sh.path.d)}" fill="${sh.path.closed ? fill : 'none'}"${sh.fillRule === 'evenodd' ? ' fill-rule="evenodd"' : ''}${stroke}/></svg>`
           } else {
             // Rechthoek / ellips: gewone CSS (lichtst).
             if (fill !== 'none') rules.push(`background:${fill}`)

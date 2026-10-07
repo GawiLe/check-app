@@ -528,3 +528,35 @@ describe('lagen verslepen', () => {
     expect(sub.intro!.start + g.start!).toBeCloseTo(before.t)
   })
 })
+
+describe('SVG-paden omzetten', () => {
+  it('leest relatieve, H/V, S/T en Z-commando’s als absolute segmenten', async () => {
+    const { parsePath, segsToD } = await import('../src/shared/svgpath')
+    expect(segsToD(parsePath('m10 10h20v10h-20z'))).toBe('M10 10L30 10L30 20L10 20Z')
+    const s = parsePath('M0 0C0 10 10 10 10 0s10-10 10 0')
+    expect(s[2]).toEqual({ c: 'C', p: [10, -10, 20, -10, 20, 0] })
+    const t = parsePath('M0 0Q5 10 10 0T20 0')
+    expect(t[2]).toEqual({ c: 'Q', p: [15, -10, 20, 0] })
+  })
+
+  it('boog (ook met aan elkaar geschreven vlaggen) eindigt exact op het eindpunt', async () => {
+    const { parsePath } = await import('../src/shared/svgpath')
+    const a = parsePath('M0 0a10 10 0 0120 20')
+    const last = a[a.length - 1]
+    expect(last.c).toBe('C')
+    if (last.c === 'C') expect([last.p[4], last.p[5]]).toEqual([20, 20])
+    // halve cirkel van (0,0) naar (20,0) met straal 10 loopt tot y = -10 (sweep 1 = met de klok mee, boven langs)
+    const half = parsePath('M0 0A10 10 0 0 1 20 0')
+    const ys = half.flatMap((s) => (s.c === 'C' ? [s.p[1], s.p[3], s.p[5]] : []))
+    expect(Math.min(...ys)).toBeLessThan(-9)
+  })
+
+  it('transformatie, kader en basisvormen', async () => {
+    const { parsePath, transformSegs, segsBounds, rectPath, ellipsePath, pointsPath } = await import('../src/shared/svgpath')
+    const segs = transformSegs(parsePath(rectPath(0, 0, 10, 20)), { a: 2, b: 0, c: 0, d: 2, e: 5, f: 5 })
+    expect(segsBounds(segs)).toEqual({ x: 5, y: 5, w: 20, h: 40 })
+    expect(segsBounds(parsePath(ellipsePath(50, 50, 10, 5)))).toMatchObject({ x: 40, w: 20 })
+    expect(pointsPath('0,0 10,0 5,8', true)).toBe('M0 0L10 0L5 8Z')
+    expect(parsePath(rectPath(0, 0, 40, 20, 5)).some((s) => s.c === 'C')).toBe(true)
+  })
+})

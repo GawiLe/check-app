@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import type { Boilerplate, Settings } from '@shared/api'
 import { IAB_SIZES, TARGET_IDS, TARGETS } from '@shared/specs'
 import type { ExportTarget } from '@shared/types'
-import { addFormat, newProject, runExport, saveAsBoilerplate } from '../lib/actions'
+import { addFormat, newProject, rememberedSvgMode, runExport, saveAsBoilerplate, setRememberedSvgMode } from '../lib/actions'
+import { Image as ImageIcon, Shapes } from 'lucide-react'
 import { useStore } from '../store'
 import { Modal, Row } from './ui'
 
@@ -217,6 +218,13 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
       <Row label="Model">
         <input value={model} onChange={(e) => setModel(e.target.value)} />
       </Row>
+      <Row label="SVG importeren">
+        <select defaultValue={rememberedSvgMode() ?? 'ask'} onChange={(e) => setRememberedSvgMode(e.target.value === 'ask' ? null : (e.target.value as 'image'))}>
+          <option value="ask">Elke keer vragen</option>
+          <option value="image">Altijd als afbeelding</option>
+          <option value="shapes">Altijd als bewerkbare vormen</option>
+        </select>
+      </Row>
       <div className="actions">
         {settings?.hasApiKey && (
           <button
@@ -262,6 +270,37 @@ function SaveBoilerplateDialog({ onClose }: { onClose: () => void }) {
         <button className="primary" disabled={!name.trim()} onClick={() => saveAsBoilerplate(name.trim())}>
           Opslaan
         </button>
+      </div>
+    </Modal>
+  )
+}
+
+/** Keuzevenster bij het importeren van een SVG. */
+export function SvgChoiceDialog() {
+  const choice = useStore((s) => s.svgChoice)
+  const [remember, setRemember] = useState(false)
+  if (!choice) return null
+  const pick = (mode: 'image' | 'shapes' | null) => choice.resolve(mode, remember)
+  return (
+    <Modal title={`SVG importeren: ${choice.name}`} onClose={() => pick(null)}>
+      <div className="choice-cards">
+        <button className="choice-card" autoFocus onClick={() => pick('image')}>
+          <ImageIcon size={22} />
+          <b>Als afbeelding</b>
+          <span>Eén laag, blijft scherp op elk formaat. Het lichtst en exact zoals het bestand. Je animeert hem als geheel.</span>
+        </button>
+        <button className="choice-card" onClick={() => pick('shapes')}>
+          <Shapes size={22} />
+          <b>Als bewerkbare vormen</b>
+          <span>Elke vorm wordt een eigen laag in een nieuwe compositie, met eigen vulling, lijn en animatie. Handig voor logo-animaties.</span>
+        </button>
+      </div>
+      <label className="check" style={{ marginTop: 12 }}>
+        <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+        Onthoud mijn keuze (aan te passen in Instellingen)
+      </label>
+      <div className="actions">
+        <button onClick={() => pick(null)}>Annuleren</button>
       </div>
     </Modal>
   )
