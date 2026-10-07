@@ -240,7 +240,12 @@ Bij een tekstlaag kies je een font met de font-kiezer:
   - Bij export wordt het font weer verkleind tot alleen de gebruikte tekens.
   - Hiervoor is internet nodig. De catalogus wordt een week bewaard; offline zie je de populairste fonts.
 
-Eigen WOFF/WOFF2/TTF/OTF-bestanden kun je nog steeds importeren onder *Assets & fonts*.
+**Eigen font:** kies in de font-kiezer *Eigen font toevoegen…* (WOFF, WOFF2, TTF of OTF). Het font wordt in `fonts/` gezet en meteen gekozen; daarna staat het onder *In dit project*. Importeren kan ook onder *Assets & fonts*.
+
+**Bij export** (eigen fonts en Google Fonts; systeemfonts worden nooit meegeleverd):
+
+- Het font wordt per formaat verkleind tot alleen de tekens die in dát formaat voorkomen (subset, woff2). Een font van 700 KB wordt zo vaak een paar KB. Het exportvenster meldt per font hoeveel tekens en hoeveel KB.
+- Standaard wordt het als **Base64** in de HTML gezet, zonder losse `.woff`/`.woff2`-bestanden in de zip. Uitzetten kan bij *Ontwerp → Export → Fonts* (dan losse `.woff2`). Voor Google Ads en Azerion is inbedden altijd aan.
 
 ### Eigen presets
 
@@ -284,16 +289,16 @@ Een write-on laag zet tekst uit je eigen font om naar SVG-paden per letter. De e
 
 ## Export en validatie
 
-| | CM360 | Google Ads | Ad Manager | Adform | Generiek IAB |
-|---|---|---|---|---|---|
-| Klik | `var clickTag` + `window.open(window.clickTag)` | idem | idem | `dhtml.getVar('clickTAG')` + `manifest.json` | idem als CM360 |
-| Klikgebieden | `clickTag1`, `clickTag2` … | gaan naar de ene URL van de advertentie | `clickTag1` … | `clickTAG1` … | `clickTag1` … |
-| `<meta name="ad.size">` | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Fonts | los `.woff2` | inline base64 (losse fonts niet toegestaan) | los `.woff2` | los `.woff2` | los `.woff2` |
-| Max. ZIP | 10 MB (IAB-advies 150 KB) | 150 KB | 1 MB | 10 MB (IAB-advies 150 KB) | 200 KB |
-| Max. bestanden | 100 | 40 | 100 | 100 | 100 |
-| Animatie | 30 s, 3 loops | 30 s, 3 loops | 30 s, 3 loops | 30 s, 3 loops | 15 s, 3 loops |
-| Backup-JPG (eindframe, ≤40 KB) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| | CM360 | Google Ads | Ad Manager | Adform | Azerion | Generiek IAB |
+|---|---|---|---|---|---|---|
+| Klik | `var clickTag` + `window.open(window.clickTag)` | idem | idem | `dhtml.getVar('clickTAG')` + `manifest.json` | idem als CM360 | idem als CM360 |
+| Klikgebieden | `clickTag1`, `clickTag2` … | gaan naar de ene URL van de advertentie | `clickTag1` … | `clickTAG1` … | `clickTag1` … | `clickTag1` … |
+| `<meta name="ad.size">` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Fonts (subset) | Base64 (instelbaar) | Base64 (verplicht) | Base64 (instelbaar) | Base64 (instelbaar) | Base64 (verplicht) | Base64 (instelbaar) |
+| Max. ZIP | 10 MB (IAB-advies 150 KB) | 150 KB | 1 MB | 10 MB (IAB-advies 150 KB) | 300 KB | 200 KB |
+| Max. bestanden | 100 | 40 | 100 | 100 | 100 | 100 |
+| Animatie | 30 s, 3 loops | 30 s, 3 loops | 30 s, 3 loops | 30 s, 3 loops | 30 s, 3 loops | 15 s, 3 loops |
+| Backup-JPG (eindframe, ≤40 KB) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 **Backup-afbeelding:** van het eindframe, als `<naam>.jpg` naast `<naam>.zip` (bijv. `campagne_300x600.zip` + `campagne_300x600.jpg`). Met dezelfde naam koppelt CM360 hem bij het uploaden aan de juiste creative.
 

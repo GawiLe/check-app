@@ -51,9 +51,9 @@ export function usedFontIds(comp: Composition): string[] {
 }
 
 /** Alle tekens per font (voor subsetting). */
-export function charsPerFont(project: Project): Record<string, string> {
+export function charsPerFont(project: Project, only?: Composition): Record<string, string> {
   const out: Record<string, Set<string>> = {}
-  for (const c of project.compositions)
+  for (const c of only ? [only] : project.compositions)
     for (const l of allLayers(c.layers))
       if (l.type === 'text' && l.text?.fontId) {
         const set = (out[l.text.fontId] ??= new Set())

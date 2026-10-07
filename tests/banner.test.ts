@@ -810,3 +810,39 @@ describe('klikgebieden', () => {
     expect(issues.filter((i) => i.level === 'error')).toEqual([])
   })
 })
+
+describe('fonts en Azerion', () => {
+  it('eigen fonts standaard als Base64; verplicht voor Google Ads en Azerion', async () => {
+    const { fontsInline } = await import('../src/shared/specs')
+    expect(fontsInline('cm360', {})).toBe(true)
+    expect(fontsInline('cm360', { embedFonts: true })).toBe(true)
+    expect(fontsInline('cm360', { embedFonts: false })).toBe(false)
+    expect(fontsInline('azerion', { embedFonts: false })).toBe(true)
+    expect(fontsInline('google-ads', { embedFonts: false })).toBe(true)
+  })
+  it('subset per formaat: alleen de letters van dat formaat', async () => {
+    const { charsPerFont } = await import('../src/shared/build')
+    const p = createStarterProject('Subset')
+    const fid = 'font1'
+    const base = p.compositions[0]
+    const t = base.layers.find((l) => l.type === 'text')!
+    t.text!.fontId = fid
+    t.text!.content = 'Abba'
+    const other = structuredClone(base)
+    other.id = 'c2'
+    other.layers.find((l) => l.type === 'text')!.text!.content = 'Zoef'
+    p.compositions.push(other)
+    expect([...charsPerFont(p, base)[fid]].sort().join('')).toBe('Aab')
+    expect([...charsPerFont(p)[fid]].sort().join('')).toBe('AZabefo')
+  })
+  it('Azerion: max. 300 KB en geen losse fontbestanden', () => {
+    const p = createStarterProject('Az')
+    p.clickTag = 'https://www.makro.nl'
+    const { html } = build(p)
+    const comp = p.compositions[0]
+    const ok = validateBanner({ target: 'azerion', comp, html, files: [{ name: 'index.html', bytes: 9000 }], zipBytes: 290 * 1024, politeLoad: true } as never)
+    expect(ok.filter((i) => i.level === 'error')).toEqual([])
+    const bad = validateBanner({ target: 'azerion', comp, html, files: [{ name: 'index.html', bytes: 9000 }, { name: 'f0.woff2', bytes: 9000 }], zipBytes: 310 * 1024, politeLoad: true } as never)
+    expect(bad.filter((i) => i.level === 'error').map((i) => i.rule).sort()).toEqual(['bestandstype', 'gewicht'])
+  })
+})

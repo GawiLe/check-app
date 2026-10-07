@@ -2163,3 +2163,8 @@ pre.code.wrap {
   border-radius: 3px 3px 0 0;
   white-space: nowrap;
 }
+.font-row.add-font {
+  gap: 8px;
+  color: var(--accent);
+  border-bottom: 1px solid var(--line);
+}

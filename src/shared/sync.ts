@@ -11,6 +11,7 @@ import { ANIM_PROPS, PROJECT_VERSION } from './types'
 export function normalizeProject(p: Project): Project {
   p.syncFormats ??= true
   p.politeLoad ??= true
+  p.embedFonts ??= true
   for (const c of p.compositions) for (const l of c.layers) l.linkId ??= l.id
   p.version = PROJECT_VERSION
   return p

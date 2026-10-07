@@ -251,9 +251,10 @@ export async function importFonts() {
   if (!dir) return
   try {
     const fonts = await window.bs.importFonts(dir)
-    if (!fonts.length) return
+    if (!fonts.length) return []
     S().update((p) => p.fonts.push(...fonts))
     S().setStatus(`Font(s) toegevoegd: ${fonts.map((f) => `${f.family} ${f.weight}`).join(', ')}`)
+    return fonts
   } catch (e) {
     fail(e)
   }

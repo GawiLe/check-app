@@ -117,5 +117,11 @@ await check('CM360: clickTag, clickTag1 en clickTag2', async () =>
 const af = await readdir(`${dir}/export/adform/${folder}`)
 const manifest = JSON.parse(await readFile(`${dir}/export/adform/${folder}/manifest.json`, 'utf8'))
 await check('Adform: manifest.json met clickTAG, clickTAG1, clickTAG2', async () => af.includes('manifest.json') && Object.keys(manifest.clicktags).join() === 'clickTAG,clickTAG1,clickTAG2')
+await check('font als Base64 ingebed, geen los .woff2-bestand', async () =>
+  html.includes('url(data:font/woff2;base64,') && !(await readdir(`${dir}/export/cm360/${folder}`)).some((f) => f.endsWith('.woff2'))
+)
+await check('melding: font verkleind tot de gebruikte tekens', async () =>
+  (await page.locator('.result .issues li').allInnerTexts()).some((t) => /tekens gebruikt, verkleind van [\d.]+ KB tot [\d.]+ KB en als Base64/.test(t))
+)
 await check('Adform: backup aanwezig', async () => (await readdir(`${dir}/export/adform`)).includes(`${folder}.jpg`))
 await app.close()

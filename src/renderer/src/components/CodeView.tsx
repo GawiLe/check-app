@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Copy } from 'lucide-react'
 import { buildBanner } from '@shared/build'
-import { TARGET_IDS, TARGETS } from '@shared/specs'
+import { fontsInline, TARGET_IDS, TARGETS } from '@shared/specs'
 import type { ExportTarget } from '@shared/types'
 import { highlight, prettyBanner } from '../lib/codeformat'
 import { currentComp, useStore } from '../store'
@@ -17,7 +17,7 @@ export function CodeView() {
   const [target, setTarget] = useState<ExportTarget>(project.targets[0] ?? 'cm360')
   const html = useMemo(() => {
     const fontSrc = Object.fromEntries(
-      project.fonts.map((f, i) => [f.id, TARGETS[target].inlineFonts ? 'url(data:font/woff2;base64,…) format("woff2")' : `url(f${i}.woff2) format("woff2")`])
+      project.fonts.map((f, i) => [f.id, fontsInline(target, project) ? 'url(data:font/woff2;base64,…) format("woff2")' : `url(f${i}.woff2) format("woff2")`])
     )
     return buildBanner(project, comp, { mode: 'export', target, assetUrl: (p) => p.split('/').pop()!, fontSrc }).html
   }, [project, comp, target])

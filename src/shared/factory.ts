@@ -142,6 +142,7 @@ export function createStarterProject(name = 'Nieuwe campagne'): Project {
     targets: ['cm360'],
     syncFormats: true,
     politeLoad: true,
+    embedFonts: true,
     fonts: [],
     baseCompositionId: comp.id,
     compositions: [comp]

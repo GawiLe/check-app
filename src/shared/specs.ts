@@ -98,6 +98,19 @@ export const TARGETS: Record<ExportTarget, TargetSpec> = {
     backupImage: true,
     notes: 'Met manifest.json en Adform.DHTML.js; klik-URLs (clickTAG) vul je in Adform in.'
   },
+  azerion: {
+    id: 'azerion',
+    label: 'Azerion',
+    maxZipBytes: 300 * 1024,
+    initialLoadBytes: IAB_INITIAL,
+    maxFiles: 100,
+    allowedExtensions: ['html', 'css', 'js', 'json', 'gif', 'png', 'jpg', 'jpeg', 'svg', 'webp'],
+    inlineFonts: true,
+    maxAnimationSeconds: 30,
+    maxLoops: 3,
+    backupImage: true,
+    notes: 'Max. 300KB ZIP; fonts ingebed (Base64), geen losse fontbestanden.'
+  },
   generic: {
     id: 'generic',
     label: 'Generiek IAB',
@@ -114,3 +127,8 @@ export const TARGETS: Record<ExportTarget, TargetSpec> = {
 }
 
 export const TARGET_IDS = Object.keys(TARGETS) as ExportTarget[]
+
+/** Worden eigen fonts als Base64 in de HTML gezet? Verplicht voor sommige platforms, anders de projectkeuze. */
+export function fontsInline(target: ExportTarget, project: { embedFonts?: boolean }): boolean {
+  return TARGETS[target].inlineFonts || project.embedFonts !== false
+}

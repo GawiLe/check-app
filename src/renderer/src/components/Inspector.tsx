@@ -256,6 +256,10 @@ function CompDesign() {
           <Switch checked={project.politeLoad} onChange={(v) => update((p) => void (p.politeLoad = v))} />
           <span className="faint">afbeeldingen na page load</span>
         </Row>
+        <Row label="Fonts">
+          <Switch checked={project.embedFonts !== false} onChange={(v) => update((p) => void (p.embedFonts = v))} />
+          <span className="faint">{project.embedFonts !== false ? 'ingebed (Base64)' : 'losse .woff2'}</span>
+        </Row>
         <div className="row" style={{ alignItems: 'flex-start' }}>
           <span className="label" style={{ paddingTop: 6 }}>
             Platform

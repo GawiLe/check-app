@@ -226,7 +226,7 @@ export interface FontAsset {
   style: 'normal' | 'italic'
 }
 
-export type ExportTarget = 'cm360' | 'google-ads' | 'gam' | 'adform' | 'generic'
+export type ExportTarget = 'cm360' | 'google-ads' | 'gam' | 'adform' | 'azerion' | 'generic'
 
 export interface Project {
   version: number
@@ -238,6 +238,12 @@ export interface Project {
   syncFormats: boolean
   /** Polite loading: afbeeldingen pas laden na het `load`-event van de pagina. */
   politeLoad: boolean
+  /**
+   * Eigen fonts (geïmporteerd of Google) in de HTML inbedden als Base64 in plaats van losse
+   * .woff2-bestanden. Veel ad-servers (o.a. Google Ads, Azerion) accepteren geen losse fonts.
+   * Ontbreekt = aan.
+   */
+  embedFonts?: boolean
   fonts: FontAsset[]
   baseCompositionId: string
   compositions: Composition[]

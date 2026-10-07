@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, Download, Loader2, Search } from 'lucide-react'
+import { ChevronDown, Download, FilePlus2, Loader2, Search } from 'lucide-react'
 import { newId } from '@shared/factory'
 import type { FontAsset } from '@shared/types'
 import { fontFileUrl, POPULAR_FONTS, POPULAR_IDS, SYSTEM_FONTS, WEIGHT_NAME, type WebFont } from '@shared/webfonts'
 import { useStore } from '../store'
+import { importFonts } from '../lib/actions'
 
 let catalog: WebFont[] | null = null
 let catalogPromise: Promise<WebFont[]> | null = null
@@ -108,6 +109,19 @@ export function FontPicker(props: { value: string | null; onPick: (fontId: strin
                 </span>
               </div>
             ))}
+            <div
+              className="font-row add-font"
+              title="WOFF, WOFF2, TTF of OTF. Bij export verkleind tot de gebruikte letters en (standaard) als Base64 ingebed."
+              onClick={async () => {
+                setOpen(false)
+                const added = await importFonts()
+                if (added?.[0]) props.onPick(added[0].id, added[0].weight)
+              }}
+            >
+              <FilePlus2 size={13} />
+              <span className="grow">Eigen font toevoegen…</span>
+              <span className="meta">woff · ttf · otf</span>
+            </div>
             {systemFonts.length > 0 && <div className="font-group">Systeem (niet meegeleverd)</div>}
             {systemFonts.map((name) => (
               <div

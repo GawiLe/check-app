@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url'
 import { zipSync } from 'fflate'
 import type { ExportRequest } from '@shared/api'
 import { buildBanner, charsPerFont } from '@shared/build'
-import { TARGETS } from '@shared/specs'
+import { fontsInline, TARGETS } from '@shared/specs'
 import type { Composition, ExportResult, ExportTarget, Project } from '@shared/types'
 import { initialLoad, validateBanner } from '@shared/validate'
 import { subsetToWoff2 } from './fonts'
@@ -25,11 +25,26 @@ const MIME: Record<string, string> = {
   '.webp': 'image/webp'
 }
 
-/** Subset fonts één keer per export, over alle formaten heen. */
-async function prepareFonts(dir: string, project: Project): Promise<Record<string, Buffer>> {
-  const chars = charsPerFont(project)
+/**
+ * Fonts verkleinen tot de letters die in dít formaat echt gebruikt worden (subset), als woff2.
+ * Per formaat, want elke banner bevat zijn eigen kopie (zeker bij Base64). Gelijke sets worden hergebruikt.
+ */
+const subsetCache = new Map<string, Promise<Buffer>>()
+async function prepareFonts(dir: string, project: Project, comp: Composition): Promise<Record<string, Buffer>> {
+  const chars = charsPerFont(project, comp)
   const out: Record<string, Buffer> = {}
-  for (const f of project.fonts) if (!f.system && chars[f.id]) out[f.id] = await subsetToWoff2(dir, f.file, chars[f.id])
+  for (const f of project.fonts) {
+    if (f.system || !chars[f.id]) continue
+    const set = [...new Set(chars[f.id] + ' ')].sort().join('')
+    const key = `${dir}|${f.file}|${set}`
+    if (!subsetCache.has(key)) subsetCache.set(key, subsetToWoff2(dir, f.file, set))
+    try {
+      out[f.id] = await subsetCache.get(key)!
+    } catch (err) {
+      subsetCache.delete(key)
+      throw err
+    }
+  }
   return out
 }
 
@@ -68,7 +83,7 @@ async function exportOne(
   project.fonts.forEach((f, i) => {
     const buf = fonts[f.id]
     if (!buf) return
-    if (spec.inlineFonts) {
+    if (fontsInline(target, project)) {
       fontSrc[f.id] = `url(data:font/woff2;base64,${buf.toString('base64')}) format("woff2")`
     } else {
       const fname = `f${i}.woff2`
@@ -111,6 +126,22 @@ async function exportOne(
   const fileList = Object.entries(files).map(([n, d]) => ({ name: n, bytes: d.byteLength }))
   const issues = validateBanner({ target, comp, html: built.html, files: fileList, zipBytes: zip.byteLength, backupBytes, politeLoad: project.politeLoad })
 
+  // Laat zien wat het verkleinen van de fonts oplevert
+  const chars = charsPerFont(project, comp)
+  for (const f of project.fonts) {
+    const buf = fonts[f.id]
+    if (!buf || !built.fontIds.includes(f.id)) continue
+    const orig = await stat(join(dir, f.file)).then((st) => st.size).catch(() => 0)
+    const n = new Set(chars[f.id]).size
+    const kbs = (b: number) => `${(b / 1024).toFixed(1)} KB`
+    const at = issues.findIndex((i) => i.rule === 'ok')
+    issues.splice(at < 0 ? issues.length : at, 0, {
+      level: 'info',
+      rule: 'font',
+      message: `${f.family} ${f.weight}: ${n} tekens gebruikt, verkleind van ${kbs(orig)} tot ${kbs(buf.byteLength)}${fontsInline(target, project) ? ' en als Base64 in de HTML gezet' : ' (los .woff2-bestand)'}.`
+    })
+  }
+
   return {
     target,
     composition: comp.name,
@@ -149,13 +180,13 @@ export async function renderBackup(indexHtml: string, comp: Composition, outFile
 }
 
 export async function exportBanners(req: ExportRequest): Promise<ExportResult[]> {
-  const fonts = await prepareFonts(req.dir, req.project)
   const results: ExportResult[] = []
-  for (const target of req.targets)
-    for (const id of req.compositionIds) {
-      const comp = req.project.compositions.find((c) => c.id === id)
-      if (comp) results.push(await exportOne(req.dir, req.project, comp, target, fonts))
-    }
+  for (const id of req.compositionIds) {
+    const comp = req.project.compositions.find((c) => c.id === id)
+    if (!comp) continue
+    const fonts = await prepareFonts(req.dir, req.project, comp)
+    for (const target of req.targets) results.push(await exportOne(req.dir, req.project, comp, target, fonts))
+  }
   await writeFile(join(req.dir, 'export', 'rapport.json'), JSON.stringify(results, null, 2))
   return results
 }
