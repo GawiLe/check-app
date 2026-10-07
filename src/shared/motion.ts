@@ -1,4 +1,4 @@
-import { round } from './anim'
+import { baseValue, round } from './anim'
 import type { AnimProp, Composition, EaseName, Emphasis, EmphasisType, Keyframe, Layer, Motion } from './types'
 
 // Binnenkomst en uitgang worden bij het bouwen omgezet naar keyframes rond de
@@ -43,6 +43,8 @@ function awayValue(l: Layer, m: Motion, p: AnimProp): number | null {
       return m.dy ? l.y + m.dy : null
     case 'scale':
       return m.scale !== 1 ? l.scale * m.scale : null
+    case 'scaleY':
+      return m.scale !== 1 ? (l.scaleY ?? l.scale) * m.scale : null
     case 'rotation':
       return m.rotation ? l.rotation + m.rotation : null
     case 'opacity':
@@ -52,7 +54,7 @@ function awayValue(l: Layer, m: Motion, p: AnimProp): number | null {
   }
 }
 
-const PROPS: AnimProp[] = ['x', 'y', 'scale', 'rotation', 'opacity', 'reveal']
+const PROPS: AnimProp[] = ['x', 'y', 'scale', 'scaleY', 'rotation', 'opacity', 'reveal']
 
 /** Keyframes van een accent-animatie (rond de rustwaarde), per eigenschap. */
 export function emphasisKeyframes(l: Layer, em: Emphasis): Partial<Record<AnimProp, Keyframe[]>> {
@@ -80,15 +82,19 @@ export function emphasisKeyframes(l: Layer, em: Emphasis): Partial<Record<AnimPr
     flash: { prop: 'opacity', mul: true, steps: [[0, 0, 'easeInOut'], [0.5, -0.65, 'easeInOut'], [1, 0, 'linear']] }
   }
   const shape = shapes[em.type]
-  const rest = shape.prop === 'reveal' ? 1 : l[shape.prop]
-  const kfs: Keyframe[] = []
-  for (let i = 0; i < n; i++)
-    for (const [f, delta, e] of shape.steps) {
-      if (i > 0 && f === 0) continue
-      const v = shape.mul ? rest * (1 + delta * k) : rest + delta * k
-      kfs.push({ t: round(em.start + (i + f) * d), v: round(v, 3), e })
-    }
-  out[shape.prop] = kfs
+  const build = (prop: AnimProp, rest: number) => {
+    const kfs: Keyframe[] = []
+    for (let i = 0; i < n; i++)
+      for (const [f, delta, e] of shape.steps) {
+        if (i > 0 && f === 0) continue
+        const v = shape.mul ? rest * (1 + delta * k) : rest + delta * k
+        kfs.push({ t: round(em.start + (i + f) * d), v: round(v, 3), e })
+      }
+    out[prop] = kfs
+  }
+  build(shape.prop, shape.prop === 'reveal' ? 1 : baseValue(l, shape.prop))
+  // Ontkoppelde schaal: verticaal net zo laten pulseren
+  if (shape.prop === 'scale' && l.scaleLinked === false) build('scaleY', l.scaleY ?? l.scale)
   return out
 }
 
@@ -99,8 +105,10 @@ export function effectiveLayer(l: Layer): Layer {
   const emph = l.emphasis ? emphasisKeyframes(l, l.emphasis) : {}
   for (const p of PROPS) {
     if (l.tracks[p]?.length) continue
+    // Gekoppelde schaal: scaleY volgt scale, geen eigen keyframes nodig
+    if (p === 'scaleY' && l.scaleLinked !== false) continue
     let kfs: Keyframe[] = []
-    const restV = p === 'reveal' ? 1 : l[p]
+    const restV = p === 'reveal' ? 1 : p === 'scaleY' ? (l.scaleY ?? l.scale) : l[p]
     const inAway = l.intro ? awayValue(l, l.intro, p) : null
     const outAway = l.outro ? awayValue(l, l.outro, p) : null
     if (inAway == null && outAway == null && !emph[p]) continue

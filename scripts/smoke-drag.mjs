@@ -15,10 +15,14 @@ const row = (name) => page.locator('.tl-name:not(.sub)').filter({ has: page.getB
 await page.waitForSelector('.welcome')
 await page.evaluate((d) => window.bs.openProject(d), dir)
 // Ruime tijdlijn, zodat alle rijen zichtbaar zijn
-await page.evaluate(() => localStorage.setItem('bs-layout', JSON.stringify({ left: 220, right: 288, timeline: 480 })))
 await page.reload()
 await page.locator('.welcome .list-item').first().click()
 await page.waitForSelector('.app')
+await page.evaluate(() => {
+  const d = window.__bsDock.getState()
+  const col = d.root.children.find((c) => c.kind === 'split')
+  d.resize(col.id, [0.35, 0.65])
+})
 
 /** Rij slepen met de muis, boven (before) of onder (after) een andere rij. */
 const dragRow = async (from, to, where) => {
@@ -65,8 +69,10 @@ await page.evaluate(async (a) => {
   const s = window.__bsStore.getState()
   s.bumpAssets()
 }, res.assets[0])
-await page.locator('.left-tabs button', { hasText: 'Assets' }).click()
+await page.locator('.dock-tab', { hasText: 'Assets' }).click()
 await page.locator('.list-item', { hasText: 'badge.svg' }).click()
+await page.locator('.choice-card', { hasText: 'Als afbeelding' }).click()
+await page.waitForTimeout(400)
 await check('SVG geïmporteerd als laag', async () => (await project()).compositions[0].layers.some((l) => l.image?.src === 'assets/badge.svg'))
 await page.waitForTimeout(600)
 await page.screenshot({ path: `${shots}/drag-svg.png` })

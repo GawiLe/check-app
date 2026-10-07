@@ -1,4 +1,4 @@
-import { easeIndex, round } from './anim'
+import { baseValue, easeIndex, round } from './anim'
 import { effectiveLayer, endFrameTime } from './motion'
 import { minifiedRuntime, WIPE_INDEX } from './runtime'
 import { allLayers } from './tree'
@@ -25,7 +25,7 @@ export interface BuildOutput {
   fontIds: string[]
 }
 
-const PROP_KEY: Record<AnimProp, string> = { x: 'x', y: 'y', scale: 's', rotation: 'r', opacity: 'o', reveal: 'v' }
+const PROP_KEY: Record<AnimProp, string> = { x: 'x', y: 'y', scale: 's', scaleY: 'q', rotation: 'r', opacity: 'o', reveal: 'v' }
 
 export const escapeHtml = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -65,7 +65,8 @@ function isAnimated(l: Layer): boolean {
 }
 
 function staticTransform(l: Layer): string {
-  return `transform:translate(${n(l.x)}px,${n(l.y)}px) rotate(${n(l.rotation)}deg) scale(${n(l.scale)});opacity:${n(l.opacity)}`
+  const sy = l.scaleLinked === false ? (l.scaleY ?? l.scale) : l.scale
+  return `transform:translate(${n(l.x)}px,${n(l.y)}px) rotate(${n(l.rotation)}deg) scale(${n(l.scale)},${n(sy)});opacity:${n(l.opacity)}`
 }
 
 /** CSS font-family: meegeleverd font (f0, f1…), systeemfont op naam, altijd met fallback. */
@@ -178,7 +179,9 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
         const b: Record<string, number> = {}
         const p: Record<string, number[][]> = {}
         for (const prop of Object.keys(PROP_KEY) as AnimProp[]) {
-          b[PROP_KEY[prop]] = round(l[prop])
+          // Gekoppelde schaal: alleen `s`, de runtime gebruikt die voor beide richtingen
+          if (prop === 'scaleY' && l.scaleLinked !== false) continue
+          b[PROP_KEY[prop]] = round(baseValue(l, prop))
           const kfs = l.tracks[prop]
           if (kfs && kfs.length) p[PROP_KEY[prop]] = kfs.map((k) => [round(k.t + offset), round(k.v), easeIndex(k.e)])
         }

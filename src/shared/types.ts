@@ -26,9 +26,9 @@ export const EASES: EaseName[] = [
 ]
 
 /** Animeerbare eigenschappen. `reveal` (0..1) stuurt write-on en wipe-effecten. */
-export type AnimProp = 'x' | 'y' | 'scale' | 'rotation' | 'opacity' | 'reveal'
+export type AnimProp = 'x' | 'y' | 'scale' | 'scaleY' | 'rotation' | 'opacity' | 'reveal'
 
-export const ANIM_PROPS: AnimProp[] = ['x', 'y', 'scale', 'rotation', 'opacity', 'reveal']
+export const ANIM_PROPS: AnimProp[] = ['x', 'y', 'scale', 'scaleY', 'rotation', 'opacity', 'reveal']
 
 export interface Keyframe {
   /** Tijd in seconden. */
@@ -153,6 +153,12 @@ export interface Layer {
   rotation: number
   scale: number
   opacity: number
+  /** Verticale schaal; alleen gebruikt als `scaleLinked` uit staat (anders volgt hij `scale`). */
+  scaleY?: number
+  /** Schaal X en Y gekoppeld (standaard aan): `scale` geldt dan voor beide richtingen. */
+  scaleLinked?: boolean
+  /** Breedte en hoogte gekoppeld: verhouding blijft gelijk bij aanpassen. */
+  sizeLinked?: boolean
   /** Anchor point (draaipunt voor schaal en rotatie), relatief: 0 = links/boven, 1 = rechts/onder. Standaard 0,5. */
   anchorX?: number
   anchorY?: number

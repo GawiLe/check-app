@@ -19,18 +19,19 @@ import {
   Type,
   Unlock
 } from 'lucide-react'
-import { layerStateAt, round, sortKeyframes, upsertKeyframe } from '@shared/anim'
+import { baseValue, layerStateAt, round, sampleTrack, sortKeyframes, upsertKeyframe } from '@shared/anim'
 import { effectiveLayer, endFrameTime } from '@shared/motion'
 import { overrideLabel } from '@shared/sync'
+import { GROUP_LABEL, groupOf, groupProps, groupTimes, layerGroups, type PropGroupId } from '@shared/propgroups'
 import { allLayers, layerLength, shiftTiming, trimIn, trimOut } from '@shared/tree'
 import type { AnimProp, EaseName, Layer } from '@shared/types'
 import { ANIM_PROPS, EASES } from '@shared/types'
-import { applyLibrary, keyAssist, moveLayer, openComp, reorderTo } from '../lib/actions'
+import { applyLibrary, keyAssist, moveLayer, openComp, renameLayer, reorderTo } from '../lib/actions'
 import { openEmptyMenu, openKeyMenu, openLayerMenu } from '../lib/menus'
 import { contextOf, currentComp, updateComp, updateLayer, useStore } from '../store'
 import { EASE_LABEL } from './Inspector'
 import { DRAG_TYPE } from './Library'
-import { formatTime } from './ui'
+import { formatTime, InlineRename } from './ui'
 
 const FPS = 30
 const snap = (t: number) => Math.round(t * FPS) / FPS
@@ -41,6 +42,7 @@ const PROP_LABEL: Record<AnimProp, string> = {
   x: 'Positie X',
   y: 'Positie Y',
   scale: 'Schaal',
+  scaleY: 'Schaal Y',
   rotation: 'Rotatie',
   opacity: 'Dekking',
   reveal: 'Reveal'
@@ -81,6 +83,7 @@ export function Timeline() {
   const selectedKeys = useStore((s) => s.selectedKeys)
   const tabs = useStore((s) => s.tabs)
   const activeTab = useStore((s) => s.activeTab)
+  const renaming = useStore((s) => s.renaming)
   const expanded = useStore((s) => s.expanded)
   const [pps, setPps] = useState(120)
   const s = useStore.getState
@@ -126,12 +129,16 @@ export function Timeline() {
     updateLayer(
       d.layerId,
       (l) => {
-        const kfs = l.tracks[d.prop]
-        if (!kfs) return
-        const k = kfs.find((x) => Math.abs(x.t - cur.t) < 1e-4)
-        if (!k || kfs.some((x) => x !== k && Math.abs(x.t - nt) < 1e-4)) return
-        k.t = round(nt)
-        l.tracks[d.prop] = sortKeyframes(kfs)
+        // Alle onderdelen van de groep (bijv. X en Y van Positie) samen verschuiven
+        const members = groupProps(l, groupOf(d.prop))
+        if (members.some((m) => l.tracks[m]?.some((x) => Math.abs(x.t - nt) < 1e-4))) return
+        for (const m of members) {
+          const kfs = l.tracks[m]
+          const k = kfs?.find((x) => Math.abs(x.t - cur.t) < 1e-4)
+          if (!kfs || !k) continue
+          k.t = round(nt)
+          l.tracks[m] = sortKeyframes(kfs)
+        }
       },
       'kfdrag'
     )
@@ -256,50 +263,60 @@ export function Timeline() {
   })
 
 
-  /** Keyframes van één eigenschap: eigen keyframes (sleepbaar) en die uit binnenkomst/accent/uitgang (hol). */
-  const propDiamonds = (l: Layer, prop: AnimProp, offset: number) => {
-    const own = l.tracks[prop]
-    if (own?.length)
-      return own.map((k) => {
-        const sel = selectedKeys.some((sk) => sk.layerId === l.id && sk.prop === prop && Math.abs(sk.t - k.t) < 1e-4)
+  /** Keyframes van een eigenschapsgroep (Positie = X+Y …): eigen keyframes sleepbaar, die uit binnenkomst/accent/uitgang hol. */
+  const groupDiamonds = (l: Layer, g: PropGroupId, offset: number) => {
+    const members = groupProps(l, g)
+    const prop = members[0]
+    const times = groupTimes(l, g)
+    if (times.length)
+      return times.map((t) => {
+        const sel = selectedKeys.some((sk) => sk.layerId === l.id && groupOf(sk.prop) === g && Math.abs(sk.t - t) < 1e-4)
+        const k = members.map((m) => l.tracks[m]?.find((x) => Math.abs(x.t - t) < 1e-4)).find(Boolean)
+        const vals = members.map((m) => round(sampleTrack(l.tracks[m], t, baseValue(l, m)), 2)).join(', ')
         return (
           <div
-            key={'k' + k.t}
-            className={`diamond${sel ? ' sel' : ''}`}
-            style={{ left: xOf(offset + k.t) }}
-            title={`${PROP_LABEL[prop]} ${round(k.v, 2)} @ ${(offset + k.t).toFixed(2)}s · ${EASE_LABEL[k.e]}`}
-            onPointerDown={(e) => e.button === 0 && onKeyDown(e, l.id, prop, k.t, offset)}
-            onContextMenu={(e) => openKeyMenu(e, { layerId: l.id, prop, t: k.t })}
+            key={'k' + t}
+            className={`diamond${sel ? ' sel' : ''}${k?.ei || k?.eo ? ' eased' : ''}`}
+            style={{ left: xOf(offset + t) }}
+            title={`${GROUP_LABEL[g]} ${vals} @ ${(offset + t).toFixed(2)}s${k ? ` · ${EASE_LABEL[k.e]}` : ''}`}
+            onPointerDown={(e) => e.button === 0 && onKeyDown(e, l.id, prop, t, offset)}
+            onContextMenu={(e) => openKeyMenu(e, { layerId: l.id, prop, t })}
             onPointerMove={onKeyMove}
             onPointerUp={() => (keyDrag.current = null)}
           />
         )
       })
-    return (effectiveLayer(l).tracks[prop] ?? []).map((k) => (
+    const eff = effectiveLayer(l)
+    const gen = [...new Set(members.flatMap((m) => (eff.tracks[m] ?? []).map((k) => k.t)))]
+    return gen.map((t) => (
       <div
-        key={'g' + k.t}
+        key={'g' + t}
         className="diamond generated"
-        style={{ left: xOf(offset + k.t) }}
-        title={`${PROP_LABEL[prop]} ${round(k.v, 2)} @ ${(offset + k.t).toFixed(2)}s · uit binnenkomst/accent/uitgang (sleep het gekleurde blok)`}
+        style={{ left: xOf(offset + t) }}
+        title={`${GROUP_LABEL[g]} @ ${(offset + t).toFixed(2)}s · uit binnenkomst/accent/uitgang (sleep het gekleurde blok)`}
       />
     ))
   }
 
-  /** Keyframe op de playhead toevoegen of weghalen (◆ in de eigenschap-rij). */
-  const toggleKeyAtPlayhead = (l: Layer, prop: AnimProp, offset: number) => {
+  /** Keyframe op de playhead voor de hele groep toevoegen of weghalen (◆ in de eigenschap-rij). */
+  const toggleKeyAtPlayhead = (l: Layer, g: PropGroupId, offset: number) => {
     const t = round(time - offset)
-    const v = layerStateAt(l, t)[prop]
+    const st = layerStateAt(l, t)
     updateLayer(l.id, (x) => {
-      const kfs = x.tracks[prop] ?? []
-      const has = kfs.find((k) => Math.abs(k.t - t) < 1 / 60)
-      if (has) {
-        const rest = kfs.filter((k) => k !== has)
-        if (rest.length) x.tracks[prop] = rest
-        else {
-          x[prop] = v
-          delete x.tracks[prop]
-        }
-      } else x.tracks[prop] = upsertKeyframe(kfs, t, v)
+      const members = groupProps(x, g)
+      const has = members.some((m) => x.tracks[m]?.some((k) => Math.abs(k.t - t) < 1 / 60))
+      for (const m of members) {
+        const kfs = x.tracks[m] ?? []
+        if (has) {
+          const rest = kfs.filter((k) => Math.abs(k.t - t) >= 1 / 60)
+          if (rest.length) x.tracks[m] = rest
+          else {
+            if (m === 'scaleY') x.scaleY = st[m]
+            else x[m] = st[m]
+            delete x.tracks[m]
+          }
+        } else x.tracks[m] = upsertKeyframe(kfs, t, st[m])
+      }
     })
   }
 
@@ -343,9 +360,28 @@ export function Timeline() {
           {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         </button>
         <Icon size={13} className="type" />
-        <span className="grow" title={l.name}>
-          {l.name}
-        </span>
+        {renaming === l.id ? (
+          <InlineRename
+            value={l.name}
+            onDone={(v) => {
+              if (v) renameLayer(l.id, v)
+              s().setRenaming(null)
+            }}
+          />
+        ) : (
+          <span
+            className="grow"
+            title={l.type === 'group' ? `${l.name} · dubbelklik = openen, Enter = naam wijzigen` : `${l.name} · dubbelklik of Enter = naam wijzigen`}
+            onDoubleClick={(e) => {
+              // Composities openen met dubbelklik (zoals in After Effects); andere lagen hernoemen
+              if (l.type === 'group') return
+              e.stopPropagation()
+              s().setRenaming(l.id)
+            }}
+          >
+            {l.name}
+          </span>
+        )}
         {derived && depth === 0 && l.overrides?.length ? (
           <span className="override-dot" title={`Wijkt af van basis: ${l.overrides.map(overrideLabel).join(', ')}`} />
         ) : null}
@@ -389,32 +425,44 @@ export function Timeline() {
         {emphasisSegment(l, offset)}
         {motionSegment(l, 'outro', offset)}
         {!open &&
-          ANIM_PROPS.filter((p) => l.tracks[p]?.length).flatMap((p) =>
-            l.tracks[p]!.map((k) => <div key={p + k.t} className="diamond summary" style={{ left: xOf(offset + k.t) }} />)
-          )}
+          [...new Set(ANIM_PROPS.flatMap((p) => (l.tracks[p] ?? []).map((k) => k.t)))].map((t) => (
+            <div key={'s' + t} className="diamond summary" style={{ left: xOf(offset + t) }} />
+          ))}
       </div>
     )
     if (!open) return
-    // Eigenschappen met keyframes (positie, schaal, rotatie, dekking …)
+    // Eigenschappen, zoals in After Effects: Positie (X+Y), Schaal, Rotatie, Dekking …
     const st = layerStateAt(l, time - offset)
-    for (const p of propsFor(l)) {
-      const hasKeyHere = l.tracks[p]?.some((k) => Math.abs(k.t - (time - offset)) < 1 / 60)
+    for (const g of layerGroups(l)) {
+      const members = groupProps(l, g)
+      const hasKeyHere = members.some((m) => l.tracks[m]?.some((k) => Math.abs(k.t - (time - offset)) < 1 / 60))
+      const on = members.some((m) => l.tracks[m]?.length)
+      const value =
+        g === 'position'
+          ? `${Math.round(st.x)}, ${Math.round(st.y)}`
+          : g === 'scale'
+            ? l.scaleLinked === false
+              ? `${Math.round(st.scale * 100)}, ${Math.round(st.scaleY * 100)}%`
+              : `${Math.round(st.scale * 100)}%`
+            : g === 'rotation'
+              ? `${Math.round(st.rotation)}°`
+              : `${Math.round(st[g] * 100)}%`
       rows.push(
-        <div key={l.id + p + 'n'} className="tl-name sub" style={{ paddingLeft: 30 + depth * 16 }}>
+        <div key={l.id + g + 'n'} className="tl-name sub" style={{ paddingLeft: 30 + depth * 16 }}>
           <button
-            className={`kf-btn${l.tracks[p]?.length ? ' on' : ''}${hasKeyHere ? ' here' : ''}`}
+            className={`kf-btn${on ? ' on' : ''}${hasKeyHere ? ' here' : ''}`}
             title={hasKeyHere ? 'Keyframe op de playhead weghalen' : 'Keyframe op de playhead zetten'}
-            onClick={() => toggleKeyAtPlayhead(l, p, offset)}
+            onClick={() => toggleKeyAtPlayhead(l, g, offset)}
           >
             ◆
           </button>
-          <span className="grow">{PROP_LABEL[p]}</span>
-          <span className="faint" style={{ fontVariantNumeric: 'tabular-nums' }}>
-            {p === 'scale' || p === 'opacity' || p === 'reveal' ? `${Math.round(st[p] * 100)}%` : p === 'rotation' ? `${Math.round(st[p])}°` : Math.round(st[p])}
+          <span className="grow">{GROUP_LABEL[g]}</span>
+          <span className={on ? 'kf-val' : 'faint'} style={{ fontVariantNumeric: 'tabular-nums' }}>
+            {value}
           </span>
         </div>,
-        <div key={l.id + p + 't'} className="tl-track sub">
-          {propDiamonds(l, p, offset)}
+        <div key={l.id + g + 't'} className="tl-track sub">
+          {groupDiamonds(l, g, offset)}
         </div>
       )
     }
@@ -450,9 +498,19 @@ export function Timeline() {
           .filter((g): g is Layer => !!g)
           .map((g) => (
             <span key={g.id} className={`tl-tab${activeTab === g.id ? ' on' : ''}`}>
-              <button onClick={() => s().setActiveTab(g.id)} title="Compositie">
-                <Folder size={12} /> {g.name}
-              </button>
+              {renaming === g.id ? (
+                <InlineRename
+                  value={g.name}
+                  onDone={(v) => {
+                    if (v) renameLayer(g.id, v)
+                    s().setRenaming(null)
+                  }}
+                />
+              ) : (
+                <button onClick={() => s().setActiveTab(g.id)} onDoubleClick={() => s().setRenaming(g.id)} title="Compositie · dubbelklik om de naam te wijzigen">
+                  <Folder size={12} /> {g.name}
+                </button>
+              )}
               <button className="close" title="Tab sluiten" onClick={() => s().closeTab(g.id)}>
                 ×
               </button>

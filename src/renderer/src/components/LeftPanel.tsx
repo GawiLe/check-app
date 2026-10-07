@@ -1,20 +1,17 @@
-import { useState } from 'react'
 import { ImagePlus, Type, X } from 'lucide-react'
-import { Library } from './Library'
 import { addAsset, importDroppedFiles, importFonts, importImages } from '../lib/actions'
 import { assetUrl, useStore } from '../store'
 import { Section } from './ui'
 
-export function LeftPanel() {
+export function AssetsPanel() {
   const project = useStore((s) => s.project)!
   const assets = useStore((s) => s.assets)
   const rev = useStore((s) => s.assetsRev)
   const s = useStore.getState
-  const [tab, setTab] = useState<'library' | 'assets'>('library')
 
   return (
     <div
-      className="panel left"
+      className="panel-scroll"
       onDragOver={(e) => e.dataTransfer.types.includes('Files') && e.preventDefault()}
       onDrop={(e) => {
         if (!e.dataTransfer.files.length) return
@@ -23,18 +20,6 @@ export function LeftPanel() {
         void importDroppedFiles(e.dataTransfer.files, undefined, false)
       }}
     >
-      <div className="left-tabs">
-        <button className={tab === 'library' ? 'on' : ''} onClick={() => setTab('library')}>
-          Animaties
-        </button>
-        <button className={tab === 'assets' ? 'on' : ''} onClick={() => setTab('assets')}>
-          Assets & fonts
-        </button>
-      </div>
-      {tab === 'library' ? (
-        <Library />
-      ) : (
-        <>
       <Section
         title="Assets"
         actions={
@@ -95,8 +80,6 @@ export function LeftPanel() {
           ))}
         </div>
       </Section>
-        </>
-      )}
     </div>
   )
 }

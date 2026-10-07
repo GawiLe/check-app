@@ -62,7 +62,7 @@ await store(() => {
     ll.tracks.scale.push({ t: 2, v: 1.3, e: 'linear' })
   })
 })
-const diamonds = page.locator('.tl-track.sub').nth(2).locator('.diamond:not(.generated)')
+const diamonds = page.locator('.tl-track.sub').nth(1).locator('.diamond:not(.generated)')
 await diamonds.nth(0).click()
 await diamonds.nth(1).click({ modifiers: ['Shift'] })
 await diamonds.nth(0).click({ button: 'right' })

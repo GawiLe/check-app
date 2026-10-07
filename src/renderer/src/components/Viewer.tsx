@@ -129,6 +129,7 @@ interface Box {
   wx: number
   wy: number
   scale: number
+  scaleY: number
   rotation: number
   /** Schaal en rotatie van de bovenliggende composities (voor slepen). */
   parentScale: number
@@ -147,14 +148,14 @@ function boxesAt(layers: Layer[], t: number): Box[] {
       const st = layerStateAt(l, lt)
       const { ax, ay } = anchorOf(l)
       const [wx, wy] = map(st.x + ax * l.width, st.y + ay * l.height)
-      out.push({ layer: l, ax, ay, wx, wy, scale: st.scale * ps, rotation: st.rotation + pr, parentScale: ps, parentRot: pr, ancestors })
+      out.push({ layer: l, ax, ay, wx, wy, scale: st.scale * ps, scaleY: st.scaleY * ps, rotation: st.rotation + pr, parentScale: ps, parentRot: pr, ancestors })
       if (l.children) {
         const r = rad(st.rotation)
         const ox = st.x + ax * l.width
         const oy = st.y + ay * l.height
         const inner: Mapper = (x, y) => {
           const dx = (x - ax * l.width) * st.scale
-          const dy = (y - ay * l.height) * st.scale
+          const dy = (y - ay * l.height) * st.scaleY
           return map(ox + dx * Math.cos(r) - dy * Math.sin(r), oy + dx * Math.sin(r) + dy * Math.cos(r))
         }
         visit(l.children, lt - (l.start ?? 0), inner, st.scale * ps, st.rotation + pr, [...ancestors, l])
@@ -167,10 +168,13 @@ function boxesAt(layers: Layer[], t: number): Box[] {
 
 /** Canvaspunt → coördinaat binnen het kader van de laag (0..breedte, 0..hoogte). */
 function toLocal(b: Box, x: number, y: number): [number, number] {
+  // Eerst terugdraaien, dan terugschalen (wereld = anchor + R·S·lokaal)
   const r = rad(-b.rotation)
-  const dx = (x - b.wx) / (b.scale || 1e-6)
-  const dy = (y - b.wy) / (b.scale || 1e-6)
-  return [dx * Math.cos(r) - dy * Math.sin(r) + b.ax * b.layer.width, dx * Math.sin(r) + dy * Math.cos(r) + b.ay * b.layer.height]
+  const dx = x - b.wx
+  const dy = y - b.wy
+  const u = (dx * Math.cos(r) - dy * Math.sin(r)) / (b.scale || 1e-6)
+  const v = (dx * Math.sin(r) + dy * Math.cos(r)) / (b.scaleY || 1e-6)
+  return [u + b.ax * b.layer.width, v + b.ay * b.layer.height]
 }
 
 const inside = (b: Box, x: number, y: number) => {
@@ -317,7 +321,7 @@ function SingleViewer() {
       case 'resize': {
         const [u, v] = toLocal(d.box, p.x, p.y)
         const w = Math.max(4, Math.round(u))
-        const h = e.shiftKey ? Math.round(w / d.ratio) : Math.max(4, Math.round(v))
+        const h = e.shiftKey || d.box.layer.sizeLinked ? Math.round(w / d.ratio) : Math.max(4, Math.round(v))
         updateLayer(d.id, (l) => void Object.assign(l, { width: w, height: h }), 'resize')
         break
       }
@@ -405,18 +409,18 @@ function SingleViewer() {
     width: b.layer.width * zoom,
     height: b.layer.height * zoom,
     transformOrigin: `${b.ax * 100}% ${b.ay * 100}%`,
-    transform: `translate(${(b.wx - b.ax * b.layer.width) * zoom}px,${(b.wy - b.ay * b.layer.height) * zoom}px) rotate(${b.rotation}deg) scale(${b.scale})`
+    transform: `translate(${(b.wx - b.ax * b.layer.width) * zoom}px,${(b.wy - b.ay * b.layer.height) * zoom}px) rotate(${b.rotation}deg) scale(${b.scale},${b.scaleY})`
   })
 
   const box = (b: Box, cls: string, handles: boolean) => (
     <div key={cls + b.layer.id} className={`sel ${cls}${b.layer.type === 'group' ? ' group' : ''}`} style={frameStyle(b)}>
       {handles && (
         <>
-          <div className="size-label" style={{ transform: `scale(${1 / (b.scale || 1)})`, transformOrigin: '0 100%' }}>
+          <div className="size-label" style={{ transform: `scale(${1 / (b.scale || 1)},${1 / (b.scaleY || 1)})`, transformOrigin: '0 100%' }}>
             {b.layer.type === 'group' ? `${b.layer.name} · ` : ''}
             {Math.round(b.layer.width)} × {Math.round(b.layer.height)}
           </div>
-          <div className="handle" style={{ transform: `scale(${1 / (b.scale || 1)})` }} onPointerDown={(e) => startResize(e, b)} />
+          <div className="handle" style={{ transform: `scale(${1 / (b.scale || 1)},${1 / (b.scaleY || 1)})` }} onPointerDown={(e) => startResize(e, b)} />
         </>
       )}
     </div>
@@ -619,7 +623,7 @@ function TextEditor({ box, zoom, project }: { box: Box; zoom: number; project: P
         width: l.width * zoom,
         height: l.height * zoom,
         transformOrigin: `${box.ax * 100}% ${box.ay * 100}%`,
-        transform: `translate(${(box.wx - box.ax * l.width) * zoom}px,${(box.wy - box.ay * l.height) * zoom}px) rotate(${box.rotation}deg) scale(${box.scale})`,
+        transform: `translate(${(box.wx - box.ax * l.width) * zoom}px,${(box.wy - box.ay * l.height) * zoom}px) rotate(${box.rotation}deg) scale(${box.scale},${box.scaleY})`,
         fontFamily: font?.system ? font.family : font ? `${font.family}, Arial` : 'Arial, Helvetica, sans-serif',
         fontSize: t.size * zoom,
         fontWeight: t.weight,

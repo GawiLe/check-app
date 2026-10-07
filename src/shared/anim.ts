@@ -45,7 +45,7 @@ export function sampleTrack(kfs: Keyframe[] | undefined, t: number, fallback: nu
 export type LayerState = Record<AnimProp, number>
 
 export function baseValue(layer: Layer, prop: AnimProp): number {
-  return layer[prop]
+  return prop === 'scaleY' ? (layer.scaleY ?? layer.scale) : layer[prop]
 }
 
 export function layerStateAt(input: Layer, t: number): LayerState {
@@ -54,6 +54,10 @@ export function layerStateAt(input: Layer, t: number): LayerState {
     x: sampleTrack(layer.tracks.x, t, layer.x),
     y: sampleTrack(layer.tracks.y, t, layer.y),
     scale: sampleTrack(layer.tracks.scale, t, layer.scale),
+    scaleY:
+      layer.scaleLinked === false
+        ? sampleTrack(layer.tracks.scaleY, t, layer.scaleY ?? layer.scale)
+        : sampleTrack(layer.tracks.scale, t, layer.scale),
     rotation: sampleTrack(layer.tracks.rotation, t, layer.rotation),
     opacity: sampleTrack(layer.tracks.opacity, t, layer.opacity),
     reveal: sampleTrack(layer.tracks.reveal, t, layer.reveal)

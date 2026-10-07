@@ -162,3 +162,31 @@ export const formatTime = (t: number) => {
   const f = Math.floor((t - s) * 30)
   return `${String(s).padStart(2, '0')}:${String(f).padStart(2, '0')}`
 }
+
+/** Naam direct bewerken (Enter = opslaan, Esc = annuleren). */
+export function InlineRename(props: { value: string; onDone: (v: string | null) => void; className?: string }) {
+  const [v, setV] = useState(props.value)
+  const ref = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    ref.current?.focus()
+    ref.current?.select()
+  }, [])
+  const done = (save: boolean) => props.onDone(save && v.trim() && v.trim() !== props.value ? v.trim() : null)
+  return (
+    <input
+      ref={ref}
+      className={`inline-rename ${props.className ?? ''}`}
+      value={v}
+      onChange={(e) => setV(e.target.value)}
+      onBlur={() => done(true)}
+      onClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        e.stopPropagation()
+        if (e.key === 'Enter') done(true)
+        if (e.key === 'Escape') done(false)
+      }}
+    />
+  )
+}

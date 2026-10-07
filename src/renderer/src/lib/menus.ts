@@ -44,6 +44,7 @@ export function openLayerMenu(e: React.MouseEvent, layerId: string) {
           { label: 'Compositie opheffen (lagen terugzetten)', shortcut: isMac ? '⇧⌘G' : 'Shift+Ctrl+G', onClick: ungroupSelection }
         ] as MenuItem[])
       : []),
+    ...(single ? ([{ label: 'Naam wijzigen', shortcut: 'Enter', onClick: () => S().setRenaming(l.id) }] as MenuItem[]) : []),
     sep,
     { label: 'Knippen', shortcut: cmd('X'), onClick: cutSelection },
     { label: 'Kopiëren', shortcut: cmd('C'), onClick: copySelection },

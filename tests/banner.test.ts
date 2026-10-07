@@ -70,7 +70,7 @@ describe('export-HTML', () => {
         const el = win.document.getElementById(`a${i}`)!
         if (!l.intro && !l.outro && !Object.keys(l.tracks).length) return
         const st = layerStateAt(l, Math.min(t, comp.duration))
-        const m = el.style.transform.match(/translate\(([-\d.e]+)px, ?([-\d.e]+)px\) rotate\(([-\d.e]+)deg\) scale\(([-\d.e]+)\)/)!
+        const m = el.style.transform.match(/translate\(([-\d.e]+)px, ?([-\d.e]+)px\) rotate\(([-\d.e]+)deg\) scale\(([-\d.e]+)(?:, ?([-\d.e]+))?\)/)!
         expect(+m[1]).toBeCloseTo(st.x, 2)
         expect(+m[2]).toBeCloseTo(st.y, 2)
         expect(+m[4]).toBeCloseTo(st.scale, 2)
@@ -558,5 +558,119 @@ describe('SVG-paden omzetten', () => {
     expect(segsBounds(parsePath(ellipsePath(50, 50, 10, 5)))).toMatchObject({ x: 40, w: 20 })
     expect(pointsPath('0,0 10,0 5,8', true)).toBe('M0 0L10 0L5 8Z')
     expect(parsePath(rectPath(0, 0, 40, 20, 5)).some((s) => s.c === 'C')).toBe(true)
+  })
+})
+
+describe('schaal X/Y en gekoppelde eigenschappen', () => {
+  it('ontkoppelde schaal: X en Y apart, ook in de runtime', async () => {
+    const p = createStarterProject()
+    const l = p.compositions[0].layers.find((x) => x.name === 'CTA')!
+    l.intro = null
+    l.scaleLinked = false
+    l.scale = 1
+    l.scaleY = 1
+    l.tracks.scale = [
+      { t: 0, v: 0.5, e: 'linear' },
+      { t: 1, v: 1, e: 'linear' }
+    ]
+    l.tracks.scaleY = [
+      { t: 0, v: 2, e: 'linear' },
+      { t: 1, v: 1, e: 'linear' }
+    ]
+    expect(layerStateAt(l, 0.5)).toMatchObject({ scale: 0.75, scaleY: 1.5 })
+    const dom = new JSDOM(build(p, 'preview').html, { runScripts: 'dangerously', pretendToBeVisual: true })
+    await new Promise((r) => dom.window.addEventListener('load', () => setTimeout(r, 20)))
+    const win = dom.window as unknown as { BS: { seek(t: number): void }; document: Document }
+    win.BS.seek(0.5)
+    const transforms = [...win.document.querySelectorAll<HTMLElement>('.L')].map((e) => e.style.transform)
+    expect(transforms.some((t) => /scale\(0\.75, ?1\.5\)/.test(t))).toBe(true)
+  })
+  it('gekoppelde schaal: Y volgt X', () => {
+    const l = createLayer('shape', { width: 300, height: 600 })
+    l.tracks.scale = [
+      { t: 0, v: 0, e: 'linear' },
+      { t: 1, v: 1, e: 'linear' }
+    ]
+    expect(layerStateAt(l, 0.5)).toMatchObject({ scale: 0.5, scaleY: 0.5 })
+  })
+})
+
+describe('anchor bij ongelijke schaal', () => {
+  it('blijft op dezelfde plek', async () => {
+    const { moveAnchor, layerCorners } = await import('../src/shared/geometry')
+    const l = createLayer('shape', { width: 300, height: 600 })
+    Object.assign(l, { x: 10, y: 20, width: 80, height: 50, rotation: 20 })
+    const before = layerCorners(l.x, l.y, l.width, l.height, 0.5, 0.5, 2, 20, 0.5).corners
+    moveAnchor(l, 1, 0, 2, 20, 0.5)
+    const after = layerCorners(l.x, l.y, l.width, l.height, 1, 0, 2, 20, 0.5).corners
+    after.forEach((c, i) => {
+      expect(c[0]).toBeCloseTo(before[i][0], 1)
+      expect(c[1]).toBeCloseTo(before[i][1], 1)
+    })
+  })
+})
+
+describe('werkruimte-indeling (dock)', () => {
+  it('standaard: tijdlijn alleen onder het canvas', async () => {
+    const m = await import('../src/renderer/src/dock/model')
+    const root = m.defaultLayout()
+    expect(root.kind).toBe('split')
+    const mid = (root as m.SplitNode).children[1] as m.SplitNode
+    expect(mid.dir).toBe('col')
+    expect(m.visiblePanels(mid)).toEqual(['viewer', 'code', 'timeline'])
+  })
+  it('paneel als tab naar een andere groep, en naast/onder een groep', async () => {
+    const m = await import('../src/renderer/src/dock/model')
+    let root = m.defaultLayout()
+    const designGroup = m.findTabsWith(root, 'design')!
+    root = m.dropPanel(root, 'library', designGroup.id, 'center')
+    expect(m.findTabsWith(root, 'library')!.panels).toEqual(['design', 'motion', 'ai', 'library'])
+    // assets bleef alleen over in de linker groep
+    expect(m.findTabsWith(root, 'assets')!.panels).toEqual(['assets'])
+    const tl = m.findTabsWith(root, 'timeline')!
+    root = m.dropPanel(root, 'assets', tl.id, 'right')
+    const parent = (n: m.DockNode): m.SplitNode | null => {
+      if (n.kind === 'tabs') return null
+      if (n.children.some((c) => c.kind === 'tabs' && c.panels.includes('timeline'))) return n
+      for (const c of n.children) {
+        const p = parent(c)
+        if (p) return p
+      }
+      return null
+    }
+    const p = parent(root)!
+    expect(p.dir).toBe('row')
+    expect(m.visiblePanels(p)).toEqual(['timeline', 'assets'])
+    expect(m.visiblePanels(root).sort()).toEqual([...m.ALL_PANELS].sort())
+  })
+  it('sluiten en weer openen; ongeldige opslag wordt geweigerd', async () => {
+    const m = await import('../src/renderer/src/dock/model')
+    let root = m.removePanel(m.defaultLayout(), 'ai')
+    expect(m.visiblePanels(root)).not.toContain('ai')
+    root = m.showPanel(root, 'ai')
+    expect(m.findTabsWith(root, 'ai')!.panels).toContain('design')
+    // alle panelen van een groep sluiten ruimt de groep op
+    root = m.removePanel(m.removePanel(root, 'library'), 'assets')
+    expect(root.kind === 'split' && root.children.length).toBe(2)
+    expect(m.validLayout({ kind: 'tabs', id: 'x', panels: ['viewer', 'viewer'], active: 'viewer' })).toBeNull()
+    expect(m.validLayout(root)).not.toBeNull()
+  })
+})
+
+describe('codeweergave', () => {
+  it('kleurt HTML in één doorgang, zonder geneste of kapotte markup', async () => {
+    const { highlight } = await import('../src/renderer/src/lib/codeformat')
+    const out = highlight('<meta charset="utf-8">\n<a href="x">tekst & meer</a>')
+    expect(out).toContain('&lt;<span class="c-tag">meta</span> <span class="c-attr">charset</span>=<span class="c-str">"utf-8"</span>&gt;')
+    expect(out).toContain('tekst &amp; meer')
+    expect(out).not.toMatch(/"c-attr">class/)
+    // Weer naar platte tekst: identiek aan de invoer
+    const plain = out.replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+    expect(plain).toBe('<meta charset="utf-8">\n<a href="x">tekst & meer</a>')
+  })
+  it('kleurt CSS-eigenschappen en selectors', async () => {
+    const { highlight } = await import('../src/renderer/src/lib/codeformat')
+    expect(highlight('  width:300px;')).toBe('  <span class="c-prop">width</span>:300px;')
+    expect(highlight('  html,body {')).toBe('  <span class="c-sel">html,body</span> {')
   })
 })

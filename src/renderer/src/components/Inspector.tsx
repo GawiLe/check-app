@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { BookmarkPlus, Folder, Image as ImageIcon, ListOrdered, PenLine, RotateCcw, Sparkles, Square, Timer, Trash2, Type, Wand2, X } from 'lucide-react'
+import { BookmarkPlus, Folder, Image as ImageIcon, Link2, Link2Off, ListOrdered, PenLine, RotateCcw, Sparkles, Square, Timer, Trash2, Type, Wand2, X } from 'lucide-react'
 import { layerStateAt } from '@shared/anim'
 import { applyLibraryItem, LIBRARY, matchLibraryItem } from '@shared/library'
 import { defaultIntro, defaultOutro } from '@shared/motion'
 import { baseComp, isLinkedToBase, overrideLabel } from '@shared/sync'
+import { GROUP_LABEL, groupProps, layerGroups, type PropGroupId } from '@shared/propgroups'
 import { findDeep, layerLength, trimIn, trimOut } from '@shared/tree'
 import { PRESETS } from '@shared/presets'
 import { TARGET_IDS, TARGETS } from '@shared/specs'
@@ -44,32 +45,40 @@ export const EASE_LABEL: Record<EaseName, string> = {
 
 const TYPE_ICON = { text: Type, image: ImageIcon, shape: Square, writeon: PenLine, group: Folder }
 
-export function Inspector() {
-  const tab = useStore((s) => s.tab)
+function useSelectedLayer() {
   const comp = useStore(currentComp)!
   const selection = useStore((s) => s.selection)
   const layer = selection.length === 1 ? findDeep(comp.layers, selection[0])?.layer : undefined
-  const setTab = useStore.getState().setTab
+  return { layer, count: selection.length }
+}
 
+/** Paneel "Ontwerp": inhoud, transform en tijd van de selectie, of het formaat/project. */
+export function DesignPanel() {
+  const { layer, count } = useSelectedLayer()
   return (
-    <div className="inspector">
-      <div className="tabs">
-        <button className={tab === 'design' ? 'on' : ''} onClick={() => setTab('design')}>
-          Ontwerp
-        </button>
-        <button className={tab === 'motion' ? 'on' : ''} onClick={() => setTab('motion')}>
-          Animatie
-        </button>
-        <button className={tab === 'ai' ? 'on' : ''} onClick={() => setTab('ai')}>
-          <Sparkles size={13} /> AI
-        </button>
-      </div>
-      <div className="scroll">
-        <FormatNotice />
-        {tab === 'design' && (layer ? <LayerDesign layer={layer} /> : selection.length > 1 ? <Multi n={selection.length} /> : <CompDesign />)}
-        {tab === 'motion' && (layer ? <LayerMotion layer={layer} /> : <CompMotion />)}
-        {tab === 'ai' && <AiPanel />}
-      </div>
+    <div className="panel-scroll">
+      <FormatNotice />
+      {layer ? <LayerDesign layer={layer} /> : count > 1 ? <Multi n={count} /> : <CompDesign />}
+    </div>
+  )
+}
+
+/** Paneel "Animatie": binnenkomst, accent, uitgang en keyframes. */
+export function MotionPanel() {
+  const { layer } = useSelectedLayer()
+  return (
+    <div className="panel-scroll">
+      <FormatNotice />
+      {layer ? <LayerMotion layer={layer} /> : <CompMotion />}
+    </div>
+  )
+}
+
+/** Paneel "AI". */
+export function AiPanelView() {
+  return (
+    <div className="panel-scroll">
+      <AiPanel />
     </div>
   )
 }
@@ -484,19 +493,8 @@ function LayerDesign({ layer }: { layer: Layer }) {
         </Section>
       )}
       <TimeRange layer={layer} />
-      <Section title="Positie en maat">
-        <div className="grid2">
-          <Num label="X" value={st.x} animated={anim('x')} onChange={set('x')} />
-          <Num label="Y" value={st.y} animated={anim('y')} onChange={set('y')} />
-        </div>
-        <div className="grid2">
-          <Num label="B" value={layer.width} min={1} onChange={(v, co) => up((l) => void (l.width = v), co ? 'w' : undefined)} />
-          <Num label="H" value={layer.height} min={1} onChange={(v, co) => up((l) => void (l.height = v), co ? 'h' : undefined)} />
-        </div>
-        <div className="grid2">
-          <Num label="°" title="Rotatie" value={st.rotation} animated={anim('rotation')} onChange={set('rotation')} />
-          <Num label="%" title="Schaal" value={Math.round(st.scale * 100)} animated={anim('scale')} min={0} max={1000} onChange={(v, co) => set('scale')(v / 100, co)} />
-        </div>
+      <Section title="Transform">
+        <TransformRows layer={layer} />
         <div className="row" style={{ alignItems: 'flex-start', marginTop: 4 }}>
           <span className="label" style={{ paddingTop: 4 }}>
             Anchor
@@ -517,18 +515,6 @@ function LayerDesign({ layer }: { layer: Layer }) {
             <Num label="Y%" value={Math.round((layer.anchorY ?? 0.5) * 100)} min={0} max={100} onChange={(v, co) => setAnchor(layer.id, layer.anchorX ?? 0.5, v / 100, co ? 'anchor' : undefined)} />
           </div>
         </div>
-        <Row label="Dekking">
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={Math.round(st.opacity * 100)}
-            onChange={(e) => setLayerValue(layer.id, 'opacity', +e.target.value / 100, 'p-opacity')}
-          />
-          <span className="muted" style={{ width: 34, textAlign: 'right' }}>
-            {Math.round(st.opacity * 100)}%
-          </span>
-        </Row>
         <Row label="CTA-hover">
           <Switch checked={layer.cta} onChange={(v) => up((l) => void (l.cta = v))} />
         </Row>
@@ -538,6 +524,129 @@ function LayerDesign({ layer }: { layer: Layer }) {
 }
 
 // ---------------- Animatie ----------------
+
+/**
+ * Transform-eigenschappen zoals in After Effects: één regel per eigenschap met één
+ * keyframe-knop (◆). Positie = X+Y, Schaal = X+Y (te koppelen), Maat = B+H (te koppelen).
+ */
+function TransformRows({ layer, showSize = true }: { layer: Layer; showSize?: boolean }) {
+  const time = useStore((s) => s.time)
+  const project = useStore((s) => s.project)!
+  const compId = useStore((s) => s.compId)
+  const st = layerStateAt(layer, layerLocalTime(project, compId, layer.id, time))
+  const up = (fn: (l: Layer) => void, co?: string) => updateLayer(layer.id, fn, co)
+  const set = (p: AnimProp) => (v: number, co: boolean) => setLayerValue(layer.id, p, v, co ? `p-${p}` : undefined)
+  const animated = (g: PropGroupId) => groupProps(layer, g).some((p) => layer.tracks[p]?.length)
+  const scaleLinked = layer.scaleLinked !== false
+  const sizeLinked = !!layer.sizeLinked
+
+  const kf = (g: PropGroupId) => (
+    <button
+      className={`icon sm kf${animated(g) ? ' on' : ''}`}
+      title={animated(g) ? `${GROUP_LABEL[g]}: keyframes verwijderen` : `${GROUP_LABEL[g]} animeren: keyframe op de huidige tijd`}
+      onClick={() => toggleStopwatch(layer.id, groupProps(layer, g)[0])}
+    >
+      ◆
+    </button>
+  )
+  const link = (on: boolean, title: string, toggle: () => void) => (
+    <button className={`icon sm link${on ? ' on' : ''}`} title={title} onClick={toggle}>
+      {on ? <Link2 size={13} /> : <Link2Off size={13} />}
+    </button>
+  )
+
+  return (
+    <div className="transform-rows">
+      <div className="trow">
+        {kf('position')}
+        <span className="label">Positie</span>
+        <Num label="X" value={st.x} animated={animated('position')} onChange={set('x')} />
+        <Num label="Y" value={st.y} animated={animated('position')} onChange={set('y')} />
+      </div>
+      {showSize && (
+        <div className="trow">
+          <span className="kf-space" />
+          <span className="label">Maat</span>
+          <Num
+            label="B"
+            value={layer.width}
+            min={1}
+            onChange={(v, co) =>
+              up((l) => {
+                if (l.sizeLinked && l.width) l.height = Math.max(1, Math.round((v * l.height) / l.width))
+                l.width = v
+              }, co ? 'w' : undefined)
+            }
+          />
+          {link(sizeLinked, sizeLinked ? 'Breedte en hoogte gekoppeld' : 'Breedte en hoogte los', () => up((l) => void (l.sizeLinked = !l.sizeLinked)))}
+          <Num
+            label="H"
+            value={layer.height}
+            min={1}
+            onChange={(v, co) =>
+              up((l) => {
+                if (l.sizeLinked && l.height) l.width = Math.max(1, Math.round((v * l.width) / l.height))
+                l.height = v
+              }, co ? 'h' : undefined)
+            }
+          />
+        </div>
+      )}
+      <div className="trow">
+        {kf('scale')}
+        <span className="label">Schaal</span>
+        <Num label="X%" value={Math.round(st.scale * 1000) / 10} animated={animated('scale')} min={0} max={2000} decimals={1} onChange={(v, co) => set('scale')(v / 100, co)} />
+        {link(scaleLinked, scaleLinked ? 'Schaal X en Y gekoppeld (klik om los te maken)' : 'Schaal X en Y los (klik om te koppelen)', () =>
+          up((l) => {
+            if (l.scaleLinked === false) {
+              // Koppelen: Y volgt weer X
+              l.scaleLinked = true
+              delete l.scaleY
+              delete l.tracks.scaleY
+            } else {
+              // Loskoppelen: Y begint gelijk aan X (ook de keyframes)
+              l.scaleLinked = false
+              l.scaleY = l.scale
+              if (l.tracks.scale) l.tracks.scaleY = structuredClone(l.tracks.scale)
+            }
+          })
+        )}
+        <Num
+          label="Y%"
+          value={Math.round(st.scaleY * 1000) / 10}
+          animated={animated('scale')}
+          min={0}
+          max={2000}
+          decimals={1}
+          onChange={(v, co) => set(scaleLinked ? 'scale' : 'scaleY')(v / 100, co)}
+        />
+      </div>
+      <div className="trow">
+        {kf('rotation')}
+        <span className="label">Rotatie</span>
+        <Num label="°" value={st.rotation} animated={animated('rotation')} onChange={set('rotation')} />
+      </div>
+      <div className="trow">
+        {kf('opacity')}
+        <span className="label">Dekking</span>
+        <input type="range" min={0} max={100} value={Math.round(st.opacity * 100)} onChange={(e) => setLayerValue(layer.id, 'opacity', +e.target.value / 100, 'p-opacity')} />
+        <span className={animated('opacity') ? 'kf-val' : 'muted'} style={{ width: 38, textAlign: 'right', flex: '0 0 auto' }}>
+          {Math.round(st.opacity * 100)}%
+        </span>
+      </div>
+      {layerGroups(layer).includes('reveal') && (
+        <div className="trow">
+          {kf('reveal')}
+          <span className="label">Reveal</span>
+          <input type="range" min={0} max={100} value={Math.round(st.reveal * 100)} onChange={(e) => setLayerValue(layer.id, 'reveal', +e.target.value / 100, 'p-reveal')} />
+          <span className={animated('reveal') ? 'kf-val' : 'muted'} style={{ width: 38, textAlign: 'right', flex: '0 0 auto' }}>
+            {Math.round(st.reveal * 100)}%
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function CompMotion() {
   const comp = useStore(currentComp)!
@@ -616,38 +725,10 @@ function LayerMotion({ layer }: { layer: Layer }) {
 
       <Section title={<><Timer size={13} /> Keyframes</>} defaultOpen={Object.keys(layer.tracks).length > 0}>
         <div className="hint-text" style={{ marginTop: 0, marginBottom: 8 }}>
-          Voor eigen bewegingen: klik op ◆ om een eigenschap te animeren. Een keyframe op een eigenschap gaat vóór de binnenkomst/uitgang.
+          Klik op ◆ om een eigenschap te animeren; elke wijziging zet dan een keyframe op de huidige tijd. Positie zet X én Y tegelijk. Eigen keyframes gaan
+          vóór de binnenkomst/uitgang.
         </div>
-        {(
-          [
-            ['x', 'Positie X', 1, undefined, undefined, 0],
-            ['y', 'Positie Y', 1, undefined, undefined, 0],
-            ['scale', 'Schaal', 0.01, 0, 10, 2],
-            ['rotation', 'Rotatie', 1, undefined, undefined, 0],
-            ['opacity', 'Dekking', 0.01, 0, 1, 2],
-            ['reveal', 'Reveal', 0.01, 0, 1, 2]
-          ] as [AnimProp, string, number, number | undefined, number | undefined, number][]
-        )
-          .filter(([p]) => p !== 'reveal' || canReveal)
-          .map(([p, label, step, min, max, decimals]) => {
-            const on = !!layer.tracks[p]?.length
-            return (
-              <div className="row" key={p}>
-                <button
-                  className={`icon sm${on ? ' on' : ''}`}
-                  style={on ? { color: 'var(--key)', background: 'rgba(242,193,78,.12)' } : undefined}
-                  title={on ? 'Keyframes verwijderen' : 'Animeren vanaf hier'}
-                  onClick={() => toggleStopwatch(layer.id, p, st[p])}
-                >
-                  ◆
-                </button>
-                <span className="label">{label}</span>
-                <div className="grow">
-                  <Scrub value={st[p]} step={step} min={min} max={max} decimals={decimals} animated={on} onChange={(v, co) => setLayerValue(layer.id, p, v, co ? `p-${p}` : undefined)} />
-                </div>
-              </div>
-            )
-          })}
+        <TransformRows layer={layer} showSize={false} />
         {layer.type !== 'writeon' && (
           <Row label="Wipe">
             <select

@@ -6,6 +6,7 @@ import { allLayers, cloneLayer, findDeep, groupLayers, localTime, reorderLayer, 
 import { layerStateAt } from '@shared/anim'
 import { moveAnchor } from '@shared/geometry'
 import { applyKeyAssist, type KeyAssist } from '@shared/keys'
+import { groupOf, groupProps } from '@shared/propgroups'
 import { penToPath, type PenPoint } from '@shared/path'
 import { ANIM_PROPS } from '@shared/types'
 import type { ExportTarget, Layer, LayerType } from '@shared/types'
@@ -206,11 +207,16 @@ export function duplicateSelection() {
 export function deleteSelection() {
   const { selection, selectedKey, compId } = S()
   if (selectedKey) {
-    updateLayer(selectedKey.layerId, (l) => {
-      const kfs = (l.tracks[selectedKey.prop] ?? []).filter((k) => Math.abs(k.t - selectedKey.t) > 1e-4)
-      if (kfs.length) l.tracks[selectedKey.prop] = kfs
-      else delete l.tracks[selectedKey.prop]
-    })
+    // Alle geselecteerde keyframes, per groep (Positie verwijdert X én Y op dat moment)
+    const keys = S().selectedKeys.length ? S().selectedKeys : [selectedKey]
+    for (const key of keys)
+      updateLayer(key.layerId, (l) => {
+        for (const m of groupProps(l, groupOf(key.prop))) {
+          const kfs = (l.tracks[m] ?? []).filter((k) => Math.abs(k.t - key.t) > 1e-4)
+          if (kfs.length) l.tracks[m] = kfs
+          else delete l.tracks[m]
+        }
+      })
     S().selectKey(null)
     return
   }
@@ -319,8 +325,11 @@ export function keyAssist(mode: KeyAssist) {
   S().update((p) => {
     const byTrack = new Map<string, SelectedKey[]>()
     for (const k of selectedKeys) {
-      const key = `${k.layerId}|${k.prop}`
-      byTrack.set(key, [...(byTrack.get(key) ?? []), k])
+      const l = findLayer(p, compId, k.layerId)
+      for (const m of l ? groupProps(l, groupOf(k.prop)) : [k.prop]) {
+        const key = `${k.layerId}|${m}`
+        byTrack.set(key, [...(byTrack.get(key) ?? []), { ...k, prop: m }])
+      }
     }
     for (const keys of byTrack.values()) {
       const l = findLayer(p, compId, keys[0].layerId)
@@ -343,7 +352,7 @@ export function setAnchor(layerId: string, ax: number, ay: number, coalesce?: st
   const l = findLayer(project!, compId, layerId)
   if (!l) return
   const st = layerStateAt(l, layerLocalTime(project!, compId, layerId, time))
-  updateLayer(layerId, (x) => moveAnchor(x, Math.min(1, Math.max(0, ax)), Math.min(1, Math.max(0, ay)), st.scale, st.rotation), coalesce)
+  updateLayer(layerId, (x) => moveAnchor(x, Math.min(1, Math.max(0, ax)), Math.min(1, Math.max(0, ay)), st.scale, st.rotation, st.scaleY), coalesce)
 }
 
 export function ungroupSelection() {
@@ -726,4 +735,15 @@ export async function importSvgAsShapes(path: string, at?: { x: number; y: numbe
   } catch (e) {
     fail(e)
   }
+}
+
+export function renameLayer(id: string, name: string) {
+  updateLayer(id, (l) => void (l.name = name))
+}
+
+export function renameComposition(id: string, name: string) {
+  S().update((p) => {
+    const c = p.compositions.find((x) => x.id === id)
+    if (c) c.name = name
+  })
 }

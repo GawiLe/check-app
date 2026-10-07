@@ -32,12 +32,12 @@ await page.waitForSelector('.app')
 // Bestand in het project zetten (zoals slepen op het linkerpaneel) en via de assets toevoegen
 await page.evaluate(async ({ d, f }) => window.bs.importPaths(d, [f]), { d: dir, f: file })
 await page.evaluate(() => window.__bsStore.getState().bumpAssets())
-await page.locator('.left-tabs button', { hasText: 'Assets' }).click()
+await page.locator('.dock-tab', { hasText: 'Assets' }).click()
 await page.evaluate(async () => {}) // assets verversen
 await page.reload()
 await page.locator('.welcome .list-item').first().click()
 await page.waitForSelector('.app')
-await page.locator('.left-tabs button', { hasText: 'Assets' }).click()
+await page.locator('.dock-tab', { hasText: 'Assets' }).click()
 
 // 1. Als bewerkbare vormen
 await page.locator('.list-item', { hasText: 'badge.svg' }).first().click()

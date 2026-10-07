@@ -1,6 +1,8 @@
 import { create } from 'zustand'
-import { upsertKeyframe } from '@shared/anim'
+import { baseValue, layerStateAt, upsertKeyframe } from '@shared/anim'
+import { groupOf, groupProps } from '@shared/propgroups'
 import type { UserPreset } from '@shared/library'
+import { useDock } from './dock/store'
 import { normalizeProject, syncFormats } from '@shared/sync'
 import { findDeep, localTime } from '@shared/tree'
 import type { AnimProp, Composition, ExportResult, Layer, Project } from '@shared/types'
@@ -33,6 +35,8 @@ interface State {
   tool: Tool
   /** Tekstlaag die nu op het canvas bewerkt wordt. */
   editingText: string | null
+  /** Laag, compositie of formaat waarvan de naam nu bewerkt wordt. */
+  renaming: string | null
   /** Open keuzevenster bij het importeren van een SVG. */
   svgChoice: { name: string; resolve: (mode: SvgMode | null, remember: boolean) => void } | null
   time: number
@@ -74,6 +78,7 @@ interface State {
   setActiveTab(id: string | null): void
   setTool(t: Tool): void
   setEditingText(id: string | null): void
+  setRenaming(id: string | null): void
   setSvgChoice(c: State['svgChoice']): void
   setTime(t: number): void
   setPlaying(p: boolean): void
@@ -115,6 +120,7 @@ export const useStore = create<State>((set, get) => ({
   activeTab: null,
   tool: 'select',
   editingText: null,
+  renaming: null,
   svgChoice: null,
   time: 0,
   playing: false,
@@ -205,6 +211,7 @@ export const useStore = create<State>((set, get) => ({
   setActiveTab: (id) => set({ activeTab: id, selection: [], selectedKeys: [], selectedKey: null }),
   setTool: (t) => set({ tool: t, editingText: null }),
   setEditingText: (id) => set({ editingText: id }),
+  setRenaming: (id) => set({ renaming: id }),
   setSvgChoice: (c) => set({ svgChoice: c }),
   setTime: (t) => set({ time: Math.max(0, t) }),
   setPlaying: (p) => set({ playing: p }),
@@ -216,7 +223,11 @@ export const useStore = create<State>((set, get) => ({
   setExportResults: (r) => set({ exportResults: r }),
   setOverview: (o) => set({ overview: o }),
   setAutoKey: (a) => set({ autoKey: a }),
-  setTab: (t) => set({ tab: t }),
+  setTab: (t) => {
+    set({ tab: t })
+    // Het bijbehorende paneel naar voren halen (of tonen als het gesloten was)
+    useDock.getState().show(t)
+  },
   setExpanded: (e) => set({ expanded: e }),
   setPresets: (p) => set({ presets: p })
 }))
@@ -254,26 +265,40 @@ export function setLayerValue(layerId: string, prop: AnimProp, value: number, co
   useStore.getState().update((p) => {
     const l = findLayer(p, compId, layerId)
     if (!l) return
-    const kfs = l.tracks[prop]
-    if (kfs && kfs.length) l.tracks[prop] = upsertKeyframe(kfs, time, value)
-    else if (autoKey && time > 0.01) {
-      // Eerste wijziging met auto-key: oude waarde op 0s, nieuwe op de huidige tijd.
-      l.tracks[prop] = upsertKeyframe(upsertKeyframe([], 0, l[prop]), time, value)
-    } else l[prop] = value
+    // Gekoppelde schaal: X en Y tegelijk (scaleY volgt scale)
+    const members = groupProps(l, groupOf(prop))
+    const animated = members.some((m) => l.tracks[m]?.length)
+    if (animated || (autoKey && time > 0.01)) {
+      // Eén keyframe voor de hele groep (bijv. Positie = X én Y op hetzelfde moment)
+      const st = layerStateAt(l, time)
+      for (const m of members) {
+        const v = m === prop ? value : st[m]
+        const kfs = l.tracks[m]
+        if (kfs?.length) l.tracks[m] = upsertKeyframe(kfs, time, v)
+        else if (animated) l.tracks[m] = upsertKeyframe([], time, v)
+        else l.tracks[m] = upsertKeyframe(upsertKeyframe([], 0, baseValue(l, m)), time, v)
+      }
+    } else if (prop === 'scaleY') l.scaleY = value
+    else l[prop] = value
   }, coalesce)
 }
 
-/** Stopwatch aan/uit: aan = eerste keyframe op huidige tijd met huidige waarde. */
-export function toggleStopwatch(layerId: string, prop: AnimProp, currentValue: number) {
+/** Stopwatch aan/uit voor een hele groep (Positie, Schaal, …): aan = keyframe op de huidige tijd. */
+export function toggleStopwatch(layerId: string, prop: AnimProp) {
   const { compId, project } = useStore.getState()
   const time = layerLocalTime(project!, compId, layerId, useStore.getState().time)
   useStore.getState().update((p) => {
     const l = findLayer(p, compId, layerId)
     if (!l) return
-    if (l.tracks[prop]?.length) {
-      l[prop] = currentValue
-      delete l.tracks[prop]
-    } else l.tracks[prop] = upsertKeyframe([], time, currentValue)
+    const members = groupProps(l, groupOf(prop))
+    const st = layerStateAt(l, time)
+    if (members.some((m) => l.tracks[m]?.length)) {
+      for (const m of members) {
+        if (m === 'scaleY') l.scaleY = st[m]
+        else l[m] = st[m]
+        delete l.tracks[m]
+      }
+    } else for (const m of members) l.tracks[m] = upsertKeyframe([], time, st[m])
   })
 }
 

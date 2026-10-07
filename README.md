@@ -91,8 +91,29 @@ In de tijdlijn staan ze als groene (IN), gele (ACCENT) en oranje (UIT) blokken, 
 - **Keyframes** voor eigen bewegingen:
   - Klik ◆ bij een eigenschap, of zet **Auto-key** (de rode stip in de tijdlijn) aan. Dan zet elke wijziging in positie, schaal, rotatie of dekking een keyframe op de huidige tijd.
   - Sleep keyframes, en kies een easing per keyframe.
+- **Transform zoals in After Effects**: positie (X en Y) en schaal staan elk op één regel, met één ◆. Eén klik zet een keyframe voor X én Y tegelijk; in de tijdlijn is het ook één regel *Positie* en één regel *Schaal*.
+  - **Schaal X% / Y%** zijn standaard gekoppeld (🔗). Ontkoppel om breedte en hoogte apart te schalen; opnieuw koppelen zet Y weer gelijk aan X.
+  - **Maat B / H** (pixels) kun je ook koppelen: dan blijft de verhouding gelijk bij typen en bij slepen aan de hoeken.
 - **Hele laag verschuiven**: sleep de balk van een laag in de tijdlijn. Alle keyframes en de binnenkomst/uitgang gaan mee.
 - Het **eindframe** ligt vóór de eerste uitgang. De laatste loop stopt daar, zodat het eindbeeld en de backup-afbeelding alles tonen.
+
+### Werkruimte indelen
+
+Alle panelen (Canvas, Code, Tijdlijn, Animaties, Assets & fonts, Ontwerp, Animatie, AI) zijn los, zoals in After Effects:
+
+- **Verplaatsen**: sleep een tabblad naar een andere paneelgroep (wordt een tab) of naar de rand van een paneel (links/rechts = naast elkaar, boven/onder = onder elkaar).
+- **Groter/kleiner**: sleep de lijnen tussen panelen.
+- **Aan/uit**: × op een tab sluit het paneel; terug via **Venster** (werkbalk of menubalk).
+- **Maximaliseren**: dubbelklik op een tab, de knop rechtsboven, of ` (backtick) met de muis boven een paneel.
+- **Indeling herstellen** staat in het menu Venster. Je indeling wordt onthouden.
+
+### Code bekijken
+
+Bovenin het canvas kies je **Ontwerp**, **Code** of **Beide** (naast elkaar). De code is precies de HTML die geëxporteerd wordt, live bijgewerkt: *Leesbaar* (opgemaakt) of *Exact* (zoals in de zip), per platform, met de grootte en een kopieerknop. Er is ook een los paneel *Code* dat je overal neer kunt zetten.
+
+### Hernoemen
+
+Lagen: selecteer en druk **Enter**, dubbelklik op de naam in de tijdlijn, of rechtermuisknop → *Naam wijzigen*. Composities: Enter of rechtermuisknop (dubbelklik opent ze). Formaten en compositie-tabs: dubbelklik op het tabblad.
 
 ### Werken op het canvas
 
@@ -229,6 +250,8 @@ Een write-on laag zet tekst uit je eigen font om naar SVG-paden per letter. De e
 | Cmd/Ctrl+D | laag of groep dupliceren |
 | Cmd/Ctrl+G, Shift+Cmd/Ctrl+G | groeperen / degroeperen |
 | U | eigenschappen van de selectie uit-/inklappen in de tijdlijn |
+| Enter | geselecteerde laag hernoemen |
+| ` | paneel onder de muis maximaliseren / terug |
 | Alt+[ / Alt+] | in- / uitpunt op de playhead |
 | Dubbelklik (canvas) | laag binnen een groep selecteren |
 | Cmd/Ctrl+S, +E | opslaan, exporteren |
@@ -264,7 +287,8 @@ De uitkomst staat in het exportvenster en in `export/rapport.json`.
 src/shared/   types, animatie (easing/sampling), runtime, HTML-builder, validatie, presets, formaten
 src/main/     Electron hoofdproces: projectmappen, fonts (subset + write-on paden), export/zip/backup, AI
 src/preload/  veilige brug naar de renderer (window.bs)
-src/renderer/ React-editor: viewer, tijdlijn, inspector, dialogen
+src/renderer/ React-editor: viewer, tijdlijn, inspector, codeweergave, dialogen
+src/renderer/src/dock/  werkruimte: indeling als boom van splitsingen en tabgroepen
 ```
 
 - **Formaten koppelen** gebeurt in `src/shared/sync.ts`: na elke wijziging worden inhoud en timing doorgezet naar lagen met hetzelfde `linkId`.

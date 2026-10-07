@@ -1668,3 +1668,401 @@ input[type='range'] {
   background: var(--accent-bg);
   outline: none;
 }
+
+/* ---------- Transform-regels (Positie, Maat, Schaal, …) ---------- */
+.transform-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.trow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.trow .label {
+  min-width: 52px;
+  flex: 0 0 52px;
+}
+.trow .num {
+  flex: 1;
+}
+.trow input[type='range'] {
+  flex: 1;
+}
+.trow .kf,
+.trow .kf-space {
+  width: 18px;
+  flex: 0 0 18px;
+  font-size: 11px;
+}
+.trow .kf.on {
+  color: var(--key);
+  background: rgba(242, 193, 78, 0.12);
+}
+.trow .link {
+  width: 20px;
+  flex: 0 0 20px;
+}
+.trow .link.on {
+  color: var(--accent);
+  background: transparent;
+}
+.kf-val {
+  color: var(--key);
+}
+.inline-rename {
+  height: 22px;
+  padding: 0 6px;
+  flex: 1;
+  min-width: 60px;
+  background: var(--bg);
+  border: 1px solid var(--accent);
+}
+.format-rename {
+  width: 160px;
+  flex: 0 0 160px;
+}
+.formats .format-name {
+  color: var(--muted);
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+/* ---------- Werkruimte (dock) ---------- */
+.app {
+  display: flex !important;
+  flex-direction: column;
+  height: 100%;
+}
+.app > .toolbar {
+  flex: 0 0 48px;
+}
+.dock-root {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  padding: 4px;
+  gap: 0;
+  background: #0c0c0e;
+}
+.dock-root > * {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.dock-split {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+.dock-split.dock-row {
+  flex-direction: row;
+}
+.dock-split.dock-col {
+  flex-direction: column;
+}
+.dock-cell {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+.dock-cell > * {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.dock-splitter {
+  flex: 0 0 4px;
+  background: transparent;
+  z-index: 5;
+}
+.dock-splitter.dock-row {
+  cursor: col-resize;
+}
+.dock-splitter.dock-col {
+  cursor: row-resize;
+}
+.dock-splitter:hover,
+.dock-splitter:active {
+  background: rgba(124, 140, 255, 0.45);
+}
+.dock-tabs {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.dock-head {
+  flex: 0 0 30px;
+  display: flex;
+  align-items: stretch;
+  gap: 1px;
+  background: #141416;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.dock-head.drop {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+.dock-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px 0 12px;
+  color: var(--muted);
+  cursor: grab;
+  white-space: nowrap;
+  font-size: 12px;
+  border-right: 1px solid var(--line);
+}
+.dock-tab:hover {
+  color: var(--text);
+}
+.dock-tab.on {
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+.dock-close {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  opacity: 0;
+  color: var(--faint);
+}
+.dock-tab:hover .dock-close,
+.dock-tab.on .dock-close {
+  opacity: 1;
+}
+.dock-head-space {
+  flex: 1;
+}
+.dock-max-btn {
+  align-self: center;
+  margin-right: 4px;
+}
+.dock-body {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.dock-body > :not(.dock-drop) {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+.dock-drop {
+  position: absolute;
+  background: rgba(124, 140, 255, 0.22);
+  border: 2px solid var(--accent);
+  pointer-events: none;
+  z-index: 30;
+}
+.dock-drop.center {
+  inset: 6px;
+}
+.dock-drop.left {
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 45%;
+}
+.dock-drop.right {
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 45%;
+}
+.dock-drop.top {
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 45%;
+}
+.dock-drop.bottom {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 45%;
+}
+.dock-max {
+  display: flex;
+}
+.dock-max > * {
+  flex: 1;
+}
+.panel-scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}
+.dock-body .timeline,
+.dock-body .viewer {
+  border: none;
+}
+.menu .menu-wrap,
+.menu-wrap .menu[style] {
+  left: auto;
+}
+
+/* ---------- Canvas: ontwerp / code / beide ---------- */
+.canvas-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.canvas-modes {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 8;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+.canvas-modes button {
+  height: 24px;
+  font-size: 11px;
+}
+.canvas-split {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.canvas-part {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+.canvas-part > * {
+  flex: 1;
+  min-width: 0;
+}
+.canvas-split.both .canvas-part.code {
+  border-left: 1px solid var(--line);
+}
+.canvas-split.code .canvas-part.code .code-bar,
+.canvas-split.both .canvas-part.code .code-bar {
+  padding-left: 12px;
+}
+.canvas-split.code .code-bar {
+  padding-left: 250px !important;
+}
+
+/* ---------- Code-weergave ---------- */
+.code-view {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #0f0f12;
+}
+.code-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  flex-wrap: wrap;
+}
+.code-bar select {
+  height: 24px;
+}
+pre.code {
+  flex: 1;
+  margin: 0;
+  padding: 12px 14px;
+  overflow: auto;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: #c9cbd6;
+  user-select: text;
+  tab-size: 2;
+}
+pre.code.wrap {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.c-tag {
+  color: #7c8cff;
+}
+.c-attr {
+  color: #f2c14e;
+}
+.c-str {
+  color: #3fbf86;
+}
+.c-prop {
+  color: #8fd0ff;
+}
+.c-sel {
+  color: #e0795a;
+}
+.c-com {
+  color: #6b6b78;
+  font-style: italic;
+}
+.dock-head {
+  scrollbar-width: none;
+}
+.dock-head::-webkit-scrollbar {
+  display: none;
+}
+.dock-body .panel-scroll {
+  overflow-x: hidden !important;
+}
+.dock-body .lib-grid {
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+}
+.dock-body .lib-tile {
+  min-width: 0;
+}
+/* Werkbalk: formaten krimpen mee en scrollen zonder balk als ze niet passen */
+.app > .toolbar {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+}
+.app > .toolbar > .formats {
+  justify-self: center;
+  max-width: 100%;
+  min-width: 0;
+  scrollbar-width: none;
+}
+.app > .toolbar > .formats::-webkit-scrollbar {
+  display: none;
+}
+.formats button {
+  flex: 0 0 auto;
+}
+/* Panelen kunnen altijd smaller/lager: inhoud bepaalt nooit de minimale maat */
+.dock-cell,
+.dock-body,
+.canvas-split,
+.canvas-part {
+  overflow: hidden;
+  min-width: 0;
+}
+.dock-resizing iframe {
+  pointer-events: none;
+}
+.dock-resizing-row,
+.dock-resizing-row * {
+  cursor: col-resize !important;
+}
+.dock-resizing-col,
+.dock-resizing-col * {
+  cursor: row-resize !important;
+}

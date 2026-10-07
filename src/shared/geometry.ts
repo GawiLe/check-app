@@ -8,13 +8,11 @@ export const anchorOf = (l: Pick<Layer, 'anchorX' | 'anchorY'>) => ({ ax: l.anch
  * Met schaal s en rotatie r (graden) wordt de positie zo gecorrigeerd dat de laag
  * op dezelfde plek blijft staan. Keyframes op x/y schuiven even ver mee.
  */
-export function moveAnchor(l: Layer, ax: number, ay: number, s: number, rDeg: number) {
+export function moveAnchor(l: Layer, ax: number, ay: number, s: number, rDeg: number, sy = s) {
   const { ax: ax0, ay: ay0 } = anchorOf(l)
   const r = (rDeg * Math.PI) / 180
-  const cos = Math.cos(r) * s
-  const sin = Math.sin(r) * s
   // Wereldpositie van linksboven = pos + O − R·S·O ; houd die gelijk bij O → O'
-  const rs = (x: number, y: number): [number, number] => [x * cos - y * sin, x * sin + y * cos]
+  const rs = (x: number, y: number): [number, number] => [x * s * Math.cos(r) - y * sy * Math.sin(r), x * s * Math.sin(r) + y * sy * Math.cos(r)]
   const o0: [number, number] = [ax0 * l.width, ay0 * l.height]
   const o1: [number, number] = [ax * l.width, ay * l.height]
   const r0 = rs(...o0)
@@ -30,13 +28,13 @@ export function moveAnchor(l: Layer, ax: number, ay: number, s: number, rDeg: nu
 }
 
 /** Hoekpunten van een laag op het canvas (voor selectiekader en klikken), rekening houdend met anchor, schaal en rotatie. */
-export function layerCorners(x: number, y: number, w: number, h: number, ax: number, ay: number, s: number, rDeg: number) {
+export function layerCorners(x: number, y: number, w: number, h: number, ax: number, ay: number, s: number, rDeg: number, sy = s) {
   const r = (rDeg * Math.PI) / 180
   const px = x + ax * w
   const py = y + ay * h
   const map = (u: number, v: number): [number, number] => {
     const lx = (u - ax * w) * s
-    const ly = (v - ay * h) * s
+    const ly = (v - ay * h) * sy
     return [px + lx * Math.cos(r) - ly * Math.sin(r), py + lx * Math.sin(r) + ly * Math.cos(r)]
   }
   return { anchor: [px, py] as [number, number], map, corners: [map(0, 0), map(w, 0), map(w, h), map(0, h)] }

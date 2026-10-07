@@ -1,4 +1,4 @@
-import { round } from './anim'
+import { baseValue, round } from './anim'
 import type { AnimProp, Composition, Emphasis, EmphasisType, Keyframe, Layer, Motion } from './types'
 import { ANIM_PROPS } from './types'
 
@@ -144,7 +144,7 @@ export function presetFromLayer(l: Layer, name: string, id: string): UserPreset 
     tracks[p] = kfs.map((k) => ({
       ...k,
       t: round(k.t - t0),
-      v: REL_DIFF.includes(p) ? round(k.v - l[p], 2) : p === 'scale' ? round(l.scale ? k.v / l.scale : k.v, 3) : k.v
+      v: REL_DIFF.includes(p) ? round(k.v - baseValue(l, p), 2) : p === 'scale' || p === 'scaleY' ? round(baseValue(l, p) ? k.v / baseValue(l, p) : k.v, 3) : k.v
     }))
   }
   const rel = <T extends { start: number }>(m: T | null | undefined) => (m ? { ...m, start: round(m.start - t0) } : null)
@@ -161,7 +161,7 @@ export function applyUserPreset(l: Layer, preset: UserPreset, at?: number) {
     l.tracks[p] = kfs.map((k) => ({
       ...k,
       t: round(k.t + t0),
-      v: REL_DIFF.includes(p) ? round(l[p] + k.v, 2) : p === 'scale' ? round(l.scale * k.v, 3) : k.v
+      v: REL_DIFF.includes(p) ? round(baseValue(l, p) + k.v, 2) : p === 'scale' || p === 'scaleY' ? round(baseValue(l, p) * k.v, 3) : k.v
     }))
   }
 }

@@ -7,6 +7,7 @@ import {
   Circle,
   LayoutGrid,
   MousePointer2,
+  PanelsTopLeft,
   PenTool,
   MousePointerClick,
   Link2,
@@ -21,7 +22,10 @@ import {
   Undo2,
   Upload
 } from 'lucide-react'
-import { addLayer, importImages, openProject, regenerateWriteOn, save } from '../lib/actions'
+import { addLayer, importImages, openProject, regenerateWriteOn, renameComposition, save } from '../lib/actions'
+import { InlineRename } from './ui'
+import { ALL_PANELS, PANEL_TITLE, visiblePanels } from '../dock/model'
+import { useDock } from '../dock/store'
 import { useStore } from '../store'
 
 export function Toolbar() {
@@ -29,6 +33,7 @@ export function Toolbar() {
   const compId = useStore((s) => s.compId)
   const dirty = useStore((s) => s.dirty)
   const overview = useStore((s) => s.overview)
+  const renaming = useStore((s) => s.renaming)
   const canUndo = useStore((s) => s.past.length > 0)
   const canRedo = useStore((s) => s.future.length > 0)
   const s = useStore.getState
@@ -72,20 +77,34 @@ export function Toolbar() {
         >
           <LayoutGrid size={14} /> Alle
         </button>
-        {project.compositions.map((c) => (
-          <button
-            key={c.id}
-            className={!overview && c.id === compId ? 'on' : ''}
-            onClick={() => {
-              s().setComp(c.id)
-              s().setOverview(false)
-            }}
-            title={c.name}
-          >
-            {c.width}×{c.height}
-            {c.id === project.baseCompositionId && <span className="base-mark">●</span>}
-          </button>
-        ))}
+        {project.compositions.map((c) =>
+          renaming === c.id ? (
+            <InlineRename
+              key={c.id}
+              value={c.name}
+              className="format-rename"
+              onDone={(v) => {
+                if (v) renameComposition(c.id, v)
+                s().setRenaming(null)
+              }}
+            />
+          ) : (
+            <button
+              key={c.id}
+              className={!overview && c.id === compId ? 'on' : ''}
+              onClick={() => {
+                s().setComp(c.id)
+                s().setOverview(false)
+              }}
+              onDoubleClick={() => s().setRenaming(c.id)}
+              title={`${c.name} (${c.width}×${c.height}) · dubbelklik om de naam te wijzigen`}
+            >
+              {c.width}×{c.height}
+              {!/^(basis )?\d+x\d+$/i.test(c.name) && <span className="format-name">{c.name}</span>}
+              {c.id === project.baseCompositionId && <span className="base-mark">●</span>}
+            </button>
+          )
+        )}
         <button className="icon sm" title="Formaat toevoegen" onClick={() => s().setDialog('addFormat')}>
           <Plus size={14} />
         </button>
@@ -104,6 +123,7 @@ export function Toolbar() {
 
       <div className="group end">
         <ClickTagField />
+        <WindowMenu />
         <button className="icon" title="Opslaan als boilerplate" onClick={() => s().setDialog('saveBoilerplate')}>
           <BookmarkPlus size={16} />
         </button>
@@ -204,6 +224,51 @@ function Tools() {
           {i.icon}
         </button>
       ))}
+    </div>
+  )
+}
+
+/** Venster-menu: panelen aan/uit zetten en de indeling herstellen (zoals in After Effects). */
+function WindowMenu() {
+  const [open, setOpen] = useState(false)
+  const root = useDock((d) => d.root)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const close = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && setOpen(false)
+    window.addEventListener('pointerdown', close)
+    return () => window.removeEventListener('pointerdown', close)
+  }, [open])
+  const shown = visiblePanels(root)
+  return (
+    <div className="menu-wrap" ref={ref}>
+      <button className="ghost" onClick={() => setOpen(!open)} title="Panelen tonen/verbergen en indeling">
+        <PanelsTopLeft size={14} /> Venster
+      </button>
+      {open && (
+        <div className="menu" style={{ right: 0 }}>
+          {ALL_PANELS.map((p) => (
+            <button key={p} onClick={() => useDock.getState().toggle(p, !shown.includes(p))}>
+              <span style={{ width: 14, color: 'var(--accent)' }}>{shown.includes(p) ? '✓' : ''}</span>
+              {PANEL_TITLE[p]}
+            </button>
+          ))}
+          <div className="ctx-sep" />
+          <button
+            onClick={() => {
+              useDock.getState().reset()
+              setOpen(false)
+            }}
+          >
+            <span style={{ width: 14 }} />
+            Indeling herstellen
+          </button>
+          <div className="hint-text" style={{ padding: '4px 10px 6px', maxWidth: 230 }}>
+            Sleep een tabblad naar een andere groep, of naar de rand van een paneel om het ernaast of eronder te zetten. Dubbelklik op een tab om te
+            maximaliseren.
+          </div>
+        </div>
+      )}
     </div>
   )
 }

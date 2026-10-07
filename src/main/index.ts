@@ -216,6 +216,21 @@ function buildMenu() {
         ]
       },
       {
+        label: 'Venster',
+        submenu: [
+          { label: 'Canvas', click: send('panel:viewer') },
+          { label: 'Code', click: send('panel:code') },
+          { label: 'Tijdlijn', click: send('panel:timeline') },
+          { label: 'Animaties', click: send('panel:library') },
+          { label: 'Assets & fonts', click: send('panel:assets') },
+          { label: 'Ontwerp', click: send('panel:design') },
+          { label: 'Animatie', click: send('panel:motion') },
+          { label: 'AI', click: send('panel:ai') },
+          { type: 'separator' },
+          { label: 'Indeling herstellen', click: send('resetLayout') }
+        ]
+      },
+      {
         label: 'Beeld',
         submenu: [
           { role: 'reload', label: 'Herladen' },

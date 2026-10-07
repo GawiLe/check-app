@@ -1,11 +1,8 @@
 import { useEffect, useState } from 'react'
 import { ContextMenu } from './components/ContextMenu'
 import { Dialogs, SvgChoiceDialog } from './components/Dialogs'
-import { Inspector } from './components/Inspector'
-import { LeftPanel } from './components/LeftPanel'
-import { Timeline } from './components/Timeline'
 import { Toolbar } from './components/Toolbar'
-import { Viewer } from './components/Viewer'
+import { Workspace } from './components/Workspace'
 import {
   confirmDiscard,
   copySelection,
@@ -28,74 +25,16 @@ import { allLayers, findDeep } from '@shared/tree'
 import { layerStateAt } from '@shared/anim'
 import { endFrameTime } from '@shared/motion'
 import { FilePlus2, FolderOpen } from 'lucide-react'
+import { useDock } from './dock/store'
+import { toggleMaximizeUnderPointer } from './dock/Dock'
+import type { PanelId } from './dock/model'
 
 const isTyping = () => {
   const el = document.activeElement
   return !!el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !(el as HTMLInputElement).readOnly) || el.tagName === 'SELECT')
 }
 
-export interface Layout {
-  left: number
-  right: number
-  timeline: number
-}
-const DEFAULT_LAYOUT: Layout = { left: 220, right: 288, timeline: 260 }
-
-function loadLayout(): Layout {
-  try {
-    return { ...DEFAULT_LAYOUT, ...JSON.parse(localStorage.getItem('bs-layout') ?? '{}') }
-  } catch {
-    return DEFAULT_LAYOUT
-  }
-}
-
-/** Sleepbare scheidingslijnen tussen de panelen (worden onthouden). */
-function Splitters({ layout, setLayout }: { layout: Layout; setLayout: (l: Layout) => void }) {
-  const dragFor = (key: keyof Layout, axis: 'x' | 'y', dir: 1 | -1, min: number, max: () => number) => (e: React.PointerEvent) => {
-    const el = e.currentTarget as HTMLElement
-    el.setPointerCapture(e.pointerId)
-    const p0 = axis === 'x' ? e.clientX : e.clientY
-    const v0 = layout[key]
-    el.onpointermove = (ev) => {
-      const d = ((axis === 'x' ? ev.clientX : ev.clientY) - p0) * dir
-      setLayout({ ...layout, [key]: Math.round(Math.min(max(), Math.max(min, v0 + d))) })
-    }
-    el.onpointerup = () => (el.onpointermove = null)
-  }
-  return (
-    <>
-      <div
-        className="splitter v"
-        style={{ left: layout.left - 3, top: 48, bottom: layout.timeline }}
-        onPointerDown={dragFor('left', 'x', 1, 160, () => 420)}
-        onDoubleClick={() => setLayout({ ...layout, left: DEFAULT_LAYOUT.left })}
-      />
-      <div
-        className="splitter v"
-        style={{ right: layout.right - 3, top: 48, bottom: layout.timeline }}
-        onPointerDown={dragFor('right', 'x', -1, 240, () => 520)}
-        onDoubleClick={() => setLayout({ ...layout, right: DEFAULT_LAYOUT.right })}
-      />
-      <div
-        className="splitter h"
-        style={{ bottom: layout.timeline - 3 }}
-        onPointerDown={dragFor('timeline', 'y', -1, 120, () => window.innerHeight - 220)}
-        onDoubleClick={() => setLayout({ ...layout, timeline: DEFAULT_LAYOUT.timeline })}
-      />
-    </>
-  )
-}
-
 export function App() {
-  const [layout, setLayoutState] = useState<Layout>(loadLayout)
-  const setLayout = (l: Layout) => {
-    setLayoutState(l)
-    try {
-      localStorage.setItem('bs-layout', JSON.stringify(l))
-    } catch {
-      /* geen opslag: niet erg */
-    }
-  }
   const project = useStore((s) => s.project)
   const dialog = useStore((s) => s.dialog)
   const playing = useStore((s) => s.playing)
@@ -108,6 +47,8 @@ export function App() {
         const s = useStore.getState()
         if (action === 'new') (await confirmDiscard()) && s.setDialog('new')
         if (action === 'open') void openProject()
+        if (action.startsWith('panel:')) useDock.getState().show(action.slice(6) as PanelId)
+        if (action === 'resetLayout') useDock.getState().reset()
         if (!s.project) return
         if (action === 'save') void save()
         if (action === 'export') s.setDialog('export')
@@ -179,6 +120,9 @@ export function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (isTyping() || dialog) return
+      // Enter in een invoerveld (dat zichzelf daarbij sluit) is geen sneltoets
+      const tag = (e.target as HTMLElement | null)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
       const s = useStore.getState()
       const comp = currentComp(s)
       if (!comp) return
@@ -216,11 +160,15 @@ export function App() {
           if (e.metaKey || e.ctrlKey || e.altKey) break
           s.setTool(({ v: 'select', t: 'text', r: 'rect', e: 'ellipse', g: 'pen' } as const)[e.key])
           break
+        case '`':
+          e.preventDefault()
+          toggleMaximizeUnderPointer()
+          break
         case 'Enter':
-          // Enter op een tekstlaag: tekst bewerken
-          if (s.selection.length === 1 && s.tool === 'select') {
-            const l = findDeep(comp.layers, s.selection[0])?.layer
-            if (l?.type === 'text') s.setEditingText(l.id)
+          // Enter = naam wijzigen (zoals in After Effects); tekst bewerk je met dubbelklik op het canvas
+          if (s.selection.length === 1 && s.tool === 'select' && findDeep(comp.layers, s.selection[0])) {
+            e.preventDefault()
+            s.setRenaming(s.selection[0])
           }
           break
         case 'u':
@@ -273,13 +221,9 @@ export function App() {
     )
 
   return (
-    <div className="app" style={{ gridTemplateColumns: `${layout.left}px 1fr ${layout.right}px`, gridTemplateRows: `48px 1fr ${layout.timeline}px` }}>
-      <Splitters layout={layout} setLayout={setLayout} />
+    <div className="app">
       <Toolbar />
-      <LeftPanel />
-      <Viewer />
-      <Inspector />
-      <Timeline />
+      <Workspace />
       <Toast />
       <ContextMenu />
       <Dialogs />
