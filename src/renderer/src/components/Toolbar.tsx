@@ -193,7 +193,7 @@ function ClickTagField() {
   const valid = /^https?:\/\/[^\s.]+\.[^\s]+$/.test(v.trim())
   const commit = () => v.trim() !== url && useStore.getState().update((p) => void (p.clickTag = v.trim()))
   return (
-    <label className={`clicktag${valid ? '' : ' invalid'}`} title="clickTag: de landings-URL voor alle formaten. Wordt bij export als clickTag in elke banner gezet.">
+    <label className={`clicktag${valid ? '' : ' invalid'}`} title="clickTag-fallback: de landings-URL voor alle formaten. Het ad-server (CM360, Google Ads, GAM) vult bij uitserveren zijn eigen klik-URL in; deze URL wordt alleen gebruikt als dat niet gebeurt (bijv. bij lokaal testen).">
       <MousePointerClick size={14} />
       <input
         value={v}

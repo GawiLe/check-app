@@ -38,9 +38,32 @@ describe('export-HTML', () => {
 
   it('bevat de verplichte Google/IAB-onderdelen', () => {
     expect(html).toContain('<meta name="ad.size" content="width=300,height=600">')
-    expect(html).toContain('var clickTag="https://www.example.com";')
+    expect(html).toContain('var clickTag = "https://www.example.com";')
     expect(html).toContain('window.open(window.clickTag)')
     expect(html).not.toMatch(/src=["']?https?:/)
+  })
+
+  it('clickTag: fallback, door het ad-server meegegeven URL, en geen javascript:-URL', () => {
+    const p = createStarterProject('Klik')
+    p.clickTag = 'https://www.makro.nl'
+    const out = build(p).html
+    const clickTagAt = (url: string) => {
+      const dom = new JSDOM(out, { url, runScripts: 'dangerously', pretendToBeVisual: true })
+      return (dom.window as unknown as { clickTag: string }).clickTag
+    }
+    expect(clickTagAt('https://s0.2mdn.net/ads/index.html')).toBe('https://www.makro.nl')
+    expect(clickTagAt('https://ads.example/index.html?clickTag=' + encodeURIComponent('https://ad.server/click?u=https%3A%2F%2Fwww.makro.nl'))).toBe(
+      'https://ad.server/click?u=https%3A%2F%2Fwww.makro.nl'
+    )
+    expect(clickTagAt('https://ads.example/index.html?clickTAG=https%3A%2F%2Fx.nl')).toBe('https://x.nl')
+    expect(clickTagAt('https://ads.example/index.html?clickTag=javascript%3Aalert(1)')).toBe('https://www.makro.nl')
+    expect(clickTagAt('https://ads.example/index.html?clickTag=')).toBe('https://www.makro.nl')
+  })
+
+  it('waarschuwt als de clickTag nog de voorbeeld-URL is', () => {
+    const comp = project.compositions[0]
+    const issues = validateBanner({ target: 'cm360', comp, html, files: [], zipBytes: 1000, politeLoad: true } as never)
+    expect(issues.some((i) => i.rule === 'clickTag' && i.level === 'warning')).toBe(true)
   })
 
   it('is licht: geen frameworks of Enabler', () => {

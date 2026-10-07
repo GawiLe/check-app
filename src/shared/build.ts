@@ -66,7 +66,14 @@ function isAnimated(l: Layer): boolean {
 
 function staticTransform(l: Layer): string {
   const sy = l.scaleLinked === false ? (l.scaleY ?? l.scale) : l.scale
-  return `transform:translate(${n(l.x)}px,${n(l.y)}px) rotate(${n(l.rotation)}deg) scale(${n(l.scale)},${n(sy)});opacity:${n(l.opacity)}`
+  // Alleen wat afwijkt van de standaard: kortere CSS, hetzelfde resultaat
+  const t: string[] = []
+  if (l.x || l.y) t.push(`translate(${n(l.x)}px,${n(l.y)}px)`)
+  if (l.rotation) t.push(`rotate(${n(l.rotation)}deg)`)
+  if (l.scale !== 1 || sy !== 1) t.push(l.scale === sy ? `scale(${n(l.scale)})` : `scale(${n(l.scale)},${n(sy)})`)
+  const rules = t.length ? [`transform:${t.join(' ')}`] : []
+  if (l.opacity !== 1) rules.push(`opacity:${n(l.opacity)}`)
+  return rules.join(';')
 }
 
 /** CSS font-family: meegeleverd font (f0, f1…), systeemfont op naam, altijd met fallback. */
@@ -116,7 +123,7 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
       const rules: string[] = [`width:${n(l.width)}px`, `height:${n(l.height)}px`]
       const { ax, ay } = anchorOf(l)
       if (ax !== 0.5 || ay !== 0.5) rules.push(`transform-origin:${n(ax * 100)}% ${n(ay * 100)}%`)
-      if (!isAnimated(l)) rules.push(staticTransform(l))
+      if (!isAnimated(l) && staticTransform(l)) rules.push(staticTransform(l))
       let inner = ''
 
       switch (l.type) {
@@ -229,7 +236,12 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
     '<html lang="nl"><head><meta charset="utf-8">' +
     `<meta name="ad.size" content="width=${W},height=${H}">` +
     `<title>${escapeHtml(project.name)} ${W}x${H}</title>` +
-    `<script>var clickTag=${clickUrl};</script>` +
+    // clickTag zoals Google het voorschrijft: de URL hier is de fallback. Het ad-server (CM360, Google Ads, GAM)
+    // overschrijft hem bij het uitserveren; komt de klik-URL als ?clickTag=… binnen (generieke IAB-servers),
+    // dan wordt die gebruikt. Alleen http(s) wordt geaccepteerd.
+    `<script>var clickTag = ${clickUrl};` +
+    '(function(){try{var m=/[?&]clicktag=([^&#]+)/i.exec(location.search),u=m&&decodeURIComponent(m[1]);if(u&&/^https?:/i.test(u))clickTag=u}catch(e){}})();' +
+    '</script>' +
     `<style>${css.join('')}</style>` +
     '</head><body>' +
     click +

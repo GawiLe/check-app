@@ -40,9 +40,11 @@ export function validateBanner(input: ValidationInput): ValidationIssue[] {
   if (!/var clickTag\s*=\s*"https?:\/\/[^"]+"/.test(html))
     add('error', 'clickTag', 'clickTag is niet gedeclareerd met een geldige http(s)-URL.')
   if (!/window\.open\(window\.clickTag\)/.test(html)) add('error', 'clickTag', 'clickTag wordt niet gebruikt in de klik-actie.')
+  if (/var clickTag\s*=\s*"https?:\/\/(www\.)?example\.(com|org|nl)/i.test(html))
+    add('warning', 'clickTag', 'De fallback-clickTag is nog de voorbeeld-URL. Vul de echte landingspagina in (werkbalk of Ontwerp → Export).')
 
   // Externe requests (alles behalve de clickTag-URL)
-  const withoutClickTag = html.replace(/var clickTag=[^;]*;/, '')
+  const withoutClickTag = html.replace(/var clickTag\s*=[^;]*;/, '')
   const external = withoutClickTag.match(/(?:src|href)\s*=\s*["']?(?:https?:)?\/\/[^"'\s>]+/g)
   if (external) add('error', 'extern', `Externe bronnen gevonden: ${external.slice(0, 3).join(', ')}`)
 

@@ -209,6 +209,18 @@ Groepen werken zoals pre-comps in After Effects.
 
 De clickTag (landings-URL) staat altijd rechtsboven in de balk en geldt voor alle formaten. Is het geen geldige http(s)-URL, dan kleurt het veld rood.
 
+De URL die je hier invult is de **fallback**. De export gebruikt het standaardpatroon van Google:
+
+```html
+<script>var clickTag = "https://jouw-landingspagina.nl";</script>
+<a id="ad" href="javascript:window.open(window.clickTag)">…</a>
+```
+
+- **CM360, Google Ads en Ad Manager** herkennen `var clickTag` bij het uploaden. De trafficker vult daar de echte klik-URL in, en het ad-server overschrijft de fallback bij het uitserveren (met klikmeting).
+- **Generieke ad-servers** die de klik-URL als `?clickTag=…` (of `clickTAG`) in de URL meegeven: die waarde wordt gebruikt. Alleen http(s) wordt geaccepteerd.
+- Gebeurt geen van beide (lokaal testen, of de klik-URL is niet ingevuld), dan opent de fallback.
+- Staat de fallback nog op de voorbeeld-URL, dan waarschuwt de export.
+
 ### Fonts
 
 Bij een tekstlaag kies je een font met de font-kiezer:

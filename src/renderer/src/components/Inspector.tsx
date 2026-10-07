@@ -245,7 +245,9 @@ function CompDesign() {
 
       <Section title="Export">
         <Row label="clickTag">
-          <TextInput value={project.clickTag} placeholder="https://" onCommit={(v) => update((p) => void (p.clickTag = v.trim()))} />
+          <span title="Fallback-URL: het ad-server overschrijft hem bij uitserveren. Wordt hij niet ingevuld, dan opent deze URL." style={{ display: "contents" }}>
+          <TextInput value={project.clickTag} placeholder="https:// (fallback)" onCommit={(v) => update((p) => void (p.clickTag = v.trim()))} />
+          </span>
         </Row>
         <Row label="Polite load">
           <Switch checked={project.politeLoad} onChange={(v) => update((p) => void (p.politeLoad = v))} />
