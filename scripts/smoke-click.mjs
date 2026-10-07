@@ -124,4 +124,7 @@ await check('melding: font verkleind tot de gebruikte tekens', async () =>
   (await page.locator('.result .issues li').allInnerTexts()).some((t) => /tekens gebruikt, verkleind van [\d.]+ KB tot [\d.]+ KB en als Base64/.test(t))
 )
 await check('Adform: backup aanwezig', async () => (await readdir(`${dir}/export/adform`)).includes(`${folder}.jpg`))
+// Testeinde: wijzigingen als opgeslagen markeren, anders vraagt de app terecht of je wilt opslaan
+await page.evaluate(() => window.__bsStore.getState().markSaved()).catch(() => {})
+await page.waitForTimeout(200)
 await app.close()

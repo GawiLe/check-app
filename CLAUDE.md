@@ -1,4 +1,4 @@
-# Banner Studio – werkafspraken
+# Bnnr Studio – werkafspraken
 
 - Communiceer in het Nederlands.
 - Eindig elk antwoord aan de gebruiker met hoe de app te openen/bijwerken op de Mac:

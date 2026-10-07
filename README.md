@@ -1,10 +1,10 @@
-# Banner Studio
+# Bnnr Studio
 
 Desktop-app (Electron) voor het maken van **lichte, gevalideerde HTML5 display banners** (IAB), met een werkwijze zoals in After Effects: lagen, keyframes, easing en een tijdlijn. Je werkt vanuit boilerplates en de export is direct klaar voor **Campaign Manager 360**, **Google Ads**, **Google Ad Manager** of generiek IAB.
 
 ## Waarom
 
-Google Web Designer-exports laden standaard een eigen runtime, webcomponents, polyfills en vaak de Studio Enabler mee. Banner Studio exporteert alleen wat nodig is:
+Google Web Designer-exports laden standaard een eigen runtime, webcomponents, polyfills en vaak de Studio Enabler mee. Bnnr Studio exporteert alleen wat nodig is:
 
 - één `index.html` met inline CSS en een eigen animatie-runtime van ±1,5 KB;
 - de gebruikte afbeeldingen;
@@ -267,6 +267,10 @@ Animeer een laag en kies in de tab *Animatie* **Opslaan als preset**.
 
 Een write-on laag zet tekst uit je eigen font om naar SVG-paden per letter. De eigenschap **Reveal** (0→1) tekent eerst de omtrek van elke letter en vult hem daarna, letter voor letter. Met "Vulling" bepaal je hoe vroeg de vulling komt; 0 betekent alleen lijnen.
 
+### Niet-opgeslagen wijzigingen
+
+Sluit je het venster, sluit je de app af (Cmd+Q) of open je een ander of nieuw project terwijl er wijzigingen niet zijn opgeslagen, dan vraagt Bnnr Studio eerst: **Opslaan**, **Niet opslaan** of **Annuleren**. Op de Mac zie je niet-opgeslagen wijzigingen ook aan de stip in de sluitknop van het venster.
+
 ### Sneltoetsen
 
 | Toets | Actie |
@@ -298,6 +302,8 @@ Maak van één bestand meerdere varianten, bijvoorbeeld per actie, seizoen of pr
 Opmaak, positie en animatie blijven in alle varianten gelijk; een nieuwe afbeelding valt in het kader van het origineel. De keuzes en waarden worden in het project bewaard, zodat je later een variant toevoegt of aanpast en opnieuw aanmaakt. Een variantmap is een gewoon project: openen, bijwerken en los exporteren kan altijd.
 
 ## Export en validatie
+
+Elke geëxporteerde banner begint met `<!-- This banner was proudly created by Connect & Create -->` (vóór de doctype; geldig HTML5).
 
 | | CM360 | Google Ads | Ad Manager | Adform | Azerion | Generiek IAB |
 |---|---|---|---|---|---|---|

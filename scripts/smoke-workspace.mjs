@@ -147,4 +147,7 @@ await page.locator('.dock-tab', { hasText: 'Tijdlijn' }).dblclick()
 await check('tijdlijn gemaximaliseerd', async () => (await page.locator('.dock-max').count()) === 1)
 await page.locator('.dock-tab', { hasText: 'Tijdlijn' }).dblclick()
 await shot('w5-eind')
+// Testeinde: wijzigingen als opgeslagen markeren, anders vraagt de app terecht of je wilt opslaan
+await page.evaluate(() => window.__bsStore.getState().markSaved()).catch(() => {})
+await page.waitForTimeout(200)
 await app.close()

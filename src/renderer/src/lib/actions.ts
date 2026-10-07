@@ -27,8 +27,25 @@ export async function refreshAssets() {
   if (dir) S().setAssets(await window.bs.listAssets(dir))
 }
 
+/**
+ * Voor openen/nieuw: bij niet-opgeslagen wijzigingen vragen wat ermee moet.
+ * true = doorgaan (opgeslagen of bewust weggegooid), false = annuleren.
+ */
 export async function confirmDiscard(): Promise<boolean> {
-  return !S().dirty || window.confirm('Er zijn niet-opgeslagen wijzigingen. Doorgaan zonder opslaan?')
+  if (!S().dirty) return true
+  const answer = await window.bs.askSave()
+  if (answer === 'cancel') return false
+  if (answer === 'save') {
+    await save()
+    return !S().dirty // mislukt opslaan = niet doorgaan
+  }
+  return true
+}
+
+/** Opslaan en daarna het venster sluiten (gekozen in de vraag bij sluiten). */
+export async function saveAndClose() {
+  await save()
+  if (!S().dirty) await window.bs.closeWindow()
 }
 
 export async function newProject(boilerplateId: string | null, name: string) {

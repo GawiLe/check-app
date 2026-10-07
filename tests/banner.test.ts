@@ -969,3 +969,11 @@ describe('varianten (template)', () => {
     expect(variantFolderName('makro-q3', '///')).toBe('makro-q3-variant')
   })
 })
+
+describe('credit', () => {
+  it('staat bovenaan elke banner, vóór de doctype, en breekt de standaardmodus niet', () => {
+    const { html } = build(createStarterProject('Credit'))
+    expect(html.startsWith('<!-- This banner was proudly created by Connect & Create -->\n<!DOCTYPE html>')).toBe(true)
+    expect(new JSDOM(html).window.document.compatMode).toBe('CSS1Compat') // geen quirks mode
+  })
+})

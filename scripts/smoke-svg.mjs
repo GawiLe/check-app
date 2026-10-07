@@ -78,4 +78,7 @@ await page.getByRole('button', { name: 'Exporteren' }).first().click()
 await page.getByRole('button', { name: /Exporteer \d+ banner/ }).click()
 await page.waitForFunction(() => document.querySelectorAll('.result').length >= 1, null, { timeout: 60000 })
 console.log((await page.locator('.result .issues').allInnerTexts()).join('\n'))
+// Testeinde: wijzigingen als opgeslagen markeren, anders vraagt de app terecht of je wilt opslaan
+await page.evaluate(() => window.__bsStore.getState().markSaved()).catch(() => {})
+await page.waitForTimeout(200)
 await app.close()

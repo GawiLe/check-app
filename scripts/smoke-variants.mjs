@@ -127,4 +127,7 @@ await page.locator('.variant-results .result', { hasText: 'Zomer' }).getByRole('
 await page.waitForTimeout(1200)
 await check('variant geopend als eigen project', async () => (await page.evaluate(() => window.__bsStore.getState().dir)) === zomer)
 await shot('v4-variant-open')
+// Testeinde: wijzigingen als opgeslagen markeren, anders vraagt de app terecht of je wilt opslaan
+await page.evaluate(() => window.__bsStore.getState().markSaved()).catch(() => {})
+await page.waitForTimeout(200)
 await app.close()

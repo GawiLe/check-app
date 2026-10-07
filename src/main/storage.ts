@@ -64,7 +64,7 @@ export const PROJECT_DIRS = ['assets', 'fonts', 'export'] as const
 
 export async function readProject(dir: string): Promise<OpenedProject> {
   const project = JSON.parse(await readFile(join(dir, PROJECT_FILE), 'utf8')) as Project
-  if (project.version > PROJECT_VERSION) throw new Error('Dit project is gemaakt met een nieuwere versie van Banner Studio.')
+  if (project.version > PROJECT_VERSION) throw new Error('Dit project is gemaakt met een nieuwere versie van Bnnr Studio.')
   return { dir, project: normalizeProject(project) }
 }
 

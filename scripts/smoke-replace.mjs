@@ -124,4 +124,7 @@ await check('slepen over een ander keyframe heen: beide blijven bestaan', async 
   return l.tracks.x.length === 2 && l.tracks.y.length === 2
 })
 await shot('r2-keyframes')
+// Testeinde: wijzigingen als opgeslagen markeren, anders vraagt de app terecht of je wilt opslaan
+await page.evaluate(() => window.__bsStore.getState().markSaved()).catch(() => {})
+await page.waitForTimeout(200)
 await app.close()

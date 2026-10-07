@@ -241,6 +241,7 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
   }
 
   const html =
+    `${CREDIT}\n` +
     '<!DOCTYPE html>' +
     '<html lang="nl"><head><meta charset="utf-8">' +
     `<meta name="ad.size" content="width=${W},height=${H}">` +
@@ -265,6 +266,9 @@ export function exitLayers(comp: Composition): Layer[] {
   })
   return out
 }
+
+/** Bovenaan elke banner (ook in de codeweergave). Een commentaar vóór de doctype is geldig HTML5. */
+export const CREDIT = '<!-- This banner was proudly created by Connect & Create -->'
 
 const jsString = (v: string) => JSON.stringify(v).replace(/</g, '\\u003c')
 

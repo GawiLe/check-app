@@ -43,7 +43,8 @@
   "private": true,
   "build": {
     "appId": "nl.connectcreate.bannerstudio",
-    "productName": "Banner Studio",
+    "productName": "Bnnr Studio",
+    "icon": "resources/icon.png",
     "files": [
       "out/**/*"
     ],

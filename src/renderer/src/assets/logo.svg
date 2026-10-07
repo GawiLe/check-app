@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 602 602" width="602" height="602">
+  <title>Bnnr Studio</title>
+  <defs>
+    <mask id="buiten-cirkel">
+      <rect width="602" height="602" fill="#fff"/>
+      <circle cx="301" cy="300" r="176" fill="#000"/>
+    </mask>
+  </defs>
+  <rect width="602" height="602" fill="#0F533E"/>
+  <g fill="#C9C3B1" mask="url(#buiten-cirkel)">
+    <rect x="146" y="145" width="176" height="176"/>
+    <rect x="280" y="279" width="177" height="177"/>
+  </g>
+  <g fill="none" stroke="#C9C3B1" stroke-width="5">
+    <circle cx="301" cy="300" r="176"/>
+    <rect x="148.5" y="147.5" width="171" height="171"/>
+    <rect x="282.5" y="281.5" width="172" height="172"/>
+  </g>
+  <rect x="280" y="279" width="42" height="42" fill="#C9C3B1"/>
+</svg>

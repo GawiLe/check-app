@@ -67,6 +67,12 @@ export interface BannerStudioApi {
   ): Promise<Pick<WriteOnProps, 'glyphs' | 'viewBox'> & { width: number; height: number }>
   exportBanners(req: ExportRequest): Promise<ExportResult[]>
   createVariants(req: VariantRequest): Promise<VariantResult[]>
+  /** Niet-opgeslagen wijzigingen melden aan het hoofdproces (voor de vraag bij sluiten). */
+  setDirty(dirty: boolean): Promise<void>
+  /** "Wijzigingen opslaan?" met Opslaan / Niet opslaan / Annuleren. */
+  askSave(): Promise<'save' | 'discard' | 'cancel'>
+  /** Venster sluiten nadat er is opgeslagen (of de app afsluiten als daarom gevraagd was). */
+  closeWindow(): Promise<void>
   /** Preview-HTML klaarzetten; geeft de bsproj://-URL voor het preview-iframe terug. */
   setPreview(slot: number, html: string): Promise<string>
   revealInFolder(path: string): Promise<void>

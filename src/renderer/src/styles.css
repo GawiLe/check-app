@@ -272,7 +272,8 @@ input[type='range'] {
   width: 22px;
   height: 22px;
   border-radius: 6px;
-  background: linear-gradient(135deg, #7c8cff, #3fbf86);
+  background: #0f533e url('./assets/logo.svg') center / cover no-repeat;
+  flex: 0 0 auto;
 }
 .project-name {
   color: var(--muted);

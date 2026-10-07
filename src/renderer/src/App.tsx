@@ -16,6 +16,7 @@ import {
   openProject,
   refreshAssets,
   save,
+  saveAndClose,
   sequenceSelection,
   setInOut,
   ungroupSelection
@@ -49,6 +50,7 @@ export function App() {
         if (action === 'open') void openProject()
         if (action.startsWith('panel:')) useDock.getState().show(action.slice(6) as PanelId)
         if (action === 'resetLayout') useDock.getState().reset()
+        if (action === 'saveAndClose') void saveAndClose()
         if (!s.project) return
         if (action === 'save') void save()
         if (action === 'export') s.setDialog('export')
@@ -73,6 +75,14 @@ export function App() {
       }),
     []
   )
+
+  // Niet-opgeslagen wijzigingen doorgeven aan het hoofdproces (vraag bij sluiten/afsluiten)
+  useEffect(() => {
+    void window.bs.setDirty(useStore.getState().dirty)
+    return useStore.subscribe((s, prev) => {
+      if (s.dirty !== prev.dirty) void window.bs.setDirty(s.dirty)
+    })
+  }, [])
 
   // Bestanden die naast een drop-zone vallen niet in het venster openen
   useEffect(() => {
@@ -248,7 +258,7 @@ function Welcome() {
     <div className="welcome">
       <div className="card">
         <div className="brand">
-          <div className="logo" /> Banner Studio
+          <div className="logo" /> Bnnr Studio
         </div>
         <p>Lichte HTML5-banners voor CM360, Google Ads en Ad Manager. Eén werkbestand, alle formaten.</p>
         <div className="buttons">
