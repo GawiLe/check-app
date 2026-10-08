@@ -999,3 +999,39 @@ describe('schaduw', () => {
     expect(f).toBe('drop-shadow(0px 2px 0px rgba(0,0,0,1))')
   })
 })
+
+describe('transformgrepen', () => {
+  it('tegenoverliggende hoek/rand blijft staan, ook gedraaid en met anchor', async () => {
+    const { resizeFromHandle, layerCorners } = await import('../src/shared/geometry')
+    const cases = [
+      { hx: 1, hy: 1, u: 150, v: 80 },
+      { hx: 0, hy: 0, u: -30, v: -20 },
+      { hx: 0.5, hy: 0, u: 50, v: -15 },
+      { hx: 1, hy: 0.5, u: 130, v: 25 },
+      { hx: 0, hy: 1, u: 20, v: 70 }
+    ]
+    for (const rot of [0, 30]) {
+      for (const c of cases) {
+        const box = { w: 100, h: 50, ax: 0.2, ay: 0.7, s: 1.5, sy: 0.8, rDeg: rot }
+        const x = 40
+        const y = 60
+        const before = layerCorners(x, y, box.w, box.h, box.ax, box.ay, box.s, rot, box.sy)
+        const r = resizeFromHandle(box, c.hx, c.hy, c.u, c.v, false)
+        const after = layerCorners(x + r.dx, y + r.dy, r.width, r.height, box.ax, box.ay, box.s, rot, box.sy)
+        // vast punt: tegenoverliggende hoek of rand-midden
+        const fx = c.hx === 0.5 ? 0.5 : 1 - c.hx
+        const fy = c.hy === 0.5 ? 0.5 : 1 - c.hy
+        const p0 = before.map(fx * box.w, fy * box.h)
+        const p1 = after.map(fx * r.width, fy * r.height)
+        expect(Math.hypot(p0[0] - p1[0], p0[1] - p1[1])).toBeLessThan(1e-6)
+      }
+    }
+  })
+  it('met Shift: verhouding blijft gelijk', async () => {
+    const { resizeFromHandle } = await import('../src/shared/geometry')
+    const r = resizeFromHandle({ w: 100, h: 50, ax: 0.5, ay: 0.5, s: 1, sy: 1, rDeg: 0 }, 1, 1, 200, 60, true)
+    expect([r.width, r.height]).toEqual([200, 100])
+    const e = resizeFromHandle({ w: 100, h: 50, ax: 0.5, ay: 0.5, s: 1, sy: 1, rDeg: 0 }, 0.5, 1, 0, 100, true)
+    expect([e.width, e.height]).toEqual([200, 100])
+  })
+})

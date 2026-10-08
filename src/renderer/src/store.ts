@@ -9,7 +9,7 @@ import { findDeep, localTime } from '@shared/tree'
 import type { AnimProp, Composition, ExportResult, Layer, Project } from '@shared/types'
 import { ANIM_PROPS } from '@shared/types'
 
-export type Dialog = null | 'new' | 'export' | 'settings' | 'saveBoilerplate' | 'addFormat' | 'replaceImage' | 'variants' | 'shortcuts'
+export type Dialog = null | 'new' | 'export' | 'settings' | 'saveBoilerplate' | 'addFormat' | 'replaceImage' | 'variants' | 'shortcuts' | 'versions'
 
 export interface SelectedKey {
   layerId: string
@@ -41,6 +41,8 @@ export interface State {
   /** Open keuzevenster bij het importeren van een SVG. */
   /** Laag waarvan de afbeelding vervangen wordt (venster 'replaceImage'). */
   replaceId: string | null
+  /** Tekstlagen die in de preview niet in hun kader passen (gemeld door de banner-runtime). */
+  overflowIds: string[]
   svgChoice: { name: string; resolve: (mode: SvgMode | null, remember: boolean) => void } | null
   time: number
   playing: boolean
@@ -127,6 +129,7 @@ export const useStore = create<State>((set, get) => ({
   renaming: null,
   svgChoice: null,
   replaceId: null,
+  overflowIds: [],
   time: 0,
   playing: false,
   zoom: 1,

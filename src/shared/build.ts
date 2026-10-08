@@ -197,7 +197,9 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
       if (l.cta) css.push(`#ad:hover #${id}{filter:${shadow ? shadow + ' ' : ''}brightness(1.12)}`, `#${id}{transition:filter .2s}`)
       css.push(`#${id}{${rules.join(';')}}`)
       const exitNo = click.exitOf.get(raw.id)
-      out.push(exitNo ? `<div id="${id}" class="L X"${click.exitAttr(exitNo)}>${inner}</div>` : `<div id="${id}" class="L">${inner}</div>`)
+      // Tekst: passend maken (data-fit); in de editor-preview de laag-id voor de "past niet"-melding (data-t)
+      const textAttrs = l.type === 'text' ? `${l.text?.fit ? ' data-fit' : ''}${opts.mode === 'preview' ? ` data-t="${escapeHtml(raw.id)}"` : ''}` : ''
+      out.push(exitNo ? `<div id="${id}" class="L X"${textAttrs}${click.exitAttr(exitNo)}>${inner}</div>` : `<div id="${id}" class="L"${textAttrs}>${inner}</div>`)
 
       if (animated) {
         const b: Record<string, number> = {}

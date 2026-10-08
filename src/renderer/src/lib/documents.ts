@@ -142,6 +142,8 @@ export async function closeDocument(id: string): Promise<boolean> {
       await save()
       if (S().dirty) return false
     }
+    // Bewust niet opgeslagen: herstelkopie weggooien
+    if (answer === 'discard' && S().dir) await window.bs.clearAutosave(S().dir!)
   }
   const { docs } = D()
   const index = docs.findIndex((d) => d.id === id)
@@ -155,6 +157,17 @@ export async function closeDocument(id: string): Promise<boolean> {
   }
   await load(rest[Math.min(index, rest.length - 1)])
   return true
+}
+
+/** Herstelkopie bewaren van elk tabblad met niet-opgeslagen wijzigingen (elke minuut). */
+export async function autosaveAll() {
+  const { docs, active } = D()
+  for (const d of docs) {
+    const live = d.id === active
+    const dirty = live ? S().dirty : d.snap?.dirty
+    const project = live ? S().project : d.snap?.project
+    if (dirty && project) await window.bs.autosave(d.dir, project).catch(() => {})
+  }
 }
 
 /** Zijn er in een van de tabbladen niet-opgeslagen wijzigingen? */

@@ -5,6 +5,14 @@ import type { ExportResult, ExportTarget, FontAsset, Project, Tracks, RevealMode
 export interface OpenedProject {
   dir: string
   project: Project
+  /** Gezet als er niet-opgeslagen werk is hersteld (herstelkopie na een crash). */
+  recovered?: boolean
+}
+
+export interface VersionInfo {
+  id: string
+  savedAt: number
+  bytes: number
 }
 
 export interface Boilerplate {
@@ -74,6 +82,13 @@ export interface BannerStudioApi {
   createVariants(req: VariantRequest): Promise<VariantResult[]>
   /** Niet-opgeslagen wijzigingen melden aan het hoofdproces (voor de vraag bij sluiten). */
   setDirty(dirty: boolean): Promise<void>
+  /** Herstelkopie van niet-opgeslagen werk (elke minuut). */
+  autosave(dir: string, project: Project): Promise<void>
+  /** Herstelkopie weggooien (bewust niet opgeslagen). */
+  clearAutosave(dir: string): Promise<void>
+  /** Versiegeschiedenis (een versie bij elke keer Opslaan). */
+  listVersions(dir: string): Promise<VersionInfo[]>
+  readVersion(dir: string, id: string): Promise<Project>
   /** "Wijzigingen opslaan?" met Opslaan / Niet opslaan / Annuleren. */
   askSave(): Promise<'save' | 'discard' | 'cancel'>
   /** Venster sluiten nadat er is opgeslagen (of de app afsluiten als daarom gevraagd was). */

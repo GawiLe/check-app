@@ -300,6 +300,7 @@ function CompDesign() {
 }
 
 function LayerDesign({ layer }: { layer: Layer }) {
+  const overflowIds = useStore((s) => s.overflowIds)
   const time = useStore((s) => s.time)
   const project = useStore((s) => s.project)!
   const project_ = useStore.getState().project!
@@ -357,6 +358,15 @@ function LayerDesign({ layer }: { layer: Layer }) {
             <Num label="↕" title="Regelhoogte" value={layer.text.lineHeight} step={0.01} min={0.5} max={3} decimals={2} onChange={(v, co) => up((l) => void (l.text!.lineHeight = v), co ? 'lh' : undefined)} />
             <Num label="↔" title="Letterspatiëring" value={layer.text.letterSpacing} step={0.1} decimals={1} onChange={(v, co) => up((l) => void (l.text!.letterSpacing = v), co ? 'ls' : undefined)} />
           </div>
+          <Row label="Passend">
+            <Switch checked={!!layer.text.fit} onChange={(v) => up((l) => void (l.text!.fit = v))} />
+            <span className="faint">{layer.text.fit ? 'verkleint tot het in het kader past' : 'vaste grootte'}</span>
+          </Row>
+          {overflowIds.includes(layer.id) && (
+            <div className="warn-text">
+              Deze tekst past niet in zijn kader. Maak het kader groter, de tekst korter, of zet <b>Passend</b> aan.
+            </div>
+          )}
         </Section>
       )}
 

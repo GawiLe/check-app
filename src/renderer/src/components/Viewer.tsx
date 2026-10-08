@@ -2,6 +2,7 @@ import { exitLayers } from '@shared/build'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Maximize, Minus, Plus, Star } from 'lucide-react'
 import { layerStateAt, restStateAt } from '@shared/anim'
+import { resizeFromHandle } from '@shared/geometry'
 import { buildBanner } from '@shared/build'
 import type { Composition, Layer, Project } from '@shared/types'
 import { anchorOf } from '@shared/geometry'
@@ -22,6 +23,21 @@ function BannerFrame(props: { project: Project; comp: Composition; time: number;
   const active = useRef(0)
   const timeRef = useRef(time)
   timeRef.current = time
+
+  // De preview meldt welke tekstlagen niet in hun kader passen
+  useEffect(() => {
+    const onMsg = (e: MessageEvent) => {
+      const own = frames.some((f) => f.current?.contentWindow === e.source)
+      const d = e.data as { bs?: string; ids?: unknown }
+      if (!own || d?.bs !== 'overflow' || !Array.isArray(d.ids)) return
+      const ids = d.ids.filter((x): x is string => typeof x === 'string')
+      const cur = useStore.getState().overflowIds
+      if (ids.join() !== cur.join()) useStore.setState({ overflowIds: ids })
+    }
+    window.addEventListener('message', onMsg)
+    return () => window.removeEventListener('message', onMsg)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const html = useMemo(() => {
     const fontSrc = Object.fromEntries(project.fonts.map((f) => [f.id, `url("${assetUrl(f.file, rev)}")`]))
@@ -172,6 +188,24 @@ function boxesAt(layers: Layer[], t: number): Box[] {
 }
 
 /** Canvaspunt → coördinaat binnen het kader van de laag (0..breedte, 0..hoogte). */
+/** Grepen voor het formaat: vier hoeken en de middens van de vier randen. */
+const HANDLES: [number, number][] = [
+  [0, 0],
+  [0.5, 0],
+  [1, 0],
+  [1, 0.5],
+  [1, 1],
+  [0.5, 1],
+  [0, 1],
+  [0, 0.5]
+]
+/** Cursor die meedraait met de laag (in stappen van 45°). */
+function handleCursor(hx: number, hy: number, rotation: number) {
+  const angle = (Math.atan2(hy - 0.5, hx - 0.5) * 180) / Math.PI + rotation
+  const names = ['ew-resize', 'nwse-resize', 'ns-resize', 'nesw-resize']
+  return names[(((Math.round(angle / 45) % 4) + 4) % 4)]
+}
+
 function toLocal(b: Box, x: number, y: number): [number, number] {
   // Eerst terugdraaien, dan terugschalen (wereld = anchor + R·S·lokaal)
   const r = rad(-b.rotation)
@@ -189,9 +223,9 @@ const inside = (b: Box, x: number, y: number) => {
 
 type Drag =
   | { kind: 'move'; x: number; y: number; start: { id: string; x: number; y: number; ps: number; pr: number }[] }
-  | { kind: 'resize'; x: number; y: number; id: string; w: number; h: number; ratio: number; box: Box }
+  | { kind: 'resize'; id: string; hx: number; hy: number; box: Box; orig: Layer }
   | { kind: 'anchor'; box: Box }
-  | { kind: 'draw'; tool: 'rect' | 'ellipse'; x: number; y: number; x2: number; y2: number }
+  | { kind: 'draw'; tool: 'rect' | 'ellipse' | 'text'; x: number; y: number; x2: number; y2: number }
   | { kind: 'pen-handle'; index: number }
 
 function SingleViewer() {
@@ -201,6 +235,7 @@ function SingleViewer() {
   const time = useStore((s) => s.time)
   const rev = useStore((s) => s.assetsRev)
   const selection = useStore((s) => s.selection)
+  const overflowIds = useStore((s) => s.overflowIds)
   const tool = useStore((s) => s.tool)
   const activeTab = useStore((s) => s.activeTab)
   const editingText = useStore((s) => s.editingText)
@@ -274,7 +309,8 @@ function SingleViewer() {
       return
     }
     if (tool === 'text') {
-      addTextAt(p.x, p.y)
+      // Klikken = tekst op die plek; slepen = tekstvak trekken
+      drag.current = { kind: 'draw', tool: 'text', x: p.x, y: p.y, x2: p.x, y2: p.y }
       return
     }
     if (tool === 'pen') {
@@ -329,10 +365,29 @@ function SingleViewer() {
         }
         break
       case 'resize': {
+        // Greep in een hoek of midden op een rand; de tegenoverliggende kant blijft staan
         const [u, v] = toLocal(d.box, p.x, p.y)
-        const w = Math.max(4, Math.round(u))
-        const h = e.shiftKey || d.box.layer.sizeLinked ? Math.round(w / d.ratio) : Math.max(4, Math.round(v))
-        updateLayer(d.id, (l) => void Object.assign(l, { width: w, height: h }), 'resize')
+        const o = d.orig
+        const r = resizeFromHandle(
+          { w: o.width, h: o.height, ax: d.box.ax, ay: d.box.ay, s: d.box.scale / (d.box.parentScale || 1), sy: d.box.scaleY / (d.box.parentScale || 1), rDeg: d.box.rotation - d.box.parentRot },
+          d.hx,
+          d.hy,
+          u,
+          v,
+          e.shiftKey || !!o.sizeLinked
+        )
+        updateLayer(
+          d.id,
+          (l) => {
+            l.width = r.width
+            l.height = r.height
+            l.x = o.x + r.dx
+            l.y = o.y + r.dy
+            if (o.tracks.x) l.tracks.x = o.tracks.x.map((k) => ({ ...k, v: k.v + r.dx }))
+            if (o.tracks.y) l.tracks.y = o.tracks.y.map((k) => ({ ...k, v: k.v + r.dy }))
+          },
+          'resize'
+        )
         break
       }
       case 'anchor': {
@@ -378,6 +433,11 @@ function SingleViewer() {
       const y = Math.min(d.y, d.y2)
       const w = Math.abs(d.x2 - d.x)
       const h = Math.abs(d.y2 - d.y)
+      if (d.tool === 'text') {
+        if (w < 6 && h < 6) addTextAt(d.x, d.y)
+        else addTextAt(x, y, w, h)
+        return
+      }
       // Alleen klikken (niet slepen): standaardmaat
       if (w < 4 && h < 4) addShapeRect(d.tool, d.x - 50, d.y - 50, 100, 100)
       else addShapeRect(d.tool, x, y, w, h)
@@ -409,11 +469,10 @@ function SingleViewer() {
     else openEmptyMenu(e)
   }
 
-  const startResize = (e: React.PointerEvent, b: Box) => {
+  const startResize = (e: React.PointerEvent, b: Box, hx: number, hy: number) => {
     e.stopPropagation()
     overlayRef.current!.setPointerCapture(e.pointerId)
-    const p = toComp(e)
-    drag.current = { kind: 'resize', x: p.x, y: p.y, id: b.layer.id, w: b.layer.width, h: b.layer.height, ratio: b.layer.width / b.layer.height, box: b }
+    drag.current = { kind: 'resize', id: b.layer.id, hx, hy, box: b, orig: structuredClone(b.layer) }
   }
   const startAnchor = (e: React.PointerEvent, b: Box) => {
     e.stopPropagation()
@@ -437,7 +496,19 @@ function SingleViewer() {
             {b.layer.type === 'group' ? `${b.layer.name} · ` : ''}
             {Math.round(b.layer.width)} × {Math.round(b.layer.height)}
           </div>
-          <div className="handle" style={{ transform: `scale(${1 / (b.scale || 1)},${1 / (b.scaleY || 1)})` }} onPointerDown={(e) => startResize(e, b)} />
+          {HANDLES.map(([hx, hy]) => (
+            <div
+              key={`${hx}-${hy}`}
+              className="handle"
+              style={{
+                left: `${hx * 100}%`,
+                top: `${hy * 100}%`,
+                cursor: handleCursor(hx, hy, b.rotation),
+                transform: `translate(-50%,-50%) scale(${1 / (b.scale || 1)},${1 / (b.scaleY || 1)})`
+              }}
+              onPointerDown={(e) => startResize(e, b, hx, hy)}
+            />
+          ))}
         </>
       )}
     </div>
@@ -524,6 +595,17 @@ function SingleViewer() {
             }}
           >
             {ctxBox && <div className="sel context" style={frameStyle(ctxBox)} />}
+            {/* Tekst die niet in zijn kader past (gemeld door de preview) */}
+            {overflowIds.map((id) => {
+              const b = boxOf(id)
+              return (
+                b && (
+                  <div key={'o' + id} className="overflow-frame" style={frameStyle(b)}>
+                    <span style={{ transform: `scale(${1 / (b.scale || 1)},${1 / (b.scaleY || 1)})` }}>Tekst past niet</span>
+                  </div>
+                )
+              )
+            })}
             {/* Klikgebieden: altijd zichtbaar als gestippeld kader met hun clickTag-nummer */}
             {exitLayers(comp).map((l, i) => {
               const b = boxes.find((x) => x.layer.id === l.id)

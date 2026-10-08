@@ -66,6 +66,8 @@ export async function openProject(dir?: string) {
     const opened = await window.bs.openProject(dir)
     if (!opened) return
     await openDocument(opened.dir, opened.project)
+    // Hersteld werk is nog niet opgeslagen
+    if (opened.recovered) useStore.setState({ dirty: true })
     await refreshAssets()
     S().setStatus(`Geopend: ${opened.dir.split(/[\\/]/).pop()}`)
   } catch (e) {
@@ -162,10 +164,11 @@ export function addPenShape(points: PenPoint[], closed: boolean) {
 }
 
 /** Tekstgereedschap: nieuwe tekst op de klikplek, meteen bewerken. */
-export function addTextAt(x: number, y: number) {
+/** Tekst toevoegen: klikken = standaardvak, slepen = vak met die maat (zoals een tekstvak trekken). */
+export function addTextAt(x: number, y: number, w = 200, h = 40) {
   const p0 = toContext(x, y)
   const l = addLayer('text', (l) => {
-    Object.assign(l, { x: Math.round(p0.x), y: Math.round(p0.y), width: 200, height: 40 })
+    Object.assign(l, { x: Math.round(p0.x), y: Math.round(p0.y), width: Math.max(10, Math.round(w)), height: Math.max(10, Math.round(h)) })
     l.text!.content = 'Tekst'
   })
   S().setTool('select')

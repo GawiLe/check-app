@@ -7,6 +7,8 @@ import type { BannerStudioApi, Settings } from '@shared/api'
 import type { Project } from '@shared/types'
 import { aiAnimate } from './ai'
 import { exportBanners, MIME } from './exporter'
+import { addVersion, clearAutosave, listVersions, readNewerAutosave, readVersion, writeAutosave } from './history'
+import { normalizeProject } from '@shared/sync'
 import { createVariants } from './variants'
 import { describeFont, textToGlyphPaths } from './fonts'
 import { fontCatalog, installWebFont } from './webfonts'
@@ -127,6 +129,24 @@ const handlers: Handlers = {
       dir = res.filePaths[0]
     }
     const opened = await readProject(dir)
+    // Niet-opgeslagen werk van vorige keer (bijv. na een crash)? Dan aanbieden om het te herstellen.
+    const auto = background ? null : await readNewerAutosave(dir)
+    if (auto && win) {
+      const when = new Date(auto.savedAt).toLocaleString('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
+      const { response } = await dialog.showMessageBox(win, {
+        type: 'question',
+        buttons: ['Herstellen', 'Laatst opgeslagen versie openen'],
+        defaultId: 0,
+        cancelId: 1,
+        noLink: true,
+        message: 'Er is niet-opgeslagen werk gevonden',
+        detail: `Bnnr Studio heeft op ${when} automatisch een kopie bewaard van wijzigingen die niet zijn opgeslagen (bijvoorbeeld door een crash). Wil je die terugzetten?`
+      })
+      if (response === 0) {
+        opened.project = normalizeProject(auto.project)
+        opened.recovered = true
+      } else await clearAutosave(dir)
+    }
     if (background) {
       // In een tabblad op de achtergrond: wel openen, niet actief maken
       openDirs.add(resolve(dir))
@@ -137,7 +157,14 @@ const handlers: Handlers = {
 
   async saveProject(dir, project) {
     await writeProject(dir, project)
+    // Elke keer opslaan = een versie in de geschiedenis; de herstelkopie is dan niet meer nodig
+    await addVersion(dir, project).catch((e) => console.warn('Versie bewaren mislukt', e))
+    await clearAutosave(dir)
   },
+  autosave: (dir, project) => writeAutosave(dir, project),
+  clearAutosave: (dir) => clearAutosave(dir),
+  listVersions: (dir) => listVersions(dir),
+  readVersion: (dir, id) => readVersion(dir, id),
 
   async importImages(dir) {
     const res = await dialog.showOpenDialog(win!, {
@@ -234,6 +261,8 @@ const handlers: Handlers = {
 // (de map komt uit het venster en wordt dus niet blind vertrouwd).
 const DIR_ARG = new Set(['importImages', 'importFonts', 'listAssets', 'importPaths', 'generateWriteOn', 'saveBoilerplate', 'installWebFont'])
 const DIR_REQ = new Set(['exportBanners', 'createVariants'])
+// Mag voor elk geopend tabblad (ook op de achtergrond): opslaan, herstelkopie, versies
+const OPEN_DIR_ARG = new Set(['saveProject', 'autosave', 'clearAutosave', 'listVersions', 'readVersion'])
 function assertOpenProject(dir: unknown) {
   if (typeof dir !== 'string' || !currentDir || resolve(dir) !== resolve(currentDir)) throw new Error('Deze map is niet het geopende project.')
 }
@@ -244,7 +273,7 @@ for (const [name, fn] of Object.entries(handlers)) {
     if (!win || e.sender !== win.webContents || e.senderFrame !== win.webContents.mainFrame) throw new Error('Niet toegestaan.')
     if (DIR_ARG.has(name)) assertOpenProject(args[0])
     // Opslaan mag voor elk geopend tabblad (bijv. "alles opslaan" bij afsluiten)
-    if (name === 'saveProject' && !(typeof args[0] === 'string' && openDirs.has(resolve(args[0])))) throw new Error('Dit project is niet geopend.')
+    if (OPEN_DIR_ARG.has(name) && !(typeof args[0] === 'string' && openDirs.has(resolve(args[0])))) throw new Error('Dit project is niet geopend.')
     if (DIR_REQ.has(name)) assertOpenProject((args[0] as { dir?: unknown } | undefined)?.dir)
     return (fn as (...a: unknown[]) => unknown)(...args)
   })
@@ -272,6 +301,7 @@ async function buildMenu() {
           { type: 'separator' },
           { label: 'Opslaan als boilerplate…', click: send('saveBoilerplate') },
           { label: 'Varianten (template)…', click: send('variants') },
+          { label: 'Versiegeschiedenis…', click: send('versions') },
           { label: 'Exporteren…', accelerator: 'CmdOrCtrl+E', click: send('export') },
           { type: 'separator' },
           { label: 'Tabblad sluiten', accelerator: 'CmdOrCtrl+W', click: send('closeTab') },
@@ -351,6 +381,8 @@ async function createWindow() {
     e.preventDefault()
     void askSave().then((answer) => {
       if (answer === 'discard') {
+        // Bewust niet opslaan: geen herstelvraag de volgende keer
+        for (const d of openDirs) void clearAutosave(d)
         forceClose = true
         if (quitting) app.quit()
         else win?.close()

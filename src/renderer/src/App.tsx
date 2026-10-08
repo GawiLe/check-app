@@ -45,7 +45,7 @@ const alignTarget = (): 'selection' | 'canvas' => {
     return 'selection'
   }
 }
-import { anyDirty, closeDocument, cycleDocument, useDocs } from './lib/documents'
+import { anyDirty, autosaveAll, closeDocument, cycleDocument, useDocs } from './lib/documents'
 import { DocTabs } from './components/DocTabs'
 import { toggleMaximizeUnderPointer } from './dock/Dock'
 import type { PanelId } from './dock/model'
@@ -82,6 +82,7 @@ export function App() {
         if (action === 'saveBoilerplate') s.setDialog('saveBoilerplate')
         if (action === 'variants') s.setDialog('variants')
         if (action === 'shortcuts') s.setDialog('shortcuts')
+        if (action === 'versions' && s.project) s.setDialog('versions')
         if (action === 'duplicate' && !isTyping()) duplicateSelection()
         if (action === 'group' && !isTyping()) groupSelection()
         if (action === 'ungroup' && !isTyping()) ungroupSelection()
@@ -116,6 +117,12 @@ export function App() {
       a()
       b()
     }
+  }, [])
+
+  // Elke minuut een herstelkopie van niet-opgeslagen werk (voor als de app of de Mac crasht)
+  useEffect(() => {
+    const t = setInterval(() => void autosaveAll(), 60_000)
+    return () => clearInterval(t)
   }, [])
 
   // Bestanden die naast een drop-zone vallen niet in het venster openen

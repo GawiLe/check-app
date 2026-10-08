@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { Boilerplate, Settings } from '@shared/api'
+import type { Boilerplate, Settings, VersionInfo } from '@shared/api'
 import { IAB_SIZES, TARGET_IDS, TARGETS } from '@shared/specs'
 import type { ExportTarget } from '@shared/types'
 import { addFormat, newProject, rememberedSvgMode, replaceImage, runExport, saveAsBoilerplate, setRememberedSvgMode, uploadAndReplace } from '../lib/actions'
@@ -32,6 +32,8 @@ export function Dialogs() {
       return <VariantsDialog onClose={close} />
     case 'shortcuts':
       return <ShortcutsDialog onClose={close} />
+    case 'versions':
+      return <VersionsDialog onClose={close} />
     default:
       return null
   }
@@ -392,6 +394,55 @@ function ShortcutsDialog({ onClose }: { onClose: () => void }) {
         <button className="primary" onClick={onClose}>
           Sluiten
         </button>
+      </div>
+    </Modal>
+  )
+}
+
+/** Versiegeschiedenis: elke keer Opslaan is een versie; terugzetten kan weer ongedaan gemaakt worden. */
+function VersionsDialog({ onClose }: { onClose: () => void }) {
+  const dir = useStore((s) => s.dir)!
+  const [list, setList] = useState<VersionInfo[] | null>(null)
+  useEffect(() => {
+    void window.bs.listVersions(dir).then(setList)
+  }, [dir])
+  const restore = async (id: string) => {
+    const version = await window.bs.readVersion(dir, id)
+    useStore.getState().update((p) => {
+      for (const k of Object.keys(p)) delete (p as unknown as Record<string, unknown>)[k]
+      Object.assign(p, structuredClone(version))
+    }, undefined, true)
+    useStore.getState().setStatus('Versie teruggezet. Ongedaan maken (Cmd/Ctrl+Z) zet je huidige werk terug; opslaan maakt het definitief.')
+    onClose()
+  }
+  const fmt = (t: number) => new Date(t).toLocaleString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  return (
+    <Modal title="Versiegeschiedenis" onClose={onClose}>
+      <p className="muted" style={{ marginTop: 0 }}>
+        Elke keer dat je opslaat wordt een versie bewaard (de laatste 50). Terugzetten kun je weer ongedaan maken.
+      </p>
+      {list === null ? (
+        <p className="faint">Laden…</p>
+      ) : list.length ? (
+        <div className="list versions-list">
+          {list.map((v, i) => (
+            <div key={v.id} className="list-item">
+              <span className="grow">
+                {fmt(v.savedAt)}
+                {i === 0 && <span className="meta"> · laatst opgeslagen</span>}
+              </span>
+              <span className="meta">{(v.bytes / 1024).toFixed(0)} KB</span>
+              <button className="ghost sm" onClick={() => void restore(v.id)}>
+                Terugzetten
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="faint">Nog geen versies. Er wordt er een bewaard zodra je opslaat.</p>
+      )}
+      <div className="actions">
+        <button onClick={onClose}>Sluiten</button>
       </div>
     </Modal>
   )

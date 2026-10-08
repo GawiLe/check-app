@@ -52,3 +52,40 @@ export function pointInLayer(x: number, y: number, lx: number, ly: number, w: nu
   const v = (dx * Math.sin(r) + dy * Math.cos(r)) / s + ay * h
   return u >= 0 && u <= w && v >= 0 && v <= h
 }
+
+/**
+ * Formaat wijzigen vanuit een greep (hx, hy ∈ {0, 0.5, 1}: hoeken en middens van de randen).
+ * (u, v) = muispositie in het oorspronkelijke kader van de laag. De tegenoverliggende hoek of rand
+ * blijft op zijn plek, ook bij rotatie, schaal en een verplaatst anchor point.
+ * Geeft de nieuwe maat terug en de verschuiving (dx, dy) van de positie, in de ruimte van de ouder.
+ */
+export function resizeFromHandle(
+  box: { w: number; h: number; ax: number; ay: number; s: number; sy: number; rDeg: number },
+  hx: number,
+  hy: number,
+  u: number,
+  v: number,
+  keepRatio: boolean
+) {
+  const { w, h, ax, ay, s, sy, rDeg } = box
+  let nw = hx === 1 ? u : hx === 0 ? w - u : w
+  let nh = hy === 1 ? v : hy === 0 ? h - v : h
+  nw = Math.max(4, Math.round(nw))
+  nh = Math.max(4, Math.round(nh))
+  if (keepRatio && w > 0 && h > 0) {
+    const ratio = w / h
+    if (hx === 0.5) nw = Math.max(4, Math.round(nh * ratio))
+    else if (hy === 0.5) nh = Math.max(4, Math.round(nw / ratio))
+    else if (nw / w > nh / h) nh = Math.max(4, Math.round(nw / ratio))
+    else nw = Math.max(4, Math.round(nh * ratio))
+  }
+  // Vast punt: tegenoverliggende rand/hoek (bij een randgreep het midden van die rand)
+  const fx = hx === 0.5 ? 0.5 : 1 - hx
+  const fy = hy === 0.5 ? 0.5 : 1 - hy
+  const r = (rDeg * Math.PI) / 180
+  const lx = (fx - ax) * w - (fx - ax) * nw
+  const ly = (fy - ay) * h - (fy - ay) * nh
+  const mx = lx * s * Math.cos(r) - ly * sy * Math.sin(r)
+  const my = lx * s * Math.sin(r) + ly * sy * Math.cos(r)
+  return { width: nw, height: nh, dx: ax * w - ax * nw + mx, dy: ay * h - ay * nh + my }
+}

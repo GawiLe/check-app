@@ -153,10 +153,12 @@ Lagen: selecteer en druk **Enter**, dubbelklik op de naam in de tijdlijn, of rec
 
 - **Gereedschap** staat links in de balk:
   - **V** selecteren
-  - **T** tekst: klik op het canvas
+  - **T** tekst: klik op het canvas, of **sleep een tekstvak** in de maat die je wilt
   - **R** rechthoek en **E** ellips: sleep, met Shift voor een vierkant of cirkel
   - **G** pen tool: klik voor punten en sleep voor een bocht. Klik op het eerste punt om de vorm te sluiten. Enter of de rechtermuisknop geeft een open lijn, Esc stopt.
 - **Tekst bewerken:** dubbelklik op een tekstlaag (of Enter) en typ direct op het canvas. Esc of Cmd/Ctrl+Enter bevestigt.
+- **Formaat wijzigen:** acht grepen rondom de selectie, in elke hoek en midden op elke rand. De tegenoverliggende hoek of rand blijft staan (ook bij rotatie). Shift of het slotje bij *Maat* houdt de verhouding vast.
+- **Passende tekst:** zet bij Tekst *Passend* aan en de letter wordt in de banner zelf kleiner tot de tekst in het kader past (handig bij varianten en vertalingen). Past tekst niet, dan zie je een rood kader *Tekst past niet* op het canvas en een waarschuwing in het paneel.
 - **Anchor point:** het kruisje in het midden van een geselecteerde laag is het draaipunt voor schaal en rotatie.
   - Sleep het naar een andere plek; het klikt vast op hoeken, randen en midden. De laag verspringt niet, net als met Pan Behind in AE.
   - Je kunt het ook instellen via het 3×3-raster in de inspector.
@@ -305,6 +307,11 @@ Elk geopend project krijgt een tabblad bovenin het venster, zoals in een browser
 ### Niet-opgeslagen wijzigingen
 
 Sluit je het venster, sluit je de app af (Cmd+Q) of open je een ander of nieuw project terwijl er wijzigingen niet zijn opgeslagen, dan vraagt Bnnr Studio eerst: **Opslaan**, **Niet opslaan** of **Annuleren**. Op de Mac zie je niet-opgeslagen wijzigingen ook aan de stip in de sluitknop van het venster.
+
+### Automatisch bewaren, herstel en versies
+
+- Elke minuut bewaart Bnnr Studio een **herstelkopie** van niet-opgeslagen werk (in de verborgen map `.bnnr` in de projectmap). Crasht de app of valt de stroom uit, dan vraagt hij bij het openen of je dat werk wilt **herstellen**.
+- Elke keer opslaan bewaart een **versie** (de laatste 50). Bestand → *Versiegeschiedenis…* toont ze; *Terugzetten* kun je met Cmd/Ctrl+Z weer ongedaan maken.
 
 ### Sneltoetsen
 

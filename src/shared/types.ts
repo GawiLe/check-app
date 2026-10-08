@@ -54,6 +54,8 @@ export interface TextProps {
   align: 'left' | 'center' | 'right'
   lineHeight: number
   letterSpacing: number
+  /** Automatisch passend maken: de lettergrootte wordt (in de browser, met het echte font) verkleind tot de tekst in het kader past. */
+  fit?: boolean
 }
 
 export interface ImageProps {
