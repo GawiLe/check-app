@@ -8,6 +8,7 @@ import { assetUrl, currentComp, useStore } from '../store'
 import { findDeep } from '@shared/tree'
 import { Modal, Row } from './ui'
 import { VariantsDialog } from './Variants'
+import { SHORTCUT_GROUPS } from '../lib/shortcuts'
 
 const kb = (b: number) => `${(b / 1024).toFixed(1)} KB`
 
@@ -29,6 +30,8 @@ export function Dialogs() {
       return <ReplaceImageDialog onClose={close} />
     case 'variants':
       return <VariantsDialog onClose={close} />
+    case 'shortcuts':
+      return <ShortcutsDialog onClose={close} />
     default:
       return null
   }
@@ -356,6 +359,39 @@ function ReplaceImageDialog({ onClose }: { onClose: () => void }) {
           <FolderOpen size={14} /> Uploaden uit map…
         </button>
         <button onClick={onClose}>Annuleren</button>
+      </div>
+    </Modal>
+  )
+}
+
+/** Overzicht van alle sneltoetsen (Help → Sneltoetsen, of ?). */
+function ShortcutsDialog({ onClose }: { onClose: () => void }) {
+  return (
+    <Modal title="Sneltoetsen" wide onClose={onClose}>
+      <div className="shortcut-groups">
+        {SHORTCUT_GROUPS.map((g) => (
+          <div key={g.title} className="shortcut-group">
+            <h3>{g.title}</h3>
+            {g.items.map(([keys, what]) => (
+              <div key={keys + what} className="shortcut-row">
+                <span className="shortcut-keys">
+                  {keys.split(' / ').map((k, i) => (
+                    <span key={k}>
+                      {i > 0 && <span className="faint"> / </span>}
+                      <kbd>{k}</kbd>
+                    </span>
+                  ))}
+                </span>
+                <span>{what}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="actions">
+        <button className="primary" onClick={onClose}>
+          Sluiten
+        </button>
       </div>
     </Modal>
   )

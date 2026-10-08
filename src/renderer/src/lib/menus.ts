@@ -49,7 +49,7 @@ export function openLayerMenu(e: React.MouseEvent, layerId: string) {
     ...(single ? ([{ label: 'Naam wijzigen', shortcut: 'Enter', onClick: () => S().setRenaming(l.id) }] as MenuItem[]) : []),
     ...(single && l.image
       ? ([
-          { label: 'Afbeelding vervangen…', onClick: () => S().openReplace(l.id) },
+          { label: 'Afbeelding vervangen…', shortcut: isMac ? '⌥⌘/' : 'Ctrl+Alt+/', onClick: () => S().openReplace(l.id) },
           { label: 'Vervangen door bestand uit map…', onClick: () => void uploadAndReplace(l.id) }
         ] as MenuItem[])
       : []),
@@ -59,14 +59,14 @@ export function openLayerMenu(e: React.MouseEvent, layerId: string) {
     { label: 'Plakken', shortcut: cmd('V'), onClick: pasteClipboard, disabled: !S().clipboard.length },
     { label: 'Dupliceren', shortcut: cmd('D'), onClick: duplicateSelection },
     sep,
-    { label: 'Naar voren', onClick: () => sel.forEach((id) => moveLayer(id, -1)) },
-    { label: 'Naar achteren', onClick: () => sel.forEach((id) => moveLayer(id, 1)) },
-    { label: 'Helemaal naar voren', onClick: () => [...sel].reverse().forEach((id) => moveToEdge(id, 'front')) },
-    { label: 'Helemaal naar achteren', onClick: () => sel.forEach((id) => moveToEdge(id, 'back')) },
+    { label: 'Naar voren', shortcut: cmd(']'), onClick: () => sel.forEach((id) => moveLayer(id, -1)) },
+    { label: 'Naar achteren', shortcut: cmd('['), onClick: () => sel.forEach((id) => moveLayer(id, 1)) },
+    { label: 'Helemaal naar voren', shortcut: isMac ? '⇧⌘]' : 'Shift+Ctrl+]', onClick: () => [...sel].reverse().forEach((id) => moveToEdge(id, 'front')) },
+    { label: 'Helemaal naar achteren', shortcut: isMac ? '⇧⌘[' : 'Shift+Ctrl+[', onClick: () => sel.forEach((id) => moveToEdge(id, 'back')) },
     sep,
     ...(sel.length > 1 ? ([{ label: 'Achter elkaar zetten', onClick: () => sequenceSelection() }] as MenuItem[]) : []),
-    { label: 'In-punt op playhead', shortcut: 'Alt+[', onClick: () => setInOut('in') },
-    { label: 'Uit-punt op playhead', shortcut: 'Alt+]', onClick: () => setInOut('out') },
+    { label: 'In-punt op playhead', shortcut: '[', onClick: () => setInOut('in') },
+    { label: 'Uit-punt op playhead', shortcut: ']', onClick: () => setInOut('out') },
     ...(l && (l.start || l.end != null) ? ([{ label: 'Altijd zichtbaar (in/uit wissen)', onClick: clearInOut }] as MenuItem[]) : []),
     sep,
     ...(single

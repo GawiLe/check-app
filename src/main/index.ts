@@ -318,6 +318,11 @@ async function buildMenu() {
           { type: 'separator' },
           { role: 'togglefullscreen', label: 'Volledig scherm' }
         ]
+      },
+      {
+        label: 'Help',
+        role: 'help',
+        submenu: [{ label: 'Sneltoetsen…', accelerator: 'CmdOrCtrl+/', click: send('shortcuts') }]
       }
     ])
   )

@@ -18,6 +18,14 @@ import {
   saveAndClose,
   sequenceSelection,
   setInOut,
+  addKeyAtPlayhead,
+  alignSelection,
+  arrangeSelection,
+  distributeSelection,
+  goToLayerEdge,
+  jumpKeyframe,
+  moveLayerToPlayhead,
+  replaceSelectedImage,
   ungroupSelection
 } from './lib/actions'
 import { contextOf, currentComp, layerLocalTime, setLayerValue, useStore } from './store'
@@ -26,6 +34,17 @@ import { restStateAt } from '@shared/anim'
 import { endFrameTime } from '@shared/motion'
 import { FilePlus2, FolderOpen } from 'lucide-react'
 import { useDock } from './dock/store'
+import type { AlignMode } from '@shared/align'
+import type { PropGroupId } from '@shared/propgroups'
+
+/** Uitlijnen op selectie of banner: dezelfde keuze als de knoppen in het paneel Ontwerp. */
+const alignTarget = (): 'selection' | 'canvas' => {
+  try {
+    return localStorage.getItem('bs-align-to') === 'canvas' ? 'canvas' : 'selection'
+  } catch {
+    return 'selection'
+  }
+}
 import { anyDirty, closeDocument, cycleDocument, useDocs } from './lib/documents'
 import { DocTabs } from './components/DocTabs'
 import { toggleMaximizeUnderPointer } from './dock/Dock'
@@ -62,6 +81,7 @@ export function App() {
         if (action === 'export') s.setDialog('export')
         if (action === 'saveBoilerplate') s.setDialog('saveBoilerplate')
         if (action === 'variants') s.setDialog('variants')
+        if (action === 'shortcuts') s.setDialog('shortcuts')
         if (action === 'duplicate' && !isTyping()) duplicateSelection()
         if (action === 'group' && !isTyping()) groupSelection()
         if (action === 'ungroup' && !isTyping()) ungroupSelection()
@@ -158,6 +178,33 @@ export function App() {
         cycleDocument(e.shiftKey ? -1 : 1)
         return
       }
+      // Toetsen op fysieke positie (e.code): werkt met elk toetsenbord en met Option/Alt
+      const mod = e.metaKey || e.ctrlKey
+      const code = e.code
+      const run = (fn: () => void) => {
+        e.preventDefault()
+        fn()
+      }
+      if (code === 'Slash' && mod && e.altKey) return run(replaceSelectedImage)
+      if ((code === 'Slash' && mod && !e.altKey) || (e.key === '?' && !mod)) return run(() => s.setDialog('shortcuts'))
+      if (code === 'KeyA' && mod && e.shiftKey) return run(() => s.select([]))
+      if (e.altKey && !mod) {
+        const keyframe: Record<string, PropGroupId> = { KeyP: 'position', KeyS: 'scale', KeyR: 'rotation', KeyT: 'opacity' }
+        if (e.shiftKey && keyframe[code]) return run(() => addKeyAtPlayhead(keyframe[code]))
+        if (e.shiftKey && (code === 'KeyH' || code === 'KeyV')) return run(() => distributeSelection(code === 'KeyH' ? 'h' : 'v', alignTarget()))
+        const align: Record<string, AlignMode> = { KeyA: 'left', KeyH: 'hcenter', KeyD: 'right', KeyW: 'top', KeyV: 'vcenter', KeyS: 'bottom' }
+        if (!e.shiftKey && align[code]) return run(() => alignSelection(align[code], alignTarget()))
+      }
+      if (code === 'BracketLeft' || code === 'BracketRight') {
+        const left = code === 'BracketLeft'
+        if (mod) return run(() => arrangeSelection(e.shiftKey ? (left ? 'back' : 'front') : left ? 'backward' : 'forward'))
+        if (e.shiftKey) return run(() => moveLayerToPlayhead(left ? 'in' : 'out'))
+        return run(() => setInOut(left ? 'in' : 'out'))
+      }
+      if (!mod && !e.altKey && !e.shiftKey) {
+        if (code === 'KeyI' || code === 'KeyO') return run(() => goToLayerEdge(code === 'KeyI' ? 'in' : 'out'))
+        if (code === 'KeyJ' || code === 'KeyK') return run(() => jumpKeyframe(code === 'KeyJ' ? -1 : 1))
+      }
       switch (e.key) {
         case ' ':
           e.preventDefault()
@@ -209,10 +256,6 @@ export function App() {
             const open = s.selection.some((id) => !s.expanded[id])
             s.setExpanded({ ...s.expanded, ...Object.fromEntries(s.selection.map((id) => [id, open])) })
           }
-          break
-        case '[':
-        case ']':
-          if (e.altKey) setInOut(e.key === '[' ? 'in' : 'out')
           break
         case 'Escape':
           s.select([])

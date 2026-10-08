@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import type { AlignMode } from '@shared/align'
 import { alignSelection, distributeSelection } from '../lib/actions'
+import { K } from '../lib/shortcuts'
 
 const KEY = 'bs-align-to'
 const load = (): 'selection' | 'canvas' => {
@@ -22,12 +23,12 @@ const load = (): 'selection' | 'canvas' => {
 }
 
 const ALIGN: [AlignMode, typeof AlignStartVertical, string][] = [
-  ['left', AlignStartVertical, 'Links uitlijnen'],
-  ['hcenter', AlignCenterVertical, 'Horizontaal centreren'],
-  ['right', AlignEndVertical, 'Rechts uitlijnen'],
-  ['top', AlignStartHorizontal, 'Boven uitlijnen'],
-  ['vcenter', AlignCenterHorizontal, 'Verticaal centreren'],
-  ['bottom', AlignEndHorizontal, 'Onder uitlijnen']
+  ['left', AlignStartVertical, `Links uitlijnen (${K.alt}A)`],
+  ['hcenter', AlignCenterVertical, `Horizontaal centreren (${K.alt}H)`],
+  ['right', AlignEndVertical, `Rechts uitlijnen (${K.alt}D)`],
+  ['top', AlignStartHorizontal, `Boven uitlijnen (${K.alt}W)`],
+  ['vcenter', AlignCenterHorizontal, `Verticaal centreren (${K.alt}V)`],
+  ['bottom', AlignEndHorizontal, `Onder uitlijnen (${K.alt}S)`]
 ]
 
 /** Uitlijnen en verdelen. Eén laag wordt altijd op de banner uitgelijnd. */
@@ -55,7 +56,7 @@ export function AlignBar({ count }: { count: number }) {
         <button
           className="icon sm"
           disabled={!canDistribute}
-          title={canDistribute ? 'Horizontaal verdelen (gelijke tussenruimte)' : 'Verdelen: selecteer minimaal 3 lagen, of kies "Banner"'}
+          title={canDistribute ? `Horizontaal verdelen, gelijke tussenruimte (${K.alt}${K.shift}H)` : 'Verdelen: selecteer minimaal 3 lagen, of kies "Banner"'}
           onClick={() => distributeSelection('h', target)}
         >
           <AlignHorizontalSpaceBetween size={15} />
@@ -63,7 +64,7 @@ export function AlignBar({ count }: { count: number }) {
         <button
           className="icon sm"
           disabled={!canDistribute}
-          title={canDistribute ? 'Verticaal verdelen (gelijke tussenruimte)' : 'Verdelen: selecteer minimaal 3 lagen, of kies "Banner"'}
+          title={canDistribute ? `Verticaal verdelen, gelijke tussenruimte (${K.alt}${K.shift}V)` : 'Verdelen: selecteer minimaal 3 lagen, of kies "Banner"'}
           onClick={() => distributeSelection('v', target)}
         >
           <AlignVerticalSpaceBetween size={15} />

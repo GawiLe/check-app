@@ -3,8 +3,10 @@ import { createLayer, deriveComposition, newId } from '@shared/factory'
 import { applyLibraryItem, applyUserPreset, LIBRARY, presetFromLayer } from '@shared/library'
 import { mergeTracks, PRESETS } from '@shared/presets'
 import { resetCompOverrides, resetOverrides } from '@shared/sync'
-import { allLayers, cloneLayer, findDeep, groupLayers, localTime, reorderLayer, sequenceLayers, ungroup } from '@shared/tree'
-import { layerStateAt, restStateAt } from '@shared/anim'
+import { allLayers, cloneLayer, findDeep, groupLayers, layerLength, localTime, reorderLayer, sequenceLayers, shiftTiming, ungroup } from '@shared/tree'
+import { effectiveLayer } from '@shared/motion'
+import type { PropGroupId } from '@shared/propgroups'
+import { layerStateAt, restStateAt, upsertKeyframe } from '@shared/anim'
 import { layerCorners, moveAnchor } from '@shared/geometry'
 import { alignDeltas, distributeDeltas, unionBox, type AlignMode, type Axis, type Box } from '@shared/align'
 import { applyKeyAssist, type KeyAssist } from '@shared/keys'
@@ -900,4 +902,105 @@ export function distributeSelection(axis: Axis, to: 'selection' | 'canvas' = 'se
     const boxes = g.layers.map(visibleBox)
     shiftLayers(g.layers, distributeDeltas(boxes, axis, to === 'canvas' ? g.container : undefined))
   }
+}
+
+// ---------- Tijdlijn-sneltoetsen (zoals in After Effects) ----------
+
+/** Absolute starttijd van de compositie waarin een laag zit (som van de in-punten van de groepen). */
+function offsetOf(ancestors: Layer[]) {
+  return ancestors.reduce((a, g) => a + (g.start ?? 0), 0)
+}
+
+/** I / O: playhead naar het in- of uitpunt van de (eerste) geselecteerde laag. */
+export function goToLayerEdge(which: 'in' | 'out') {
+  const { selection, project, compId } = S()
+  const comp = currentComp(S())
+  if (!project || !comp || !selection.length) return
+  const f = findDeep(comp.layers, selection[0])
+  if (!f) return
+  const off = offsetOf(f.ancestors)
+  const start = f.layer.start ?? 0
+  const t = which === 'in' ? off + start : off + (f.layer.end ?? start + layerLength(f.layer))
+  S().setPlaying(false)
+  S().setTime(Math.max(0, Math.min(findComp(project, compId).duration, t)))
+}
+
+/** J / K: naar het vorige / volgende keyframe (van de selectie, of van alle lagen). */
+export function jumpKeyframe(dir: -1 | 1) {
+  const comp = currentComp(S())
+  if (!comp) return
+  const { selection, time } = S()
+  const times: number[] = []
+  const visit = (list: Layer[], ancestors: Layer[]) => {
+    for (const l of list) {
+      const off = offsetOf(ancestors)
+      if (!selection.length || selection.includes(l.id)) {
+        const eff = effectiveLayer(l)
+        for (const k of Object.values(eff.tracks)) for (const kf of k ?? []) times.push(round(off + kf.t, 3))
+      }
+      if (l.children) visit(l.children, [...ancestors, l])
+    }
+  }
+  visit(comp.layers, [])
+  const eps = 1e-3
+  const sorted = [...new Set(times)].sort((a, b) => a - b)
+  const next = dir > 0 ? sorted.find((t) => t > time + eps) : [...sorted].reverse().find((t) => t < time - eps)
+  if (next == null) return
+  S().setPlaying(false)
+  S().setTime(next)
+}
+
+/** ⌥⇧P/S/R/T: keyframe op de playhead voor positie, schaal, rotatie of dekking van de selectie. */
+export function addKeyAtPlayhead(group: PropGroupId) {
+  const { selection, project, compId, time } = S()
+  const comp = currentComp(S())
+  if (!project || !comp || !selection.length) return
+  S().update((p) => {
+    const c = findComp(p, compId)
+    for (const id of selection) {
+      const f = findDeep(c.layers, id)
+      if (!f || f.layer.locked) continue
+      const l = f.layer
+      const t = round(localTime(time, f.ancestors), 3)
+      const st = restStateAt(l, t)
+      for (const m of groupProps(l, group)) l.tracks[m] = upsertKeyframe(l.tracks[m], t, st[m])
+    }
+  })
+  S().setExpanded({ ...S().expanded, ...Object.fromEntries(selection.map((id) => [id, true])) })
+}
+
+/** ⇧[ / ⇧]: laag (met animatie) in de tijd verschuiven zodat hij op de playhead begint / eindigt. */
+export function moveLayerToPlayhead(which: 'in' | 'out') {
+  const { selection, compId, time } = S()
+  if (!selection.length) return
+  S().update((p) => {
+    const c = findComp(p, compId)
+    for (const id of selection) {
+      const f = findDeep(c.layers, id)
+      if (!f || f.layer.locked) continue
+      const l = f.layer
+      const t = localTime(time, f.ancestors)
+      const start = l.start ?? 0
+      const end = l.end ?? start + layerLength(l)
+      shiftTiming(l, which === 'in' ? t - start : t - end)
+    }
+  })
+}
+
+/** ⌥⌘/: afbeelding van de geselecteerde laag vervangen (zoals Replace Footage in AE). */
+export function replaceSelectedImage() {
+  const comp = currentComp(S())
+  const id = S().selection[0]
+  const l = comp && id ? findDeep(comp.layers, id)?.layer : undefined
+  if (l?.image) S().openReplace(l.id)
+  else S().setStatus('Selecteer een afbeeldingslaag om te vervangen.', 'error')
+}
+
+/** ⌘] / ⌘[ (met ⇧: helemaal): selectie naar voren of naar achteren. */
+export function arrangeSelection(where: 'forward' | 'backward' | 'front' | 'back') {
+  const sel = S().selection
+  if (where === 'forward') sel.forEach((id) => moveLayer(id, -1))
+  if (where === 'backward') [...sel].reverse().forEach((id) => moveLayer(id, 1))
+  if (where === 'front') [...sel].reverse().forEach((id) => moveToEdge(id, 'front'))
+  if (where === 'back') sel.forEach((id) => moveToEdge(id, 'back'))
 }

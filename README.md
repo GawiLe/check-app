@@ -308,33 +308,35 @@ Sluit je het venster, sluit je de app af (Cmd+Q) of open je een ander of nieuw p
 
 ### Sneltoetsen
 
+Het volledige overzicht staat in de app: **Help → Sneltoetsen** of druk **?**. De belangrijkste (⌘ = Ctrl op Windows, ⌥ = Alt):
+
 | Toets | Actie |
 |---|---|
 | Spatie | afspelen / pauze |
-| Home / End | naar begin / einde |
-| PageUp / PageDown | 1 frame terug / vooruit (Shift: 10) |
-| Pijltjes | laag 1px verplaatsen (Shift: 10px) |
-| Delete | laag of geselecteerde keyframe verwijderen |
-| Cmd/Ctrl+Z, Shift+Cmd/Ctrl+Z | ongedaan maken / opnieuw |
-| Cmd/Ctrl+D | laag of groep dupliceren |
-| Cmd/Ctrl+G, Shift+Cmd/Ctrl+G | groeperen / degroeperen |
-| U | eigenschappen van de selectie uit-/inklappen in de tijdlijn |
-| Enter | geselecteerde laag hernoemen |
-| ` | paneel onder de muis maximaliseren / terug |
-| Alt+[ / Alt+] | in- / uitpunt op de playhead |
-| Dubbelklik (canvas) | laag binnen een groep selecteren |
-| Cmd/Ctrl+S, +E | opslaan, exporteren |
-| Cmd/Ctrl+scroll | inzoomen in de viewer |
+| Home / End | naar begin / eindframe |
+| PageUp / PageDown | 1 frame terug / vooruit (⇧: 10) |
+| J / K | naar vorig / volgend keyframe |
+| I / O | naar in- / uitpunt van de geselecteerde laag |
+| [ / ] | in- / uitpunt op de playhead (inkorten) |
+| ⇧[ / ⇧] | laag verschuiven zodat hij op de playhead begint / eindigt |
+| ⌥⇧P / S / R / T | keyframe positie / schaal / rotatie / dekking op de playhead |
+| F9, ⇧F9, ⌘⇧F9 | Easy Ease, Easy Ease In, Easy Ease Out |
+| U | eigenschappen van de selectie uit-/inklappen |
+| ⌥A / ⌥H / ⌥D | links / horizontaal midden / rechts uitlijnen |
+| ⌥W / ⌥V / ⌥S | boven / verticaal midden / onder uitlijnen |
+| ⌥⇧H / ⌥⇧V | horizontaal / verticaal verdelen |
+| ⌘] / ⌘[ (⇧: helemaal) | naar voren / naar achteren |
+| ⌥⌘/ | afbeelding vervangen |
+| ⌘D, ⌘G, ⇧⌘G | dupliceren, nieuwe compositie, opheffen |
+| Enter | naam wijzigen |
+| Pijltjes | 1 px verplaatsen (⇧: 10 px) |
+| ⌘A / ⇧⌘A / Esc | alles / niets selecteren |
+| V, T, R, E, G | selecteren, tekst, rechthoek, ellips, pen |
+| ⌘S, ⌘N, ⌘O, ⌘W, ⌘E | opslaan, nieuw, openen, tabblad sluiten, exporteren |
+| Ctrl+Tab | volgend projecttabblad |
+| ` | paneel onder de muis maximaliseren |
 
-### Varianten (template)
-
-Maak van één bestand meerdere varianten, bijvoorbeeld per actie, seizoen of product: werkbalk → knop *Varianten* (of menu Bestand → *Varianten (template)…*).
-
-1. **Velden kiezen:** vink aan welke teksten en afbeeldingen/SVG's per variant anders kunnen zijn. Een veld geldt voor alle formaten tegelijk.
-2. **Varianten invullen:** een kolom per variant (naam aanpasbaar, dupliceren, verwijderen). Vul alleen in wat anders is; een leeg vak houdt het origineel. Bij een afbeelding kies je uit de assets of *Uploaden uit map…*.
-3. **Aanmaken:** elke variant wordt een eigen projectmap naast het origineel (`<project>-<variant>`) met dezelfde assets en fonts, en wordt (optioneel) meteen geëxporteerd naar de gekozen platforms. Opnieuw aanmaken werkt de bestaande variantmappen bij.
-
-Opmaak, positie en animatie blijven in alle varianten gelijk; een nieuwe afbeelding valt in het kader van het origineel. De keuzes en waarden worden in het project bewaard, zodat je later een variant toevoegt of aanpast en opnieuw aanmaakt. Een variantmap is een gewoon project: openen, bijwerken en los exporteren kan altijd.
+Letters en haakjes werken op de fysieke toets, dus ook met Option/Alt en op elk toetsenbord. In een invoerveld doen ze niets.
 
 ## Export en validatie
 
