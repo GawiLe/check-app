@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Copy, FolderOpen, Image as ImageIcon, Plus, Type, Undo2, X } from 'lucide-react'
+import { Copy, FileSpreadsheet, FolderOpen, Image as ImageIcon, Plus, Type, Undo2, X } from 'lucide-react'
 import type { VariantResult } from '@shared/api'
 import { newId } from '@shared/factory'
 import { TARGETS } from '@shared/specs'
 import type { VariantSet } from '@shared/types'
+import { tableToVariants, toCsv, variantsToTable } from '@shared/sheet'
 import { variantFields, type VariantField } from '@shared/variants'
 import { openInBackground, openProject, refreshAssets, save } from '../lib/actions'
 import { assetUrl, useStore } from '../store'
@@ -35,6 +36,38 @@ export function VariantsDialog({ onClose }: { onClose: () => void }) {
   const [exportNow, setExportNow] = useState(true)
   const [busy, setBusy] = useState(false)
   const [results, setResults] = useState<VariantResult[] | null>(null)
+  const [sheetMsg, setSheetMsg] = useState<{ text: string; level: 'info' | 'warning' } | null>(null)
+
+  /** Varianten uit CSV of Excel: rij = variant, kolom = veld (laagnaam). Zelfde naam = bijwerken. */
+  const importSheet = async () => {
+    setSheetMsg(null)
+    try {
+      const res = await window.bs.importVariantSheet(dir)
+      if (!res) return
+      const r = tableToVariants(res.table, fields, set.variants, res.images, () => newId('v'))
+      if (!r.fieldKeys.length) {
+        setSheetMsg({ level: 'warning', text: `Geen enkele kolom in ${res.file} past bij een tekst of afbeelding. Gebruik de laagnamen als kolomkop (bijv. ${fields.slice(0, 2).map((f) => `"${f.label}"`).join(' of ')}).` })
+        return
+      }
+      edit((v) => {
+        v.variants = r.variants
+        v.fields = [...new Set([...v.fields, ...r.fieldKeys])]
+      })
+      await refreshAssets()
+      const parts = [`${res.file}: ${r.added} variant(en) toegevoegd${r.updated ? `, ${r.updated} bijgewerkt` : ''}`]
+      if (r.unknown.length) parts.push(`kolom(men) niet herkend: ${r.unknown.join(', ')}`)
+      if (r.missingImages.length) parts.push(`afbeelding(en) niet gevonden: ${r.missingImages.join(', ')} (zet ze in assets/ of naast de spreadsheet)`)
+      setSheetMsg({ level: r.unknown.length || r.missingImages.length ? 'warning' : 'info', text: parts.join(' · ') })
+      setStep(2)
+    } catch (e) {
+      setSheetMsg({ level: 'warning', text: e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(e) })
+    }
+  }
+  const saveSheet = async () => {
+    const path = await window.bs.saveVariantSheet(dir, toCsv(variantsToTable(chosen, set.variants)))
+    if (path) setSheetMsg({ level: 'info', text: `Opgeslagen als ${path.split(/[\\/]/).pop()}. Vul het in Excel in (elke rij een variant) en importeer het weer.` })
+  }
+  const sheetNote = sheetMsg && <div className={`sheet-msg ${sheetMsg.level}`}>{sheetMsg.text}</div>
 
   const toggleField = (key: string, on: boolean) =>
     edit((v) => {
@@ -167,7 +200,11 @@ export function VariantsDialog({ onClose }: { onClose: () => void }) {
             )
           })}
           {!fields.length && <p className="faint">Er staan nog geen teksten of afbeeldingen in de basis.</p>}
+          {sheetNote}
           <div className="actions">
+            <button className="ghost" style={{ marginRight: 'auto' }} disabled={!fields.length} onClick={importSheet} title="Elke rij een variant, elke kolom een veld (laagnaam als kolomkop)">
+              <FileSpreadsheet size={14} /> Uit CSV/Excel…
+            </button>
             <button onClick={onClose}>Sluiten</button>
             <button className="primary" disabled={!chosen.length} onClick={goToVariants}>
               Verder ({chosen.length} veld{chosen.length === 1 ? '' : 'en'})
@@ -246,7 +283,14 @@ export function VariantsDialog({ onClose }: { onClose: () => void }) {
             Elke variant wordt een eigen projectmap naast deze ({dir.split(/[\\/]/).pop()}-&lt;naam&gt;), met eigen export. Opnieuw aanmaken werkt bestaande variantmappen bij. Deze instellingen worden
             in dit project bewaard.
           </div>
+          {sheetNote}
           <div className="actions">
+            <button className="ghost" onClick={importSheet} title="Elke rij een variant, elke kolom een veld (laagnaam als kolomkop). Zelfde variantnaam = bijwerken.">
+              <FileSpreadsheet size={14} /> Uit CSV/Excel…
+            </button>
+            <button className="ghost" style={{ marginRight: 'auto' }} onClick={saveSheet} title="Sla de varianten op als CSV om ze in Excel aan te vullen">
+              Opslaan als CSV…
+            </button>
             <button onClick={() => setStep(1)}>Velden</button>
             <button className="primary" disabled={busy || !set.variants.length} onClick={create}>
               {busy ? 'Bezig…' : `${set.variants.length} variant(en) aanmaken`}

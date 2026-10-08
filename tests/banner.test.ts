@@ -1085,3 +1085,63 @@ describe('slimme hulplijnen', () => {
     expect(m.find((x) => x.axis === 'y' && x.from === 257)?.to).toBe(600)
   })
 })
+
+describe('varianten uit CSV/Excel', () => {
+  it('leest CSV met puntkomma, aanhalingstekens en regeleinden', async () => {
+    const { parseDelimited, toCsv } = await import('../src/shared/sheet')
+    const t = parseDelimited('﻿Variant;Headline;logo.svg\r\nZomer;"Zomer;actie\nNu ""20%"" korting";zomer.svg\r\n;;\r\n')
+    expect(t).toEqual([
+      ['Variant', 'Headline', 'logo.svg'],
+      ['Zomer', 'Zomer;actie\nNu "20%" korting', 'zomer.svg']
+    ])
+    expect(parseDelimited(toCsv(t))).toEqual(t)
+    expect(parseDelimited('a\tb\n1\t2')).toEqual([
+      ['a', 'b'],
+      ['1', '2']
+    ])
+  })
+
+  it('leest het eerste werkblad van een .xlsx', async () => {
+    const { zipSync, strToU8 } = await import('fflate')
+    const { parseXlsx } = await import('../src/shared/sheet')
+    const xlsx = zipSync({
+      'xl/workbook.xml': strToU8('<workbook><sheets><sheet name="Blad1" sheetId="1" r:id="rId1"/></sheets></workbook>'),
+      'xl/_rels/workbook.xml.rels': strToU8('<Relationships><Relationship Id="rId1" Type="x" Target="worksheets/sheet1.xml"/></Relationships>'),
+      'xl/sharedStrings.xml': strToU8('<sst><si><t>Variant</t></si><si><t>Headline</t></si><si><r><t>Winter</t></r><r><t xml:space="preserve"> &amp; sale</t></r></si></sst>'),
+      'xl/worksheets/sheet1.xml': strToU8(
+        '<worksheet><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>W1</t></is></c><c r="C2"><v>42</v></c></row><row r="3"><c r="B3" t="s"><v>2</v></c></row></sheetData></worksheet>'
+      )
+    })
+    expect(parseXlsx(xlsx)).toEqual([['Variant', 'Headline'], ['W1', '', '42'], ['', 'Winter & sale']])
+  })
+
+  it('koppelt kolommen aan velden en voegt varianten samen', async () => {
+    const { tableToVariants } = await import('../src/shared/sheet')
+    const fields = [
+      { key: 'h|text', kind: 'text' as const, label: 'Headline', value: 'Hallo' },
+      { key: 's|text', kind: 'text' as const, label: 'Scène 2 › Subline', value: 'Sub' },
+      { key: 'l|image', kind: 'image' as const, label: 'logo.svg', value: 'assets/logo.svg' }
+    ]
+    const existing = [{ id: 'v1', name: 'Zomer', values: { 'h|text': 'oud', 's|text': 'blijft' } }]
+    let n = 0
+    const r = tableToVariants(
+      [
+        ['Naam', 'headline', 'Subline', 'Logo.svg', 'Prijs'],
+        ['Origineel', 'x', 'x', 'x', 'x'],
+        ['zomer', 'Nieuw', '', 'zon.png', '9,99'],
+        ['Winter', '', 'Koud', 'weg.png', '']
+      ],
+      fields,
+      existing,
+      { 'zon.png': 'assets/zon.png' },
+      () => `n${++n}`
+    )
+    expect(r.fieldKeys.sort()).toEqual(['h|text', 'l|image', 's|text'])
+    expect(r.unknown).toEqual(['Prijs'])
+    expect(r.missingImages).toEqual(['weg.png'])
+    expect(r.added).toBe(1)
+    expect(r.updated).toBe(1)
+    expect(r.variants[0]).toEqual({ id: 'v1', name: 'Zomer', values: { 'h|text': 'Nieuw', 'l|image': 'assets/zon.png' } })
+    expect(r.variants[1]).toEqual({ id: 'n1', name: 'Winter', values: { 's|text': 'Koud' } })
+  })
+})

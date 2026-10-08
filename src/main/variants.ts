@@ -1,12 +1,13 @@
 import { existsSync } from 'node:fs'
-import { cp, mkdir, readdir, readFile } from 'node:fs/promises'
+import { cp, mkdir, readdir, readFile, stat } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import type { VariantRequest, VariantResult } from '@shared/api'
 import { TARGET_IDS } from '@shared/specs'
 import { applyVariant, variantFolderName } from '@shared/variants'
 import { exportBanners } from './exporter'
 import { inside } from './paths'
-import { writeProject } from './storage'
+import { copyIntoProject, listAssets, writeProject } from './storage'
+import { looksLikeImage, parseDelimited, parseXlsx, type Table } from '@shared/sheet'
 
 /**
  * Maakt per variant een eigen projectmap naast het origineel ("<project>-<variant>") met dezelfde
@@ -55,4 +56,35 @@ async function usable(dir: string, marker: { template: string; variantId: string
     // Geen (leesbaar) projectbestand: alleen een lege map is bruikbaar
     return (await readdir(dir).catch(() => ['x'])).length === 0
   }
+}
+
+/**
+ * Spreadsheet met varianten inlezen (CSV/TSV of Excel). Afbeeldingen in de tabel mogen een bestandsnaam
+ * uit assets/ zijn, of een bestand naast de spreadsheet (wordt dan naar assets/ gekopieerd).
+ */
+export async function readVariantSheet(dir: string, file: string): Promise<{ table: Table; images: Record<string, string>; file: string }> {
+  const buf = await readFile(file)
+  const table = /\.xlsx$/i.test(file) ? parseXlsx(buf) : parseDelimited(buf.toString('utf8'))
+  const assets = new Set(await listAssets(dir))
+  const images: Record<string, string> = {}
+  const cells = new Set(table.slice(1).flat().map((c) => c.trim()).filter(looksLikeImage))
+  for (const cell of cells) {
+    if (cell.startsWith('assets/') && assets.has(cell)) continue
+    const inAssets = `assets/${basename(cell)}`
+    if (assets.has(inAssets)) {
+      images[cell] = inAssets
+      continue
+    }
+    // Alleen bestanden naast de spreadsheet (of in een submap ervan), niet ergens anders op de schijf
+    try {
+      const src = inside(dirname(file), cell)
+      if (!existsSync(src) || !(await stat(src)).isFile()) continue
+      const [copied] = await copyIntoProject(dir, 'assets', [src])
+      images[cell] = copied
+      assets.add(copied)
+    } catch {
+      // buiten de map van de spreadsheet: overslaan (komt als "niet gevonden" in het overzicht)
+    }
+  }
+  return { table, images, file: basename(file) }
 }

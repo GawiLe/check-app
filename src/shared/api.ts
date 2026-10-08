@@ -79,6 +79,10 @@ export interface BannerStudioApi {
     size: number
   ): Promise<Pick<WriteOnProps, 'glyphs' | 'viewBox'> & { width: number; height: number }>
   exportBanners(req: ExportRequest): Promise<ExportResult[]>
+  /** Varianten uit een spreadsheet: kiest een CSV/Excel-bestand en geeft de tabel + gevonden afbeeldingen (null = geannuleerd). */
+  importVariantSheet(dir: string): Promise<{ table: string[][]; images: Record<string, string>; file: string } | null>
+  /** Varianten als CSV opslaan (sjabloon om in Excel in te vullen). Geeft het pad, of null bij annuleren. */
+  saveVariantSheet(dir: string, csv: string): Promise<string | null>
   /** Live KB-teller: geschatte ZIP-grootte en initial load van één formaat. */
   estimateSize(dir: string, project: Project, compId: string, target: ExportTarget): Promise<{ zipBytes: number; initialLoadBytes: number }>
   createVariants(req: VariantRequest): Promise<VariantResult[]>

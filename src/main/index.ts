@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, shell } from 'electron'
 import { existsSync, watch, type FSWatcher } from 'node:fs'
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { extname, join, resolve } from 'node:path'
 import { inside } from './paths'
 import type { BannerStudioApi, Settings } from '@shared/api'
@@ -9,7 +9,7 @@ import { aiAnimate } from './ai'
 import { estimateSize, exportBanners, MIME } from './exporter'
 import { addVersion, clearAutosave, listVersions, readNewerAutosave, readVersion, writeAutosave } from './history'
 import { normalizeProject } from '@shared/sync'
-import { createVariants } from './variants'
+import { createVariants, readVariantSheet } from './variants'
 import { describeFont, textToGlyphPaths } from './fonts'
 import { fontCatalog, installWebFont } from './webfonts'
 import {
@@ -199,6 +199,27 @@ const handlers: Handlers = {
   },
   generateWriteOn: (dir, fontFile, text, size) => textToGlyphPaths(dir, fontFile, text, size),
   exportBanners: (req) => exportBanners(req),
+  async importVariantSheet(dir) {
+    const res = await dialog.showOpenDialog(win!, {
+      title: 'Varianten uit CSV of Excel',
+      defaultPath: dir,
+      properties: ['openFile'],
+      filters: [{ name: 'Spreadsheet (CSV, Excel)', extensions: ['csv', 'tsv', 'txt', 'xlsx'] }]
+    })
+    if (res.canceled || !res.filePaths[0]) return null
+    return readVariantSheet(dir, res.filePaths[0])
+  },
+  async saveVariantSheet(dir, csv) {
+    const res = await dialog.showSaveDialog(win!, {
+      title: 'Varianten opslaan als CSV',
+      defaultPath: join(dir, 'varianten.csv'),
+      filters: [{ name: 'CSV', extensions: ['csv'] }]
+    })
+    if (res.canceled || !res.filePath) return null
+    // Met BOM, zodat Excel de tekens (é, ë, €) goed leest
+    await writeFile(res.filePath, '\uFEFF' + String(csv))
+    return res.filePath
+  },
   estimateSize: (dir, project, compId, target) => estimateSize(dir, project, compId, target),
   createVariants: (req) => createVariants(req),
   async setDirty(v) {
@@ -260,7 +281,7 @@ const handlers: Handlers = {
 
 // Functies die in een projectmap schrijven of lezen: alleen in het project dat nu open is
 // (de map komt uit het venster en wordt dus niet blind vertrouwd).
-const DIR_ARG = new Set(['importImages', 'importFonts', 'listAssets', 'importPaths', 'generateWriteOn', 'saveBoilerplate', 'installWebFont', 'estimateSize'])
+const DIR_ARG = new Set(['importImages', 'importFonts', 'listAssets', 'importPaths', 'generateWriteOn', 'saveBoilerplate', 'installWebFont', 'estimateSize', 'importVariantSheet', 'saveVariantSheet'])
 const DIR_REQ = new Set(['exportBanners', 'createVariants'])
 // Mag voor elk geopend tabblad (ook op de achtergrond): opslaan, herstelkopie, versies
 const OPEN_DIR_ARG = new Set(['saveProject', 'autosave', 'clearAutosave', 'listVersions', 'readVersion'])

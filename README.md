@@ -296,6 +296,26 @@ Animeer een laag en kies in de tab *Animatie* **Opslaan als preset**.
 
 Een write-on laag zet tekst uit je eigen font om naar SVG-paden per letter. De eigenschap **Reveal** (0→1) tekent eerst de omtrek van elke letter en vult hem daarna, letter voor letter. Met "Vulling" bepaal je hoe vroeg de vulling komt; 0 betekent alleen lijnen.
 
+### Varianten (template)
+
+Knop *Varianten* in de werkbalk: het project is het template.
+
+1. **Velden kiezen:** vink aan welke teksten en afbeeldingen per variant anders mogen zijn.
+2. **Varianten invullen:** per variant een kolom; vul alleen in wat anders is (leeg = zoals het origineel). Afbeeldingen kies je uit de assets of upload je uit een map.
+3. **Aanmaken:** elke variant wordt een eigen projectmap naast het template (`<project>-<variant>`), desgewenst meteen geëxporteerd, en verschijnt als tabblad.
+
+**Uit CSV/Excel (optie):** met *Uit CSV/Excel…* lees je varianten in uit een `.csv`, `.tsv` of Excel-bestand (`.xlsx`, eerste werkblad):
+
+| Variant | Headline | logo.svg |
+|---|---|---|
+| Zomer | Zomeractie! | zomer.svg |
+| Winter | Winterdeals | winter.png |
+
+- De eerste rij bevat de **laagnamen** als kolomkop (of het volledige label, zoals `Scène 1 › Headline`); de kolom *Variant* (of de eerste kolom) is de naam. Gebruikte velden worden vanzelf aangevinkt.
+- Afbeeldingen: een bestandsnaam uit `assets/`, of een bestand dat naast de spreadsheet staat (dat wordt naar `assets/` gekopieerd).
+- Bestaat een variant met dezelfde naam al, dan wordt hij bijgewerkt. Een lege cel = zoals het origineel; een rij *Origineel* wordt overgeslagen.
+- *Opslaan als CSV…* maakt een sjabloon met de gekozen velden en de huidige varianten, om in Excel verder in te vullen.
+
 ### Meerdere projecten (tabbladen)
 
 Elk geopend project krijgt een tabblad bovenin het venster, zoals in een browser. Per tabblad blijft alles bewaard: ongedaan maken, selectie, tijd en zoom. Een oranje stip betekent niet-opgeslagen wijzigingen.
@@ -405,9 +425,10 @@ Vul onder **Instellingen** een Anthropic API-sleutel in. Die wordt versleuteld o
 
 ## Roadmap-ideeën
 
-- Afbeeldingen automatisch comprimeren (pngquant/mozjpeg) bij export.
 - Slimmere formaat-afleiding met ankers per laag (links/rechts/midden, schaal-regels).
-- Extra platforms: Adform, Flashtalking, Xandr.
+- Extra platforms: Flashtalking, Xandr.
 - Video-laag en sprite-sheets.
-- Varianten vanuit CSV (teksten/prijzen per variant).
+- Export naar MP4/GIF (social, previews).
+- Mockups in de app en *Publiceren naar klantportaal*.
+- Installeerbare app (.dmg) met automatische updates.
 - AI-effecten als herbruikbare presets opslaan.
