@@ -224,7 +224,7 @@ function Tools() {
   const items = [
     { id: 'select', icon: <MousePointer2 size={15} />, title: 'Selecteren (V)' },
     { id: 'text', icon: <Type size={15} />, title: 'Tekst (T): klik op het canvas' },
-    { id: 'rect', icon: <Square size={15} />, title: 'Rechthoek (R): sleep op het canvas, Shift = vierkant' },
+    { id: 'rect', icon: <Square size={15} />, title: 'Rechthoek (Q): sleep op het canvas, Shift = vierkant' },
     { id: 'ellipse', icon: <Circle size={15} />, title: 'Ellips (E): sleep op het canvas, Shift = cirkel' },
     { id: 'pen', icon: <PenTool size={15} />, title: 'Pen tool (G): klik voor punten, sleep voor bochten' }
   ] as const

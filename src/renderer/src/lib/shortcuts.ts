@@ -17,12 +17,23 @@ export const SHORTCUT_GROUPS: { title: string; items: [string, string][] }[] = [
       ['Home / End', 'Naar begin / eindframe'],
       ['PageUp / PageDown', `1 frame terug / vooruit (met ${K.shift.replace('+', '')}: 10)`],
       ['J / K', 'Naar vorig / volgend keyframe (van de selectie)'],
-      ['I / O', 'Naar in- / uitpunt van de geselecteerde laag'],
+      [`I / ${K.shift}I`, 'Naar in- / uitpunt van de geselecteerde laag'],
       ['[ / ]', 'In- / uitpunt van de laag op de playhead (inkorten)'],
       [`${K.shift}[ / ${K.shift}]`, 'Laag verschuiven zodat hij op de playhead begint / eindigt'],
-      ['U', 'Eigenschappen van de selectie uit-/inklappen'],
       ['F9', 'Easy Ease op geselecteerde keyframes'],
       [`${K.shift}F9 / ${K.cmd}${K.shift}F9`, 'Easy Ease In / Out']
+    ]
+  },
+  {
+    title: 'Eigenschappen tonen (selectie)',
+    items: [
+      ['P', 'Alleen positie'],
+      ['S', 'Alleen schaal'],
+      ['R', 'Alleen rotatie'],
+      ['O', 'Alleen dekking'],
+      ['U', 'Alles met keyframes'],
+      [`${K.shift}P / S / R / O`, 'Eigenschap erbij tonen (of weer weg)'],
+      ['Nog een keer', 'Zelfde toets = inklappen']
     ]
   },
   {
@@ -31,7 +42,7 @@ export const SHORTCUT_GROUPS: { title: string; items: [string, string][] }[] = [
       [`${K.alt}${K.shift}P`, 'Keyframe positie op de playhead'],
       [`${K.alt}${K.shift}S`, 'Keyframe schaal'],
       [`${K.alt}${K.shift}R`, 'Keyframe rotatie'],
-      [`${K.alt}${K.shift}T`, 'Keyframe dekking']
+      [`${K.alt}${K.shift}O / ${K.alt}${K.shift}T`, 'Keyframe dekking']
     ]
   },
   {
@@ -63,7 +74,7 @@ export const SHORTCUT_GROUPS: { title: string; items: [string, string][] }[] = [
     items: [
       ['V', 'Selecteren'],
       ['T', 'Tekst'],
-      ['R / E', 'Rechthoek / ellips'],
+      ['Q / E', 'Rechthoek / ellips (R werkt ook als er niets geselecteerd is)'],
       ['G', 'Pen tool']
     ]
   },

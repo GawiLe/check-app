@@ -162,7 +162,7 @@ Lagen: selecteer en druk **Enter**, dubbelklik op de naam in de tijdlijn, of rec
 - **Gereedschap** staat links in de balk:
   - **V** selecteren
   - **T** tekst: klik op het canvas, of **sleep een tekstvak** in de maat die je wilt
-  - **R** rechthoek en **E** ellips: sleep, met Shift voor een vierkant of cirkel
+  - **Q** rechthoek en **E** ellips: sleep, met Shift voor een vierkant of cirkel
   - **G** pen tool: klik voor punten en sleep voor een bocht. Klik op het eerste punt om de vorm te sluiten. Enter of de rechtermuisknop geeft een open lijn, Esc stopt.
 - **Tekst bewerken:** dubbelklik op een tekstlaag (of Enter) en typ direct op het canvas. Esc of Cmd/Ctrl+Enter bevestigt.
 - **Slimme hulplijnen:** tijdens het slepen klikt een laag vast op de randen en het midden van de banner en van andere lagen (roze lijn). De afstanden in pixels tot de buren of de bannerrand staan erbij. Houd Cmd/Ctrl ingedrukt om even niet vast te klikken.
@@ -352,12 +352,13 @@ Het volledige overzicht staat in de app: **Help → Sneltoetsen** of druk **?**.
 | Home / End | naar begin / eindframe |
 | PageUp / PageDown | 1 frame terug / vooruit (⇧: 10) |
 | J / K | naar vorig / volgend keyframe |
-| I / O | naar in- / uitpunt van de geselecteerde laag |
+| I / ⇧I | naar in- / uitpunt van de geselecteerde laag |
 | [ / ] | in- / uitpunt op de playhead (inkorten) |
 | ⇧[ / ⇧] | laag verschuiven zodat hij op de playhead begint / eindigt |
-| ⌥⇧P / S / R / T | keyframe positie / schaal / rotatie / dekking op de playhead |
+| P / S / R / O | alleen positie / schaal / rotatie / dekking van de selectie tonen in de tijdlijn (nog een keer = inklappen, ⇧ = erbij) |
+| U | alleen eigenschappen met keyframes tonen |
+| ⌥⇧P / S / R / O | keyframe positie / schaal / rotatie / dekking op de playhead (⌥⇧T werkt ook) |
 | F9, ⇧F9, ⌘⇧F9 | Easy Ease, Easy Ease In, Easy Ease Out |
-| U | eigenschappen van de selectie uit-/inklappen |
 | ⌥A / ⌥H / ⌥D | links / horizontaal midden / rechts uitlijnen |
 | ⌥W / ⌥V / ⌥S | boven / verticaal midden / onder uitlijnen |
 | ⌥⇧H / ⌥⇧V | horizontaal / verticaal verdelen |
@@ -367,7 +368,7 @@ Het volledige overzicht staat in de app: **Help → Sneltoetsen** of druk **?**.
 | Enter | naam wijzigen |
 | Pijltjes | 1 px verplaatsen (⇧: 10 px) |
 | ⌘A / ⇧⌘A / Esc | alles / niets selecteren |
-| V, T, R, E, G | selecteren, tekst, rechthoek, ellips, pen |
+| V, T, Q, E, G | selecteren, tekst, rechthoek, ellips, pen (R = rechthoek als er niets geselecteerd is) |
 | ⌘S, ⌘N, ⌘O, ⌘W, ⌘E | opslaan, nieuw, openen, tabblad sluiten, exporteren |
 | Ctrl+Tab | volgend projecttabblad |
 | ` | paneel onder de muis maximaliseren |

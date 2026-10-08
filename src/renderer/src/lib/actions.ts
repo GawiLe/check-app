@@ -970,6 +970,13 @@ export function addKeyAtPlayhead(group: PropGroupId) {
     }
   })
   S().setExpanded({ ...S().expanded, ...Object.fromEntries(selection.map((id) => [id, true])) })
+  // Toont de laag maar een deel van de eigenschappen (P/S/R/O)? Dan deze erbij, anders zie je het keyframe niet
+  const shown = { ...S().shownProps }
+  for (const id of selection) {
+    const f = shown[id]
+    if (Array.isArray(f) && !f.includes(group)) shown[id] = [...f, group]
+  }
+  S().setShownProps(shown)
 }
 
 /** ⇧[ / ⇧]: laag (met animatie) in de tijd verschuiven zodat hij op de playhead begint / eindigt. */

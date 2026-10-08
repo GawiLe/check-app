@@ -65,7 +65,7 @@ await page.locator('.tl-tabs > button').first().click()
 
 // 3. Keyframes + Easy Ease via rechtermuisknop
 await row('Subline').click()
-await page.keyboard.press('u')
+await page.keyboard.press('s') // alleen Schaal tonen
 const scaleRow = page.locator('.tl-name.sub', { hasText: 'Schaal' }).first()
 await page.locator('.timeline .ruler').click({ position: { x: 10 + 1 * 120, y: 10 } })
 await scaleRow.locator('.kf-btn').click()
@@ -78,7 +78,7 @@ await store(() => {
     ll.tracks.scale.push({ t: 2, v: 1.3, e: 'linear' })
   })
 })
-const diamonds = page.locator('.tl-track.sub').nth(1).locator('.diamond:not(.generated)')
+const diamonds = page.locator('.tl-track.sub').nth(0).locator('.diamond:not(.generated)')
 await diamonds.nth(0).click()
 await diamonds.nth(1).click({ modifiers: ['Shift'] })
 await diamonds.nth(0).click({ button: 'right' })

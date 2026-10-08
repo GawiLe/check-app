@@ -85,7 +85,7 @@ await page.evaluate(() =>
   })
 )
 await row('Subline').click()
-await page.keyboard.press('u')
+await page.keyboard.press('p') // alleen Positie tonen
 const posRow = page.locator('.tl-name.sub', { hasText: 'Positie' }).first()
 await tl.click({ position: { x: 10 + 1 * 120, y: 10 } })
 await posRow.locator('.kf-btn').click()

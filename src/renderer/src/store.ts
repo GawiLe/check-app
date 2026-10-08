@@ -1,7 +1,7 @@
 import { snapProject } from '@shared/pixels'
 import { create } from 'zustand'
 import { baseValue, layerStateAt, upsertKeyframe } from '@shared/anim'
-import { groupOf, groupProps } from '@shared/propgroups'
+import { groupOf, groupProps, type PropFilter } from '@shared/propgroups'
 import type { UserPreset } from '@shared/library'
 import { useDock } from './dock/store'
 import { normalizeProject, syncFormats } from '@shared/sync'
@@ -63,6 +63,8 @@ export interface State {
   tab: InspectorTab
   /** Uitgeklapte lagen in de tijdlijn (eigenschappen en/of inhoud van groepen). */
   expanded: Record<string, boolean>
+  /** Welke eigenschappen een uitgeklapte laag toont (P/S/R/O/U, zoals in After Effects). Ontbreekt = alle. 'keyed' = alleen met keyframes. */
+  shownProps: Record<string, PropFilter>
   /** Eigen animatie-presets (gedeeld over projecten). */
   presets: UserPreset[]
 
@@ -98,6 +100,7 @@ export interface State {
   setAutoKey(a: boolean): void
   setTab(t: InspectorTab): void
   setExpanded(e: Record<string, boolean>): void
+  setShownProps(p: Record<string, PropFilter>): void
   setPresets(p: UserPreset[]): void
 }
 
@@ -146,6 +149,7 @@ export const useStore = create<State>((set, get) => ({
   autoKey: false,
   tab: 'design',
   expanded: {},
+  shownProps: {},
   presets: [],
 
   openProject: (dir, project) =>
@@ -240,6 +244,7 @@ export const useStore = create<State>((set, get) => ({
     useDock.getState().show(t)
   },
   setExpanded: (e) => set({ expanded: e }),
+  setShownProps: (p) => set({ shownProps: p }),
   setPresets: (p) => set({ presets: p })
 }))
 

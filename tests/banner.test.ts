@@ -1180,3 +1180,24 @@ describe('verlopen, maskers en overvloeimodi', () => {
     expect(dom.window.document.querySelectorAll('.M .L').length).toBe(1)
   })
 })
+
+describe('eigenschappen tonen met P/S/R/O/U', () => {
+  it('toont alleen de gekozen eigenschap, klapt in bij dezelfde toets, Shift voegt toe', async () => {
+    const { toggleShownProps, visibleGroups } = await import('../src/shared/propgroups')
+    let r = toggleShownProps(['a', 'b'], {}, {}, ['position'], false)
+    expect(r.expanded).toEqual({ a: true, b: true })
+    expect(r.shown.a).toEqual(['position'])
+    r = toggleShownProps(['a', 'b'], r.expanded, r.shown, ['opacity'], true)
+    expect(r.shown.b).toEqual(['position', 'opacity'])
+    r = toggleShownProps(['a'], r.expanded, r.shown, ['rotation'], false)
+    expect(r.shown.a).toEqual(['rotation'])
+    r = toggleShownProps(['a'], r.expanded, r.shown, ['rotation'], false)
+    expect(r.expanded.a).toBe(false)
+    expect(r.shown.a).toBeUndefined()
+    const l = createLayer('shape', { width: 300, height: 600 })
+    l.tracks.opacity = [{ t: 0, v: 0, e: 'linear' }]
+    expect(visibleGroups(l, 'keyed')).toEqual(['opacity'])
+    expect(visibleGroups(l, ['scale', 'position'])).toEqual(['position', 'scale'])
+    expect(visibleGroups(l)).toEqual(['position', 'scale', 'rotation', 'opacity'])
+  })
+})

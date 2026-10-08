@@ -22,7 +22,7 @@ import {
 import { baseValue, layerStateAt, round, sampleTrack, sortKeyframes, upsertKeyframe } from '@shared/anim'
 import { effectiveLayer, endFrameTime } from '@shared/motion'
 import { overrideLabel } from '@shared/sync'
-import { GROUP_LABEL, groupOf, groupProps, groupTimes, layerGroups, type PropGroupId } from '@shared/propgroups'
+import { GROUP_LABEL, groupOf, groupProps, groupTimes, visibleGroups, type PropGroupId } from '@shared/propgroups'
 import { allLayers, findDeep, layerLength, shiftTiming, trimIn, trimOut } from '@shared/tree'
 import type { AnimProp, EaseName, Layer } from '@shared/types'
 import { ANIM_PROPS, EASES } from '@shared/types'
@@ -86,10 +86,17 @@ export function Timeline() {
   const activeTab = useStore((s) => s.activeTab)
   const renaming = useStore((s) => s.renaming)
   const expanded = useStore((s) => s.expanded)
+  const shownProps = useStore((s) => s.shownProps)
   const [pps, setPps] = useState(120)
   const s = useStore.getState
   const drag = useTimeDrag(pps)
-  const setExpanded = (id: string, on: boolean) => s().setExpanded({ ...s().expanded, [id]: on })
+  // Met de hand uitklappen toont weer alle eigenschappen (een P/S/R/O/U-filter vervalt)
+  const setExpanded = (id: string, on: boolean) => {
+    s().setExpanded({ ...s().expanded, [id]: on })
+    const { [id]: _drop, ...rest } = s().shownProps
+    void _drop
+    s().setShownProps(rest)
+  }
 
   const span = Math.max(comp.duration + 1, 4)
   const width = span * pps + 24
@@ -464,7 +471,7 @@ export function Timeline() {
     if (!open) return
     // Eigenschappen, zoals in After Effects: Positie (X+Y), Schaal, Rotatie, Dekking …
     const st = layerStateAt(l, time - offset)
-    for (const g of layerGroups(l)) {
+    for (const g of visibleGroups(l, shownProps[l.id])) {
       const members = groupProps(l, g)
       const hasKeyHere = members.some((m) => l.tracks[m]?.some((k) => Math.abs(k.t - (time - offset)) < 1 / 60))
       const on = members.some((m) => l.tracks[m]?.length)
@@ -576,7 +583,10 @@ export function Timeline() {
         <button
           className="icon"
           title={anyOpen ? 'Alles inklappen' : 'Alle lagen uitklappen'}
-          onClick={() => s().setExpanded(anyOpen ? {} : Object.fromEntries(allLayers(comp.layers).map((l) => [l.id, true])))}
+          onClick={() => {
+            s().setShownProps({})
+            s().setExpanded(anyOpen ? {} : Object.fromEntries(allLayers(comp.layers).map((l) => [l.id, true])))
+          }}
         >
           {anyOpen ? <ChevronsDownUp size={15} /> : <ChevronsUpDown size={15} />}
         </button>

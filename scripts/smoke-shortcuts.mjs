@@ -42,12 +42,12 @@ await check('[ en ] zetten in- en uitpunt (zonder Alt)', async () => {
   return Math.abs(l.start - 2) < 0.01 && Math.abs(l.end - 5) < 0.01
 })
 
-// 2. I / O : naar in- en uitpunt
+// 2. I / ⇧I : naar in- en uitpunt
 await setTime(0)
 await key('KeyI')
 await check('I: playhead naar in-punt', async () => Math.abs((await st()).time - 2) < 0.01)
-await key('KeyO')
-await check('O: playhead naar uitpunt', async () => Math.abs((await st()).time - 5) < 0.01)
+await key('Shift+KeyI')
+await check('⇧I: playhead naar uitpunt', async () => Math.abs((await st()).time - 5) < 0.01)
 
 // 3. Shift+[ : laag verschuiven zodat hij op de playhead begint (duur blijft)
 await setTime(3)
@@ -56,6 +56,45 @@ await check('⇧[: laag begint op de playhead, duur blijft gelijk', async () => 
   const l = await layer('Subline')
   return Math.abs(l.start - 3) < 0.01 && Math.abs(l.end - 6) < 0.01
 })
+
+// 3b. P / S / O / R / U: alleen die eigenschappen tonen in de tijdlijn (zoals After Effects)
+const subRows = () => page.locator('.tl-name.sub .grow').allInnerTexts()
+await select(['Headline'])
+await key('KeyP')
+await check('P: alleen Positie zichtbaar', async () => (await subRows()).join() === 'Positie')
+await key('Shift+KeyO')
+await check('⇧O: Dekking erbij', async () => (await subRows()).join() === 'Positie,Dekking')
+await key('KeyR')
+await check('R (met selectie): alleen Rotatie, geen rechthoek-gereedschap', async () =>
+  (await subRows()).join() === 'Rotatie' && (await st()).tool === 'select'
+)
+await key('KeyR')
+await check('R nog een keer: ingeklapt', async () => (await subRows()).length === 0)
+await select(['Headline', 'CTA'])
+await key('KeyS')
+await check('S met twee lagen: schaal van allebei', async () => (await subRows()).join() === 'Schaal,Schaal')
+await key('KeyS')
+await select(['Headline'])
+await page.evaluate(() =>
+  window.__bsStore.getState().update((p) => {
+    const l = p.compositions[0].layers.find((x) => x.name === 'Headline')
+    l.tracks.rotation = [{ t: 0, v: 0, e: 'linear' }, { t: 1, v: 10, e: 'linear' }]
+  })
+)
+await key('KeyU')
+await check('U: alleen eigenschappen met keyframes', async () => {
+  const rows = await subRows()
+  return rows.includes('Rotatie') && !rows.includes('Schaal')
+})
+await key('KeyU')
+await page.evaluate(() => window.__bsStore.getState().update((p) => void delete p.compositions[0].layers.find((x) => x.name === 'Headline').tracks.rotation))
+await page.evaluate(() => window.__bsStore.getState().select([]))
+await key('KeyR')
+await check('R zonder selectie: rechthoek-gereedschap', async () => (await st()).tool === 'rect')
+await key('KeyT')
+await check('T: tekstgereedschap', async () => (await st()).tool === 'text')
+await key('KeyV')
+await check('V: selecteren', async () => (await st()).tool === 'select')
 
 // 4. Alt+Shift+P / T : keyframes op de playhead
 await select(['Headline'])

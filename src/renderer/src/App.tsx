@@ -28,14 +28,14 @@ import {
   replaceSelectedImage,
   ungroupSelection
 } from './lib/actions'
-import { contextOf, currentComp, layerLocalTime, setLayerValue, useStore } from './store'
+import { contextOf, currentComp, layerLocalTime, setLayerValue, useStore, type Tool } from './store'
 import { allLayers, findDeep } from '@shared/tree'
 import { restStateAt } from '@shared/anim'
 import { endFrameTime } from '@shared/motion'
 import { FilePlus2, FolderOpen } from 'lucide-react'
 import { useDock } from './dock/store'
 import type { AlignMode } from '@shared/align'
-import type { PropGroupId } from '@shared/propgroups'
+import { toggleShownProps, type PropFilter, type PropGroupId } from '@shared/propgroups'
 
 /** Uitlijnen op selectie of banner: dezelfde keuze als de knoppen in het paneel Ontwerp. */
 const alignTarget = (): 'selection' | 'canvas' => {
@@ -196,7 +196,7 @@ export function App() {
       if ((code === 'Slash' && mod && !e.altKey) || (e.key === '?' && !mod)) return run(() => s.setDialog('shortcuts'))
       if (code === 'KeyA' && mod && e.shiftKey) return run(() => s.select([]))
       if (e.altKey && !mod) {
-        const keyframe: Record<string, PropGroupId> = { KeyP: 'position', KeyS: 'scale', KeyR: 'rotation', KeyT: 'opacity' }
+        const keyframe: Record<string, PropGroupId> = { KeyP: 'position', KeyS: 'scale', KeyR: 'rotation', KeyT: 'opacity', KeyO: 'opacity' }
         if (e.shiftKey && keyframe[code]) return run(() => addKeyAtPlayhead(keyframe[code]))
         if (e.shiftKey && (code === 'KeyH' || code === 'KeyV')) return run(() => distributeSelection(code === 'KeyH' ? 'h' : 'v', alignTarget()))
         const align: Record<string, AlignMode> = { KeyA: 'left', KeyH: 'hcenter', KeyD: 'right', KeyW: 'top', KeyV: 'vcenter', KeyS: 'bottom' }
@@ -208,8 +208,23 @@ export function App() {
         if (e.shiftKey) return run(() => moveLayerToPlayhead(left ? 'in' : 'out'))
         return run(() => setInOut(left ? 'in' : 'out'))
       }
+      if (!mod && !e.altKey) {
+        // Eigenschappen van de geselecteerde lagen tonen, zoals in After Effects:
+        // P positie, S schaal, R rotatie, O dekking, U alles met keyframes. Nog een keer = inklappen, Shift = erbij.
+        const props: Record<string, PropFilter> = { KeyP: ['position'], KeyS: ['scale'], KeyR: ['rotation'], KeyO: ['opacity'], KeyU: 'keyed' }
+        if (props[code] && s.selection.length) {
+          return run(() => {
+            const r = toggleShownProps(s.selection, s.expanded, s.shownProps, props[code], e.shiftKey)
+            s.setExpanded(r.expanded)
+            s.setShownProps(r.shown)
+          })
+        }
+        // Gereedschap: V selecteren, T tekst, Q rechthoek, E ellips, G pen (R zonder selectie = ook rechthoek)
+        const tools: Record<string, Tool> = { KeyV: 'select', KeyT: 'text', KeyQ: 'rect', KeyE: 'ellipse', KeyG: 'pen', KeyR: 'rect' }
+        if (!e.shiftKey && tools[code]) return run(() => s.setTool(tools[code]))
+        if (code === 'KeyI') return run(() => goToLayerEdge(e.shiftKey ? 'out' : 'in'))
+      }
       if (!mod && !e.altKey && !e.shiftKey) {
-        if (code === 'KeyI' || code === 'KeyO') return run(() => goToLayerEdge(code === 'KeyI' ? 'in' : 'out'))
         if (code === 'KeyJ' || code === 'KeyK') return run(() => jumpKeyframe(code === 'KeyJ' ? -1 : 1))
       }
       switch (e.key) {
@@ -237,14 +252,6 @@ export function App() {
           e.preventDefault()
           keyAssist(e.shiftKey && (e.metaKey || e.ctrlKey) ? 'out' : e.shiftKey ? 'in' : 'easy')
           break
-        case 'v':
-        case 't':
-        case 'r':
-        case 'e':
-        case 'g':
-          if (e.metaKey || e.ctrlKey || e.altKey) break
-          s.setTool(({ v: 'select', t: 'text', r: 'rect', e: 'ellipse', g: 'pen' } as const)[e.key])
-          break
         case '`':
           e.preventDefault()
           toggleMaximizeUnderPointer()
@@ -254,14 +261,6 @@ export function App() {
           if (s.selection.length === 1 && s.tool === 'select' && findDeep(comp.layers, s.selection[0])) {
             e.preventDefault()
             s.setRenaming(s.selection[0])
-          }
-          break
-        case 'u':
-        case 'U':
-          // Eigenschappen van de geselecteerde lagen uit-/inklappen (zoals U in After Effects)
-          if (s.selection.length) {
-            const open = s.selection.some((id) => !s.expanded[id])
-            s.setExpanded({ ...s.expanded, ...Object.fromEntries(s.selection.map((id) => [id, open])) })
           }
           break
         case 'Escape':
