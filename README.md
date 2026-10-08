@@ -141,6 +141,14 @@ Bovenin het paneel *Ontwerp* staan de knoppen voor links, midden, rechts, boven,
 
 Posities, maten en rotatie zijn altijd hele getallen, schaal en dekking hele procenten. Dat geldt voor slepen, typen, uitlijnen, keyframes en geïmporteerde projecten. Zo staat elke laag in rust precies op de pixelgrid, zonder wazige randen.
 
+### Verloop, masker en overvloeien
+
+Alleen technieken die in alle moderne browsers werken (Chrome, Safari, Firefox, Edge; ook op iOS en Android):
+
+- **Verloop** (bij Vorm): van de vulkleur naar een tweede kleur, *lineair* (met hoek) of *radiaal*, met dekking per kant. Bijvoorbeeld zwart 60% → transparant over een foto, zodat tekst leesbaar blijft. Werkt ook op gesloten pen-vormen (als SVG-verloop).
+- **Masker** (bij Weergave): snijd een afbeelding, vorm of hele compositie bij tot een rechthoek (met hoekradius) of ellips, bijvoorbeeld een ronde productfoto, of een compositie waar iets in- en uitschuift zonder buiten het kader te komen.
+- **Overvloeien** (bij Weergave): Vermenigvuldigen, Bleken, Bedekken, Zacht licht enz., zoals in Photoshop. Mengt alleen binnen de banner, nooit met de website eromheen.
+
 ### Schaduw
 
 In het paneel *Ontwerp* → **Schaduw**: kies *Zacht*, *Hard*, *Dubbel* of *Gloed*, of voeg schaduwen toe met **+** (X, Y, blur, kleur, dekking). Meerdere schaduwen worden gestapeld, dus een dubbele schaduw is gewoon twee regels. Het werkt op tekst, vormen, afbeeldingen (volgt transparantie) en hele composities, en wordt geëxporteerd als CSS `filter: drop-shadow(…)`.

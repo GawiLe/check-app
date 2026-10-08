@@ -3,7 +3,7 @@ import { effectiveLayer, endFrameTime } from './motion'
 import { minifiedRuntime, WIPE_INDEX } from './runtime'
 import { allLayers, walk } from './tree'
 import { anchorOf } from './geometry'
-import type { AnimProp, Composition, ExportTarget, FontAsset, Layer, Project, Shadow } from './types'
+import { BLEND_MODES, type AnimProp, type Composition, type ExportTarget, type FontAsset, type Gradient, type Layer, type LayerMask, type Project, type Shadow } from './types'
 
 // Bouwt de banner-HTML uit een compositie. Wordt zowel door de editor (preview)
 // als door de exporter gebruikt, zodat wat je ziet ook echt is wat je exporteert.
@@ -115,7 +115,8 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
   css.push(
     '*{margin:0;padding:0;box-sizing:border-box}',
     `html,body{width:${W}px;height:${H}px;overflow:hidden}`,
-    `#ad{position:relative;display:block;width:${W}px;height:${H}px;overflow:hidden;background:${cssValue(comp.background)};cursor:pointer;text-decoration:none}`,
+    // isolation: overvloeimodi mengen alleen binnen de banner, nooit met de pagina eromheen
+    `#ad{position:relative;display:block;width:${W}px;height:${H}px;overflow:hidden;isolation:isolate;background:${cssValue(comp.background)};cursor:pointer;text-decoration:none}`,
     '.L{position:absolute;left:0;top:0;transform-origin:50% 50%;visibility:hidden}',
     '.r .L{visibility:visible}'
   )
@@ -123,6 +124,7 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
 
   const polite = opts.mode === 'export' && project.politeLoad
   let counter = 0
+  let usesMask = false
 
   /** Bouwt een lijst lagen (recursief voor groepen). `offset` = absolute starttijd van de lijst. */
   const emit = (list: Layer[], offset: number): string => {
@@ -170,10 +172,12 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
           if (sh.kind === 'path' && sh.path) {
             // Vrije vorm: SVG die meeschaalt met de laag; lijndikte blijft gelijk.
             const stroke = sh.strokeWidth > 0 ? ` stroke="${cssValue(sh.strokeColor)}" stroke-width="${n(sh.strokeWidth)}" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"` : ''
-            inner = `<svg viewBox="0 0 ${n(sh.path.w)} ${n(sh.path.h)}" width="100%" height="100%" preserveAspectRatio="none" style="overflow:visible;display:block"><path d="${escapeHtml(sh.path.d)}" fill="${sh.path.closed ? fill : 'none'}"${sh.fillRule === 'evenodd' ? ' fill-rule="evenodd"' : ''}${stroke}/></svg>`
+            const grad = sh.gradient && fill !== 'none' && sh.path.closed ? svgGradient(`${id}g`, sh.fill, sh.gradient) : ''
+            const pathFill = sh.path.closed ? (grad ? `url(#${id}g)` : fill) : 'none'
+            inner = `<svg viewBox="0 0 ${n(sh.path.w)} ${n(sh.path.h)}" width="100%" height="100%" preserveAspectRatio="none" style="overflow:visible;display:block">${grad}<path d="${escapeHtml(sh.path.d)}" fill="${pathFill}"${sh.fillRule === 'evenodd' ? ' fill-rule="evenodd"' : ''}${stroke}/></svg>`
           } else {
             // Rechthoek / ellips: gewone CSS (lichtst).
-            if (fill !== 'none') rules.push(`background:${fill}`)
+            if (fill !== 'none') rules.push(`background:${sh.gradient ? gradientCss(sh.fill, sh.gradient, sh.kind === 'ellipse') : fill}`)
             rules.push(`border-radius:${sh.kind === 'ellipse' ? '50%' : `${n(sh.radius)}px`}`)
             if (sh.strokeWidth > 0) rules.push(`border:${n(sh.strokeWidth)}px solid ${cssValue(sh.strokeColor)}`)
           }
@@ -192,6 +196,16 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
           break
       }
 
+      // Masker: een binnenste laag die bijsnijdt (de laag zelf gebruikt clip-path al voor wipes)
+      if (l.mask && l.type !== 'text') {
+        const m = maskCss(l.mask)
+        if (m) {
+          inner = `<div class="M">${inner}</div>`
+          css.push(`#${id}>.M{${m}}`)
+          usesMask = true
+        }
+      }
+      if (l.blend && l.blend !== 'normal' && BLEND_MODES.includes(l.blend)) rules.push(`mix-blend-mode:${l.blend}`)
       const shadow = shadowFilter(l.shadows)
       if (shadow) rules.push(`filter:${shadow}`)
       if (l.cta) css.push(`#ad:hover #${id}{filter:${shadow ? shadow + ' ' : ''}brightness(1.12)}`, `#${id}{transition:filter .2s}`)
@@ -226,6 +240,7 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
   }
   const animatedEntries: unknown[] = []
   body.push(emit(comp.layers, 0))
+  if (usesMask) css.push('.M{position:absolute;left:0;top:0;width:100%;height:100%;overflow:hidden}')
 
   if (comp.border && comp.border.width > 0) {
     css.push(
@@ -282,6 +297,44 @@ export function shadowFilter(shadows: Shadow[] | undefined): string {
       return `drop-shadow(${n(s.x)}px ${n(s.y)}px ${n(Math.max(0, s.blur))}px rgba(${r},${g},${b},${n(a)}))`
     })
     .join(' ')
+}
+
+const HEX = /^#[0-9a-f]{6}$/i
+const clamp01 = (v: unknown) => Math.min(1, Math.max(0, Number(v) || 0))
+/** #rrggbb + dekking → rgba(); ongeldige kleur wordt zwart. */
+export function rgba(color: string, opacity: number): string {
+  const hex = HEX.test(color) ? color : '#000000'
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+  return `rgba(${r},${g},${b},${n(clamp01(opacity))})`
+}
+
+/** CSS-verloop voor een rechthoek of ellips (lineair met hoek, of radiaal vanuit het midden). */
+export function gradientCss(from: string, g: Gradient, ellipse = false): string {
+  const a = rgba(from, g.fromOpacity ?? 1)
+  const b = rgba(g.to, g.toOpacity ?? 1)
+  if (g.type === 'radial') return `radial-gradient(${ellipse ? 'closest-side' : 'farthest-corner'} at 50% 50%,${a},${b})`
+  return `linear-gradient(${n(Number(g.angle) || 0)}deg,${a},${b})`
+}
+
+/** Hetzelfde verloop als SVG-definitie (voor pen-vormen); hoek zoals in CSS (0 = naar boven). */
+export function svgGradient(id: string, from: string, g: Gradient): string {
+  const hex = (c: string) => (HEX.test(c) ? c : '#000000')
+  const stops = `<stop offset="0" stop-color="${hex(from)}" stop-opacity="${n(clamp01(g.fromOpacity ?? 1))}"/><stop offset="1" stop-color="${hex(g.to)}" stop-opacity="${n(clamp01(g.toOpacity ?? 1))}"/>`
+  if (g.type === 'radial') return `<defs><radialGradient id="${id}" cx=".5" cy=".5" r=".5">${stops}</radialGradient></defs>`
+  const r = ((Number(g.angle) || 0) * Math.PI) / 180
+  const dx = Math.sin(r) / 2
+  const dy = -Math.cos(r) / 2
+  return `<defs><linearGradient id="${id}" x1="${n(0.5 - dx)}" y1="${n(0.5 - dy)}" x2="${n(0.5 + dx)}" y2="${n(0.5 + dy)}">${stops}</linearGradient></defs>`
+}
+
+/** Masker: overflow + border-radius, plus clip-path (zodat ook getransformeerde inhoud in Safari netjes wordt bijgesneden). */
+export function maskCss(m: LayerMask): string {
+  if (m.shape === 'ellipse') return 'border-radius:50%;clip-path:ellipse(50% 50% at 50% 50%)'
+  if (m.shape === 'rect') {
+    const r = Math.max(0, Number(m.radius) || 0)
+    return r > 0 ? `border-radius:${n(r)}px;clip-path:inset(0 round ${n(r)}px)` : 'clip-path:inset(0)'
+  }
+  return ''
 }
 
 /** Bovenaan elke banner (ook in de codeweergave). Een commentaar vóór de doctype is geldig HTML5. */

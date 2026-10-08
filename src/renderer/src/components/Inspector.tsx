@@ -9,8 +9,8 @@ import { findDeep, layerLength, trimIn, trimOut } from '@shared/tree'
 import { PRESETS } from '@shared/presets'
 import { TARGET_IDS, TARGETS } from '@shared/specs'
 import { exitLayers } from '@shared/build'
-import type { AnimProp, EaseName, Emphasis, EmphasisType, Layer, Motion, RevealMode, Shadow } from '@shared/types'
-import { EASES } from '@shared/types'
+import type { AnimProp, BlendMode, EaseName, Emphasis, EmphasisType, Layer, Motion, RevealMode, Shadow, ShapeProps } from '@shared/types'
+import { BLEND_MODES, EASES } from '@shared/types'
 import {
   aiAnimate,
   applyPreset,
@@ -473,6 +473,7 @@ function LayerDesign({ layer }: { layer: Layer }) {
               </>
             )}
           </div>
+          {layer.shape.fillEnabled !== false && (layer.shape.kind !== 'path' || layer.shape.path?.closed) && <GradientRows layer={layer} />}
           <div className="row">
             <span className="label">Lijn</span>
             <Switch
@@ -547,6 +548,7 @@ function LayerDesign({ layer }: { layer: Layer }) {
           <Switch checked={layer.cta} onChange={(v) => up((l) => void (l.cta = v))} />
         </Row>
       </Section>
+      <LookSection layer={layer} />
       <ShadowSection layer={layer} />
       <ExitSection layer={layer} />
     </>
@@ -564,6 +566,139 @@ const SHADOW_PRESETS: Record<string, Shadow[]> = {
 }
 
 /** Schaduwen: één of meer (gestapeld), voor tekst, vormen, afbeeldingen en composities. */
+/** Verloop voor een vorm: van de vulkleur naar een tweede kleur, lineair of radiaal, met dekking per kant. */
+function GradientRows({ layer }: { layer: Layer }) {
+  const g = layer.shape!.gradient
+  const up = (fn: (gr: NonNullable<ShapeProps['gradient']>) => void, co?: string) =>
+    updateLayer(layer.id, (l) => {
+      if (l.shape?.gradient) fn(l.shape.gradient)
+    }, co)
+  return (
+    <>
+      <Row label="Verloop">
+        <Switch
+          checked={!!g}
+          onChange={(v) =>
+            updateLayer(layer.id, (l) => {
+              if (v) l.shape!.gradient = { type: 'linear', angle: 180, to: '#000000', fromOpacity: 1, toOpacity: 1 }
+              else delete l.shape!.gradient
+            })
+          }
+        />
+        {g && (
+          <div className="seg" style={{ flex: 1 }}>
+            {(
+              [
+                ['linear', 'Lineair'],
+                ['radial', 'Radiaal']
+              ] as const
+            ).map(([k, label]) => (
+              <button key={k} className={g.type === k ? 'on' : ''} style={{ flex: 1 }} onClick={() => up((gr) => void (gr.type = k))}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+      </Row>
+      {g && (
+        <>
+          <Row label="Naar">
+            <input type="color" value={g.to} onChange={(e) => up((gr) => void (gr.to = e.target.value), 'gto')} />
+            <div className="grow">
+              <TextInput value={g.to} onCommit={(v) => up((gr) => void (gr.to = v))} />
+            </div>
+            {g.type === 'linear' && (
+              <div style={{ width: 74 }}>
+                <Num label="°" value={g.angle} min={-360} max={360} onChange={(v, co) => up((gr) => void (gr.angle = v), co ? 'gan' : undefined)} />
+              </div>
+            )}
+          </Row>
+          <Row label="Dekking">
+            <span className="faint" style={{ fontSize: 11 }}>
+              begin
+            </span>
+            <input type="range" min={0} max={100} value={Math.round(g.fromOpacity * 100)} onChange={(e) => up((gr) => void (gr.fromOpacity = +e.target.value / 100), 'gfo')} />
+            <span className="faint" style={{ fontSize: 11 }}>
+              eind
+            </span>
+            <input type="range" min={0} max={100} value={Math.round(g.toOpacity * 100)} onChange={(e) => up((gr) => void (gr.toOpacity = +e.target.value / 100), 'gtoo')} />
+          </Row>
+        </>
+      )}
+    </>
+  )
+}
+
+const BLEND_LABEL: Record<BlendMode, string> = {
+  normal: 'Normaal',
+  multiply: 'Vermenigvuldigen',
+  screen: 'Bleken',
+  overlay: 'Bedekken',
+  darken: 'Donkerder',
+  lighten: 'Lichter',
+  'color-dodge': 'Kleur tegenhouden',
+  'color-burn': 'Kleur doordrukken',
+  'hard-light': 'Fel licht',
+  'soft-light': 'Zacht licht',
+  difference: 'Verschil',
+  exclusion: 'Uitsluiting',
+  hue: 'Kleurtoon',
+  saturation: 'Verzadiging',
+  color: 'Kleur',
+  luminosity: 'Lichtsterkte'
+}
+
+/** Overvloeien en masker: werkt in alle moderne browsers (Chrome, Safari, Firefox, Edge). */
+function LookSection({ layer }: { layer: Layer }) {
+  const up = (fn: (l: Layer) => void, co?: string) => updateLayer(layer.id, fn, co)
+  const mask = layer.mask
+  return (
+    <Section title="Weergave">
+      <Row label="Overvloeien">
+        <select value={layer.blend ?? 'normal'} onChange={(e) => up((l) => (e.target.value === 'normal' ? void delete l.blend : void (l.blend = e.target.value as BlendMode)))}>
+          {BLEND_MODES.map((m) => (
+            <option key={m} value={m}>
+              {BLEND_LABEL[m]}
+            </option>
+          ))}
+        </select>
+      </Row>
+      {layer.type !== 'text' && (
+        <>
+          <Row label="Masker">
+            <div className="seg" style={{ flex: 1, minWidth: 0 }}>
+              {(
+                [
+                  [null, 'Geen'],
+                  ['rect', 'Rechthoek'],
+                  ['ellipse', 'Ellips']
+                ] as const
+              ).map(([k, label]) => (
+                <button
+                  key={label}
+                  className={(mask?.shape ?? null) === k ? 'on' : ''}
+                  style={{ flex: 1, minWidth: 0, padding: '0 4px' }}
+                  onClick={() => up((l) => (k ? void (l.mask = { shape: k, radius: l.mask?.radius ?? 0 }) : void delete l.mask))}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </Row>
+          {mask?.shape === 'rect' && (
+            <Row label="Hoekradius">
+              <div className="grow">
+                <Num label="◜" value={mask.radius} min={0} max={1000} onChange={(v, co) => up((l) => void (l.mask && (l.mask.radius = v)), co ? 'mr' : undefined)} />
+              </div>
+            </Row>
+          )}
+          {mask && <div className="hint-text">{layer.type === 'group' ? 'Alles in deze compositie wordt bijgesneden tot het kader.' : 'De inhoud wordt bijgesneden tot het kader van de laag.'}</div>}
+        </>
+      )}
+    </Section>
+  )
+}
+
 function ShadowSection({ layer }: { layer: Layer }) {
   const list = layer.shadows ?? []
   const up = (fn: (l: Layer) => void, co?: string) => updateLayer(layer.id, fn, co)

@@ -1145,3 +1145,38 @@ describe('varianten uit CSV/Excel', () => {
     expect(r.variants[1]).toEqual({ id: 'n1', name: 'Winter', values: { 's|text': 'Koud' } })
   })
 })
+
+describe('verlopen, maskers en overvloeimodi', () => {
+  it('zet verloop, masker en overvloeien veilig in de CSS', () => {
+    const p = createStarterProject()
+    const comp = p.compositions[0]
+    const rect = createLayer('shape', comp)
+    rect.shape!.fill = '#ff0000'
+    rect.shape!.gradient = { type: 'linear', angle: 90, to: '#0000ff', fromOpacity: 1, toOpacity: 0.5 }
+    rect.blend = 'multiply'
+    const pen = createLayer('shape', comp)
+    pen.shape!.kind = 'path'
+    pen.shape!.path = { d: 'M0 0L10 0L10 10Z', w: 10, h: 10, closed: true }
+    pen.shape!.gradient = { type: 'radial', angle: 0, to: '#00ff00', fromOpacity: 1, toOpacity: 0 }
+    const group = createLayer('group', comp)
+    group.children = [createLayer('shape', comp)]
+    group.mask = { shape: 'rect', radius: 12 }
+    const img = createLayer('image', comp)
+    img.image!.src = 'assets/a.png'
+    img.mask = { shape: 'ellipse', radius: 0 }
+    img.blend = 'evil;}body{x' as never
+    comp.layers.unshift(rect, pen, group, img)
+    const html = build(p).html
+    expect(html).toContain('background:linear-gradient(90deg,rgba(255,0,0,1),rgba(0,0,255,0.5))')
+    expect(html).toContain('mix-blend-mode:multiply')
+    expect(html).not.toContain('evil')
+    expect(html).toMatch(/<radialGradient id="a\d+g"[^>]*><stop offset="0" stop-color="#ff0000"|<radialGradient id="a\d+g"/)
+    expect(html).toMatch(/fill="url\(#a\d+g\)"/)
+    expect(html).toContain('clip-path:inset(0 round 12px)')
+    expect(html).toContain('clip-path:ellipse(50% 50% at 50% 50%)')
+    expect(html).toContain('isolation:isolate')
+    // Groepsinhoud zit in de maskerlaag
+    const dom = new JSDOM(html)
+    expect(dom.window.document.querySelectorAll('.M .L').length).toBe(1)
+  })
+})

@@ -66,6 +66,44 @@ export interface ImageProps {
 
 export type ShapeKind = 'rect' | 'ellipse' | 'path'
 
+/** Kleurverloop voor een vorm: van de vulkleur naar `to`. Lineair (hoek in graden, 0 = naar boven, 90 = naar rechts) of radiaal vanuit het midden. */
+export interface Gradient {
+  type: 'linear' | 'radial'
+  angle: number
+  to: string
+  /** Dekking van begin- en eindkleur (0..1); handig voor een verloop naar transparant over een foto. */
+  fromOpacity: number
+  toOpacity: number
+}
+
+/** Overvloeimodi (CSS mix-blend-mode, werkt in alle moderne browsers). */
+export type BlendMode =
+  | 'normal'
+  | 'multiply'
+  | 'screen'
+  | 'overlay'
+  | 'darken'
+  | 'lighten'
+  | 'color-dodge'
+  | 'color-burn'
+  | 'hard-light'
+  | 'soft-light'
+  | 'difference'
+  | 'exclusion'
+  | 'hue'
+  | 'saturation'
+  | 'color'
+  | 'luminosity'
+
+export const BLEND_MODES: BlendMode[] = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge', 'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity']
+
+/** Masker: de inhoud van de laag (bij een compositie: alle lagen erin) wordt bijgesneden tot deze vorm. */
+export interface LayerMask {
+  shape: 'rect' | 'ellipse'
+  /** Hoekradius bij een rechthoek. */
+  radius: number
+}
+
 export interface ShapeProps {
   /** Rechthoek (met hoekradius), ellips of vrije vorm (pen tool). Ontbreekt = rechthoek. */
   kind?: ShapeKind
@@ -78,6 +116,8 @@ export interface ShapeProps {
   strokeColor: string
   /** 0 = geen lijn. */
   strokeWidth: number
+  /** Kleurverloop in plaats van een effen vulling (begint met `fill`). */
+  gradient?: Gradient | null
   /** Pen tool: SVG-pad in een eigen coördinatenstelsel van w×h (schaalt mee met de laag). */
   path?: { d: string; w: number; h: number; closed: boolean }
 }
@@ -176,6 +216,10 @@ export interface Layer {
   exit?: { url: string } | null
   /** Schaduwen (CSS drop-shadow, volgt de vorm van tekst, vormen en afbeeldingen). Meerdere = gestapeld. */
   shadows?: Shadow[]
+  /** Overvloeimodus met de lagen eronder (zoals in Photoshop/AE). */
+  blend?: BlendMode
+  /** Masker: inhoud bijsnijden tot een rechthoek (met hoekradius) of ellips. */
+  mask?: LayerMask | null
   tracks: Tracks
   intro?: Motion | null
   outro?: Motion | null
