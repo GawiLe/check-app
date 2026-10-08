@@ -474,6 +474,15 @@ export function Timeline() {
     for (const g of visibleGroups(l, shownProps[l.id])) {
       const members = groupProps(l, g)
       const hasKeyHere = members.some((m) => l.tracks[m]?.some((k) => Math.abs(k.t - (time - offset)) < 1 / 60))
+      // Keyframe-navigator (zoals in After Effects): playhead precies op het vorige / volgende keyframe
+      const keyTimes = groupTimes(effectiveLayer(l), g).map((t) => offset + t)
+      const prevKey = [...keyTimes].reverse().find((t) => t < time - 1e-4)
+      const nextKey = keyTimes.find((t) => t > time + 1e-4)
+      const goTo = (t: number | undefined) => {
+        if (t == null) return
+        s().setPlaying(false)
+        s().setTime(t)
+      }
       const on = members.some((m) => l.tracks[m]?.length)
       const value =
         g === 'position'
@@ -487,12 +496,18 @@ export function Timeline() {
               : `${Math.round(st[g] * 100)}%`
       rows.push(
         <div key={l.id + g + 'n'} className="tl-name sub" style={{ paddingLeft: 30 + depth * 16 }}>
+          <button className="kf-nav" title="Naar vorig keyframe" disabled={prevKey == null} onClick={() => goTo(prevKey)}>
+            ◀
+          </button>
           <button
             className={`kf-btn${on ? ' on' : ''}${hasKeyHere ? ' here' : ''}`}
             title={hasKeyHere ? 'Keyframe op de playhead weghalen' : 'Keyframe op de playhead zetten'}
             onClick={() => toggleKeyAtPlayhead(l, g, offset)}
           >
             ◆
+          </button>
+          <button className="kf-nav" title="Naar volgend keyframe" disabled={nextKey == null} onClick={() => goTo(nextKey)}>
+            ▶
           </button>
           <span className="grow">{GROUP_LABEL[g]}</span>
           <span className={on ? 'kf-val' : 'faint'} style={{ fontVariantNumeric: 'tabular-nums' }}>

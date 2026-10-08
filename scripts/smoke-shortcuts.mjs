@@ -117,6 +117,17 @@ await key('KeyK')
 await key('KeyJ')
 await check('J: terug naar vorig keyframe', async () => Math.abs((await st()).time - afterK) < 0.01)
 
+// 5b. Keyframe-navigator: ◀ ▶ bij een eigenschap zet de playhead precies op het keyframe
+await select(['Headline'])
+await setTime(0)
+const posNav = page.locator('.tl-name.sub', { hasText: 'Positie' }).first()
+const xKeys = (await layer('Headline')).tracks.x.map((k) => k.t).sort((a, b) => a - b)
+await posNav.locator('.kf-nav', { hasText: '▶' }).click()
+await check('▶: precies op het volgende positie-keyframe', async () => (await st()).time === xKeys[0])
+await setTime(xKeys[0] + 0.37)
+await posNav.locator('.kf-nav', { hasText: '◀' }).click()
+await check('◀: precies terug op het vorige keyframe', async () => (await st()).time === xKeys[0])
+
 // 6. Uitlijnen en verdelen met Option/Alt
 await select(['Headline', 'CTA'])
 await key('Alt+KeyA')

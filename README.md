@@ -352,6 +352,7 @@ Het volledige overzicht staat in de app: **Help → Sneltoetsen** of druk **?**.
 | Home / End | naar begin / eindframe |
 | PageUp / PageDown | 1 frame terug / vooruit (⇧: 10) |
 | J / K | naar vorig / volgend keyframe |
+| ◀ ◆ ▶ in de tijdlijn | per eigenschap: precies naar het vorige / volgende keyframe, of keyframe zetten/weghalen |
 | I / ⇧I | naar in- / uitpunt van de geselecteerde laag |
 | [ / ] | in- / uitpunt op de playhead (inkorten) |
 | ⇧[ / ⇧] | laag verschuiven zodat hij op de playhead begint / eindigt |

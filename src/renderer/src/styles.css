@@ -2640,3 +2640,20 @@ kbd {
   background: rgba(245, 165, 36, 0.14);
   color: #f5c46b;
 }
+
+/* Keyframe-navigator: ◀ ◆ ▶ per eigenschap */
+.kf-nav {
+  width: 12px;
+  height: 16px;
+  padding: 0;
+  font-size: 8px;
+  color: var(--muted);
+  border-radius: 3px;
+}
+.kf-nav:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+.kf-nav:not(:disabled):hover {
+  color: var(--key);
+}
