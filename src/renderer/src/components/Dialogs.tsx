@@ -159,6 +159,10 @@ function ExportDialog({ onClose }: { onClose: () => void }) {
           ))}
           <div className="hint-text">clickTag: {project.clickTag}</div>
           <div className="hint-text">Polite loading: {project.politeLoad ? 'aan' : 'uit'} · rand en backup volgens formaat-instellingen</div>
+          <label className="check" style={{ marginTop: 8 }} title="JPG en PNG verkleinen tot de getoonde maat (2× voor retina) en opnieuw comprimeren. De originelen blijven staan.">
+            <input type="checkbox" checked={!!project.optimizeImages} onChange={(e) => useStore.getState().update((p) => void (p.optimizeImages = e.target.checked))} />
+            Afbeeldingen optimaliseren
+          </label>
         </div>
       </div>
 

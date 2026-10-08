@@ -248,6 +248,8 @@ export interface Project {
    * Ontbreekt = aan.
    */
   embedFonts?: boolean
+  /** Afbeeldingen bij export verkleinen tot de getoonde maat (2×) en opnieuw comprimeren. */
+  optimizeImages?: boolean
   /** Varianten van dit project (template): welke velden variabel zijn en de waarden per variant. */
   variants?: VariantSet
   /** Gezet in een variantmap: van welk template (mapnaam) en welke variant dit project komt. */

@@ -6,7 +6,7 @@ import { inside } from './paths'
 import type { BannerStudioApi, Settings } from '@shared/api'
 import type { Project } from '@shared/types'
 import { aiAnimate } from './ai'
-import { exportBanners, MIME } from './exporter'
+import { estimateSize, exportBanners, MIME } from './exporter'
 import { addVersion, clearAutosave, listVersions, readNewerAutosave, readVersion, writeAutosave } from './history'
 import { normalizeProject } from '@shared/sync'
 import { createVariants } from './variants'
@@ -199,6 +199,7 @@ const handlers: Handlers = {
   },
   generateWriteOn: (dir, fontFile, text, size) => textToGlyphPaths(dir, fontFile, text, size),
   exportBanners: (req) => exportBanners(req),
+  estimateSize: (dir, project, compId, target) => estimateSize(dir, project, compId, target),
   createVariants: (req) => createVariants(req),
   async setDirty(v) {
     dirty = !!v
@@ -259,7 +260,7 @@ const handlers: Handlers = {
 
 // Functies die in een projectmap schrijven of lezen: alleen in het project dat nu open is
 // (de map komt uit het venster en wordt dus niet blind vertrouwd).
-const DIR_ARG = new Set(['importImages', 'importFonts', 'listAssets', 'importPaths', 'generateWriteOn', 'saveBoilerplate', 'installWebFont'])
+const DIR_ARG = new Set(['importImages', 'importFonts', 'listAssets', 'importPaths', 'generateWriteOn', 'saveBoilerplate', 'installWebFont', 'estimateSize'])
 const DIR_REQ = new Set(['exportBanners', 'createVariants'])
 // Mag voor elk geopend tabblad (ook op de achtergrond): opslaan, herstelkopie, versies
 const OPEN_DIR_ARG = new Set(['saveProject', 'autosave', 'clearAutosave', 'listVersions', 'readVersion'])

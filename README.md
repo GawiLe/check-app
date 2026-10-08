@@ -157,6 +157,7 @@ Lagen: selecteer en druk **Enter**, dubbelklik op de naam in de tijdlijn, of rec
   - **R** rechthoek en **E** ellips: sleep, met Shift voor een vierkant of cirkel
   - **G** pen tool: klik voor punten en sleep voor een bocht. Klik op het eerste punt om de vorm te sluiten. Enter of de rechtermuisknop geeft een open lijn, Esc stopt.
 - **Tekst bewerken:** dubbelklik op een tekstlaag (of Enter) en typ direct op het canvas. Esc of Cmd/Ctrl+Enter bevestigt.
+- **Slimme hulplijnen:** tijdens het slepen klikt een laag vast op de randen en het midden van de banner en van andere lagen (roze lijn). De afstanden in pixels tot de buren of de bannerrand staan erbij. Houd Cmd/Ctrl ingedrukt om even niet vast te klikken.
 - **Formaat wijzigen:** acht grepen rondom de selectie, in elke hoek en midden op elke rand. De tegenoverliggende hoek of rand blijft staan (ook bij rotatie). Shift of het slotje bij *Maat* houdt de verhouding vast.
 - **Passende tekst:** zet bij Tekst *Passend* aan en de letter wordt in de banner zelf kleiner tot de tekst in het kader past (handig bij varianten en vertalingen). Past tekst niet, dan zie je een rood kader *Tekst past niet* op het canvas en een waarschuwing in het paneel.
 - **Anchor point:** het kruisje in het midden van een geselecteerde laag is het draaipunt voor schaal en rotatie.
@@ -363,6 +364,10 @@ Elke geëxporteerde banner begint met `<!-- This banner was proudly created by C
 **Backup-afbeelding:** van het eindframe, als `<naam>.jpg` naast `<naam>.zip` (bijv. `campagne_300x600.zip` + `campagne_300x600.jpg`). Met dezelfde naam koppelt CM360 hem bij het uploaden aan de juiste creative.
 
 **Klikgebieden (optioneel):** standaard is de hele banner één klikveld (`clickTag`). Via *+ Laag → Klikgebied* (een onzichtbare rechthoek) of rechtermuisknop → *Eigen klikgebied* op een bestaande laag geef je een deel van de banner een eigen URL. Klikgebieden liggen altijd boven de algemene klik, ook als er een andere laag overheen ligt. Op het canvas zie je ze als geel gestippeld kader met hun nummer.
+
+**Afbeeldingen optimaliseren (optie):** zet in het paneel Ontwerp bij Export *Afbeeldingen* aan (of vink het aan in het exportvenster). Bij export worden JPG's en PNG's dan verkleind tot de maat waarop ze in dat formaat getoond worden (2× voor retina, met schaal-animaties en groepen meegerekend) en opnieuw gecomprimeerd. Een PNG zonder transparantie (zoals een foto) wordt een JPG als dat veel kleiner is. De originelen in `assets/` blijven staan; het rapport toont per afbeelding wat het opleverde.
+
+**Live KB-teller:** linksonder op het canvas zie je hoe groot de export van het huidige formaat wordt, tegen de strengste grens van de gekozen platforms (ZIP of initial load). Groen is ruim binnen de grens, oranje bijna, rood te groot.
 
 **DV360:** banners die via DV360 worden ingekocht en via CM360 worden uitgeleverd: kies CM360. Rechtstreeks in DV360 uploaden werkt met dezelfde standaard HTML5-zip. Alleen voor Studio/rich media (Enabler) is iets anders nodig.
 

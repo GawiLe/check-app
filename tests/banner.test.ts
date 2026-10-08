@@ -1035,3 +1035,53 @@ describe('transformgrepen', () => {
     expect([e.width, e.height]).toEqual([200, 100])
   })
 })
+
+describe('afbeeldingen optimaliseren', () => {
+  it('berekent de benodigde maat (2×), met schaal-animatie en groepen', async () => {
+    const { imageUses, resizeFactor } = await import('../src/shared/images')
+    const p = createStarterProject()
+    const comp = p.compositions[0]
+    const img = createLayer('image', comp)
+    Object.assign(img, { width: 100, height: 50, scale: 1, image: { src: 'assets/a.jpg', fit: 'cover' } })
+    img.tracks.scale = [
+      { t: 0, v: 0.5, e: 'linear' },
+      { t: 1, v: 1.5, e: 'linear' }
+    ]
+    const group = createLayer('group', comp)
+    const inner = createLayer('image', comp)
+    Object.assign(inner, { width: 40, height: 40, scale: 1, image: { src: 'assets/a.jpg', fit: 'contain' } })
+    Object.assign(group, { scale: 2, children: [inner] })
+    comp.layers = [img, group]
+    const uses = imageUses(comp)['assets/a.jpg']
+    expect(uses).toEqual([
+      { w: 300, h: 150, fit: 'cover' },
+      { w: 160, h: 160, fit: 'contain' }
+    ])
+    // 1200×600 bron: cover heeft 300×150 nodig (factor 0,25), contain 160×160 (factor 160/1200)
+    expect(resizeFactor(uses, 1200, 600)).toBeCloseTo(0.25)
+    // Kleiner dan nodig: nooit vergroten
+    expect(resizeFactor(uses, 100, 100)).toBe(1)
+  })
+})
+
+describe('slimme hulplijnen', () => {
+  it('klikt vast op het midden van de banner en op de rand van een andere laag', async () => {
+    const { snapMove, measuresFor } = await import('../src/shared/snap')
+    const frame = { w: 300, h: 600 }
+    // Midden op 152 → klikt naar 150 (bannermidden)
+    const a = snapMove({ x: 102, y: 400, w: 100, h: 50 }, [], frame, 6)
+    expect(a.dx).toBe(-2)
+    expect(a.guides.some((g) => g.axis === 'x' && g.at === 150)).toBe(true)
+    // Bovenrand 3 px onder de onderrand van een andere laag → klikt erop
+    const other = { x: 0, y: 100, w: 80, h: 97 }
+    const b = snapMove({ x: 20, y: 200, w: 40, h: 40 }, [other], frame, 6)
+    expect(b.dy).toBe(-3)
+    // Buiten de drempel: niets
+    expect(snapMove({ x: 120, y: 300, w: 13, h: 13 }, [], frame, 6)).toMatchObject({ dx: 0, dy: 0 })
+    // Afstanden: links tot de banner, boven tot de buur
+    const m = measuresFor({ x: 20, y: 217, w: 40, h: 40 }, [other], frame)
+    expect(m.find((x) => x.axis === 'x' && x.from === 0)?.to).toBe(20)
+    expect(m.find((x) => x.axis === 'y' && x.to === 217)?.from).toBe(197)
+    expect(m.find((x) => x.axis === 'y' && x.from === 257)?.to).toBe(600)
+  })
+})

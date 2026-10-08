@@ -260,6 +260,12 @@ function CompDesign() {
           <Switch checked={project.embedFonts !== false} onChange={(v) => update((p) => void (p.embedFonts = v))} />
           <span className="faint">{project.embedFonts !== false ? 'ingebed (Base64)' : 'losse .woff2'}</span>
         </Row>
+        <Row label="Afbeeldingen">
+          <span title="Bij export: JPG en PNG verkleinen tot de maat waarop ze getoond worden (2× voor retina) en opnieuw comprimeren. Een PNG zonder transparantie kan een JPG worden. De originelen in assets/ blijven staan." style={{ display: 'contents' }}>
+            <Switch checked={!!project.optimizeImages} onChange={(v) => update((p) => void (p.optimizeImages = v))} />
+            <span className="faint">{project.optimizeImages ? 'optimaliseren bij export' : 'zoals ze zijn'}</span>
+          </span>
+        </Row>
         <div className="row" style={{ alignItems: 'flex-start' }}>
           <span className="label" style={{ paddingTop: 6 }}>
             Platform

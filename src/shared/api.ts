@@ -79,6 +79,8 @@ export interface BannerStudioApi {
     size: number
   ): Promise<Pick<WriteOnProps, 'glyphs' | 'viewBox'> & { width: number; height: number }>
   exportBanners(req: ExportRequest): Promise<ExportResult[]>
+  /** Live KB-teller: geschatte ZIP-grootte en initial load van één formaat. */
+  estimateSize(dir: string, project: Project, compId: string, target: ExportTarget): Promise<{ zipBytes: number; initialLoadBytes: number }>
   createVariants(req: VariantRequest): Promise<VariantResult[]>
   /** Niet-opgeslagen wijzigingen melden aan het hoofdproces (voor de vraag bij sluiten). */
   setDirty(dirty: boolean): Promise<void>

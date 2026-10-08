@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Maximize, Minus, Plus, Star } from 'lucide-react'
 import { layerStateAt, restStateAt } from '@shared/anim'
 import { resizeFromHandle } from '@shared/geometry'
+import { measuresFor, snapMove, union, type Guide, type Measure, type Rect } from '@shared/snap'
 import { buildBanner } from '@shared/build'
 import type { Composition, Layer, Project } from '@shared/types'
 import { anchorOf } from '@shared/geometry'
@@ -12,6 +13,7 @@ import { addPenShape, addShapeRect, addTextAt, applyLibrary, importDroppedFiles,
 import { openEmptyMenu, openLayerMenu } from '../lib/menus'
 import { assetUrl, currentComp, setLayerValue, updateLayer, useStore } from '../store'
 import { DRAG_TYPE } from './Library'
+import { SizeMeter } from './SizeMeter'
 
 /**
  * De echte banner-HTML (zelfde builder als de export) in een iframe. Twee iframes
@@ -187,6 +189,26 @@ function boxesAt(layers: Layer[], t: number): Box[] {
   return out
 }
 
+/** Omhullende rechthoek (niet gedraaid) van een laag op het canvas, voor de slimme hulplijnen. */
+function aabb(b: Box): Rect {
+  const r = rad(b.rotation)
+  const w = b.layer.width
+  const h = b.layer.height
+  const pts = [
+    [0, 0],
+    [w, 0],
+    [0, h],
+    [w, h]
+  ].map(([u, v]) => {
+    const dx = (u - b.ax * w) * b.scale
+    const dy = (v - b.ay * h) * b.scaleY
+    return [b.wx + dx * Math.cos(r) - dy * Math.sin(r), b.wy + dx * Math.sin(r) + dy * Math.cos(r)]
+  })
+  const xs = pts.map((p) => p[0])
+  const ys = pts.map((p) => p[1])
+  return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) }
+}
+
 /** Canvaspunt → coördinaat binnen het kader van de laag (0..breedte, 0..hoogte). */
 /** Grepen voor het formaat: vier hoeken en de middens van de vier randen. */
 const HANDLES: [number, number][] = [
@@ -222,7 +244,7 @@ const inside = (b: Box, x: number, y: number) => {
 }
 
 type Drag =
-  | { kind: 'move'; x: number; y: number; start: { id: string; x: number; y: number; ps: number; pr: number }[] }
+  | { kind: 'move'; x: number; y: number; start: { id: string; x: number; y: number; ps: number; pr: number }[]; bbox: Rect | null; targets: Rect[] }
   | { kind: 'resize'; id: string; hx: number; hy: number; box: Box; orig: Layer }
   | { kind: 'anchor'; box: Box }
   | { kind: 'draw'; tool: 'rect' | 'ellipse' | 'text'; x: number; y: number; x2: number; y2: number }
@@ -244,6 +266,8 @@ function SingleViewer() {
   const drag = useRef<Drag | null>(null)
   const pen = useRef<PenPoint[]>([])
   const [penCursor, setPenCursor] = useState<[number, number] | null>(null)
+  // Slimme hulplijnen en afstanden tijdens het slepen
+  const [snapUi, setSnapUi] = useState<{ guides: Guide[]; measures: Measure[] } | null>(null)
 
   const boxes = boxesAt(comp.layers, time)
   const boxOf = (id: string) => boxes.find((b) => b.layer.id === id)
@@ -272,7 +296,13 @@ function SingleViewer() {
         return { id, x: anim('x') ? st.x : f.layer.x, y: anim('y') ? st.y : f.layer.y, ps: b.parentScale, pr: b.parentRot }
       })
       .filter((x): x is { id: string; x: number; y: number; ps: number; pr: number } => !!x)
-    drag.current = { kind: 'move', x: p.x, y: p.y, start }
+    const moving = new Set(start.map((s) => s.id))
+    const bbox = union(boxes.filter((b) => moving.has(b.layer.id)).map(aabb))
+    // Doelen: andere lagen op hetzelfde niveau (geen lagen binnen een gesleepte groep), zichtbaar en niet piepklein
+    const targets = candidates
+      .filter((b) => !moving.has(b.layer.id) && !b.ancestors.some((a) => moving.has(a.id)) && b.scale !== 0 && b.scaleY !== 0)
+      .map(aabb)
+    drag.current = { kind: 'move', x: p.x, y: p.y, start, bbox, targets }
   }
 
   const finishPen = (closed: boolean) => {
@@ -354,16 +384,29 @@ function SingleViewer() {
       return
     }
     switch (d.kind) {
-      case 'move':
+      case 'move': {
+        let mx = p.x - d.x
+        let my = p.y - d.y
+        // Vastklikken op randen en middens (Cmd/Ctrl ingedrukt = even niet)
+        if (d.bbox && !(e.metaKey || e.ctrlKey)) {
+          const frame = { w: comp.width, h: comp.height }
+          const moved = { ...d.bbox, x: d.bbox.x + mx, y: d.bbox.y + my }
+          const snap = snapMove(moved, d.targets, frame, 6 / zoom)
+          mx += snap.dx
+          my += snap.dy
+          const at = { ...moved, x: moved.x + snap.dx, y: moved.y + snap.dy }
+          setSnapUi({ guides: snap.guides, measures: measuresFor(at, d.targets, frame).filter((m) => m.to - m.from >= 1) })
+        } else setSnapUi(null)
         for (const st of d.start) {
           // Verschuiving omrekenen naar de ruimte van de compositie waar de laag in zit
           const r = rad(-st.pr)
-          const wx = (p.x - d.x) / st.ps
-          const wy = (p.y - d.y) / st.ps
+          const wx = mx / st.ps
+          const wy = my / st.ps
           setLayerValue(st.id, 'x', Math.round(st.x + wx * Math.cos(r) - wy * Math.sin(r)), 'move')
           setLayerValue(st.id, 'y', Math.round(st.y + wx * Math.sin(r) + wy * Math.cos(r)), 'move')
         }
         break
+      }
       case 'resize': {
         // Greep in een hoek of midden op een rand; de tegenoverliggende kant blijft staan
         const [u, v] = toLocal(d.box, p.x, p.y)
@@ -420,6 +463,7 @@ function SingleViewer() {
 
   /** Sleepactie afbreken zonder iets toe te passen (focus kwijt, pointer geannuleerd). */
   const cancelDrag = () => {
+    setSnapUi(null)
     if (!drag.current) return
     drag.current = null
     force((n) => n + 1)
@@ -428,6 +472,7 @@ function SingleViewer() {
   const onUp = () => {
     const d = drag.current
     drag.current = null
+    setSnapUi(null)
     if (d?.kind === 'draw') {
       const x = Math.min(d.x, d.x2)
       const y = Math.min(d.y, d.y2)
@@ -617,6 +662,22 @@ function SingleViewer() {
                 )
               )
             })}
+            {snapUi?.guides.map((g, i) => (
+              <div
+                key={'g' + i}
+                className="snap-line"
+                style={g.axis === 'x' ? { left: g.at * zoom, top: g.from * zoom, width: 1, height: (g.to - g.from) * zoom } : { top: g.at * zoom, left: g.from * zoom, height: 1, width: (g.to - g.from) * zoom }}
+              />
+            ))}
+            {snapUi?.measures.map((m, i) => (
+              <div
+                key={'m' + i}
+                className={`snap-measure ${m.axis}`}
+                style={m.axis === 'x' ? { left: m.from * zoom, top: m.at * zoom, width: (m.to - m.from) * zoom } : { top: m.from * zoom, left: m.at * zoom, height: (m.to - m.from) * zoom }}
+              >
+                <span>{Math.round(m.to - m.from)}</span>
+              </div>
+            ))}
             {hovered && box(hovered, 'hover', false)}
             {selected.map((b) => box(b, '', !!single && b === single))}
             {single && tool === 'select' && !editBox && (
@@ -665,6 +726,7 @@ function SingleViewer() {
         <div className="tool-hint">Klik voor punten, sleep voor een bocht. Klik op het eerste punt om te sluiten, Enter of rechtermuisknop voor een open lijn, Esc om te stoppen.</div>
       )}
       {ctxGroup && <div className="tool-hint top">Compositie "{ctxGroup.name}" geopend: je bewerkt de lagen hierin. Klik op het formaat-tabblad onder om terug te gaan.</div>}
+      <SizeMeter />
       <div className="floating">
         <button className="icon sm" title="Uitzoomen" onClick={() => zoomTo(zoom / 1.25)}>
           <Minus size={14} />

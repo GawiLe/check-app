@@ -74,6 +74,42 @@ await check('greep midden rechts: alleen breder, hoogte en links blijven', async
 })
 await shot('e1-grepen')
 
+// 1b. Slimme hulplijnen: headline vlak naast het bannermidden loslaten → klikt vast op het midden, met hulplijn
+const zoomNow = await page.evaluate(() => window.__bsStore.getState().zoom)
+const dragBy = async (dxComp, dyComp, hold) => {
+  const sb = await page.locator('.viewer .sel:not(.hover)').first().boundingBox()
+  // Niet in het midden pakken: daar zit het anchor point
+  const cx = sb.x + sb.width * 0.2
+  const cy = sb.y + sb.height * 0.3
+  await page.mouse.move(cx, cy)
+  await page.mouse.down()
+  if (hold) await page.keyboard.down(hold)
+  await page.mouse.move(cx + dxComp * zoomNow, cy + dyComp * zoomNow, { steps: 8 })
+}
+await select(['Headline'])
+await page.waitForTimeout(200)
+let cta = await layer('Headline')
+const rawX = cta.x + 150 + 3 - (cta.x + cta.width / 2)
+await dragBy(150 + 3 - (cta.x + cta.width / 2), 7)
+await check('hulplijn zichtbaar tijdens slepen', async () => (await page.locator('.snap-line').count()) > 0 && (await page.locator('.snap-measure').count()) > 0)
+await shot('e1b-hulplijnen')
+await page.mouse.up()
+await check('vastgeklikt op het bannermidden of een rand van een andere laag', async () => {
+  const l = await layer('Headline')
+  const edges = (await layers()).filter((o) => o.name !== 'Headline').flatMap((o) => [o.x, o.x + o.width / 2, o.x + o.width])
+  const snapped = Math.abs(l.x + l.width / 2 - 150) <= 0.5 || edges.some((e) => [l.x, l.x + l.width / 2, l.x + l.width].some((m) => Math.abs(m - e) <= 0.5))
+  return snapped && Math.abs(l.x - rawX) >= 0.5 && Math.abs(l.x - rawX) <= 6
+})
+await check('hulplijnen weg na loslaten', async () => (await page.locator('.snap-line, .snap-measure').count()) === 0)
+cta = await layer('Headline')
+await dragBy(3, 0, 'Control')
+await page.mouse.up()
+await page.keyboard.up('Control')
+await check('met Ctrl/Cmd: niet vastklikken', async () => {
+  const l = await layer('Headline')
+  return Math.abs(l.x - (cta.x + 3)) <= 1
+})
+
 // 2. Tekstvak trekken met het tekstgereedschap
 const count0 = (await layers()).length
 await page.evaluate(() => window.__bsStore.getState().setTool('text'))

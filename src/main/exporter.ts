@@ -10,6 +10,8 @@ import { inside } from './paths'
 import type { Composition, ExportResult, ExportTarget, Project } from '@shared/types'
 import { initialLoad, validateBanner } from '@shared/validate'
 import { subsetToWoff2 } from './fonts'
+import { imageUses } from '@shared/images'
+import { optimizeImage, type OptimizedImage } from './images'
 
 const slug = (s: string) =>
   s
@@ -31,46 +33,47 @@ const MIME: Record<string, string> = {
  * Per formaat, want elke banner bevat zijn eigen kopie (zeker bij Base64). Gelijke sets worden hergebruikt.
  */
 const subsetCache = new Map<string, Promise<Buffer>>()
-async function prepareFonts(dir: string, project: Project, comp: Composition): Promise<Record<string, Buffer>> {
+async function prepareFonts(dir: string, project: Project, comp: Composition, cache = subsetCache): Promise<Record<string, Buffer>> {
   const chars = charsPerFont(project, comp)
   const out: Record<string, Buffer> = {}
   for (const f of project.fonts) {
     if (f.system || !chars[f.id]) continue
     const set = [...new Set(chars[f.id] + ' ')].sort().join('')
-    const key = `${dir}|${f.file}|${set}`
-    if (!subsetCache.has(key)) subsetCache.set(key, subsetToWoff2(dir, f.file, set))
+    const mtime = cache === subsetCache ? 0 : await stat(inside(dir, f.file)).then((st) => st.mtimeMs).catch(() => 0)
+    const key = `${dir}|${f.file}|${mtime}|${set}`
+    if (!cache.has(key)) {
+      if (cache.size > 200) cache.clear()
+      cache.set(key, subsetToWoff2(dir, f.file, set))
+    }
     try {
-      out[f.id] = await subsetCache.get(key)!
+      out[f.id] = await cache.get(key)!
     } catch (err) {
-      subsetCache.delete(key)
+      cache.delete(key)
       throw err
     }
   }
   return out
 }
 
-async function exportOne(
-  dir: string,
-  project: Project,
-  comp: Composition,
-  target: ExportTarget,
-  fonts: Record<string, Buffer>
-): Promise<ExportResult> {
-  const spec = TARGETS[target]
-  const name = `${slug(project.name)}_${comp.width}x${comp.height}`
-  const targetDir = join(dir, 'export', target)
-  const outDir = join(targetDir, name)
-  await rm(outDir, { recursive: true, force: true })
-  await mkdir(outDir, { recursive: true })
-
+/** Alle bestanden van één banner (in het geheugen): HTML, afbeeldingen, fonts en extra bestanden. */
+async function pack(dir: string, project: Project, comp: Composition, target: ExportTarget, fonts: Record<string, Buffer>) {
   const files: Record<string, Uint8Array> = {}
+
+  // Afbeeldingen optimaliseren (optie): eerst, want een PNG kan een JPG worden (andere naam)
+  const optimized: Record<string, OptimizedImage> = {}
+  if (project.optimizeImages) {
+    for (const [src, uses] of Object.entries(imageUses(comp))) {
+      const o = await optimizeImage(dir, src, uses).catch(() => null)
+      if (o) optimized[src] = o
+    }
+  }
 
   // Afbeeldingen plat in de root, met unieke, veilige namen.
   const assetNames: Record<string, string> = {}
   const taken = new Set(['index.html'])
   const assetUrl = (p: string) => {
     if (!assetNames[p]) {
-      const ext = extname(p).toLowerCase()
+      const ext = optimized[p]?.ext ?? extname(p).toLowerCase()
       const stem = slug(basename(p, extname(p)))
       let n = `${stem}${ext}`
       for (let i = 2; taken.has(n); i++) n = `${stem}-${i}${ext}`
@@ -99,10 +102,36 @@ async function exportOne(
     const m = src.match(/^url\((f\d+\.woff2)\)/)
     if (m && !built.fontIds.includes(fid)) delete files[m[1]]
   }
-  for (const p of built.assets) files[assetNames[p]] = await readFile(inside(dir, p))
+  const imageNotes: string[] = []
+  for (const p of built.assets) {
+    const o = optimized[p]
+    files[assetNames[p]] = o ? o.data : await readFile(inside(dir, p))
+    if (o) {
+      const size = o.to[0] < o.from[0] ? `${o.from[0]}×${o.from[1]} → ${o.to[0]}×${o.to[1]} px, ` : ''
+      imageNotes.push(`${basename(p)}: ${size}${kbs(o.origBytes)} → ${kbs(o.data.byteLength)}${o.ext !== extname(p).toLowerCase() ? ` (als ${o.ext.slice(1).toUpperCase()})` : ''}`)
+    }
+  }
   files['index.html'] = new TextEncoder().encode(built.html)
   for (const [n, text] of Object.entries(built.extraFiles)) files[n] = new TextEncoder().encode(text)
+  return { files, built, imageNotes }
+}
 
+const kbs = (b: number) => `${(b / 1024).toFixed(1)} KB`
+
+async function exportOne(
+  dir: string,
+  project: Project,
+  comp: Composition,
+  target: ExportTarget,
+  fonts: Record<string, Buffer>
+): Promise<ExportResult> {
+  const name = `${slug(project.name)}_${comp.width}x${comp.height}`
+  const targetDir = join(dir, 'export', target)
+  const outDir = join(targetDir, name)
+  await rm(outDir, { recursive: true, force: true })
+  await mkdir(outDir, { recursive: true })
+
+  const { files, built, imageNotes } = await pack(dir, project, comp, target, fonts)
   for (const [n, data] of Object.entries(files)) await writeFile(join(outDir, n), data)
 
   const zip = zipSync(files, { level: 9 })
@@ -134,13 +163,17 @@ async function exportOne(
     if (!buf || !built.fontIds.includes(f.id)) continue
     const orig = await stat(inside(dir, f.file)).then((st) => st.size).catch(() => 0)
     const n = new Set(chars[f.id]).size
-    const kbs = (b: number) => `${(b / 1024).toFixed(1)} KB`
     const at = issues.findIndex((i) => i.rule === 'ok')
     issues.splice(at < 0 ? issues.length : at, 0, {
       level: 'info',
       rule: 'font',
       message: `${f.family} ${f.weight}: ${n} tekens gebruikt, verkleind van ${kbs(orig)} tot ${kbs(buf.byteLength)}${fontsInline(target, project) ? ' en als Base64 in de HTML gezet' : ' (los .woff2-bestand)'}.`
     })
+  }
+
+  if (imageNotes.length) {
+    const at = issues.findIndex((i) => i.rule === 'ok')
+    issues.splice(at < 0 ? issues.length : at, 0, { level: 'info', rule: 'images', message: `Afbeeldingen geoptimaliseerd: ${imageNotes.join(' · ')}` })
   }
 
   return {
@@ -194,6 +227,22 @@ export async function exportBanners(req: ExportRequest): Promise<ExportResult[]>
   }
   await writeFile(join(req.dir, 'export', 'rapport.json'), JSON.stringify(results, null, 2))
   return results
+}
+
+const estimateFonts = new Map<string, Promise<Buffer>>()
+
+/**
+ * Live KB-teller: hoe groot wordt de ZIP van dit formaat (en de initial load) bij export?
+ * Zelfde opbouw als de echte export, maar alleen in het geheugen. Font-subsets en afbeeldingen worden gecachet.
+ */
+export async function estimateSize(dir: string, project: Project, compId: string, target: ExportTarget): Promise<{ zipBytes: number; initialLoadBytes: number }> {
+  const comp = project.compositions.find((c) => c.id === compId)
+  if (!comp || !TARGET_IDS.includes(target)) throw new Error('Onbekend formaat of platform')
+  const fonts = await prepareFonts(dir, project, comp, estimateFonts)
+  const { files } = await pack(dir, project, comp, target, fonts)
+  const zip = zipSync(files, { level: 9 })
+  const fileList = Object.entries(files).map(([n, d]) => ({ name: n, bytes: d.byteLength }))
+  return { zipBytes: zip.byteLength, initialLoadBytes: initialLoad(fileList, project.politeLoad) }
 }
 
 export { MIME }
