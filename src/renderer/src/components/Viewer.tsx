@@ -14,6 +14,7 @@ import { openEmptyMenu, openLayerMenu } from '../lib/menus'
 import { assetUrl, currentComp, setLayerValue, updateLayer, useStore } from '../store'
 import { DRAG_TYPE } from './Library'
 import { SizeMeter } from './SizeMeter'
+import { viewOf } from '../lib/windows'
 
 /**
  * De echte banner-HTML (zelfde builder als de export) in een iframe. Twee iframes
@@ -38,8 +39,10 @@ function BannerFrame(props: { project: Project; comp: Composition; time: number;
       const cur = useStore.getState().overflowIds
       if (ids.join() !== cur.join()) useStore.setState({ overflowIds: ids })
     }
-    window.addEventListener('message', onMsg)
-    return () => window.removeEventListener('message', onMsg)
+    // Berichten komen binnen in het venster waarin de preview staat (kan een los paneel zijn)
+    const w = viewOf(frames[0].current)
+    w.addEventListener('message', onMsg)
+    return () => w.removeEventListener('message', onMsg)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -586,7 +589,8 @@ function SingleViewer() {
   useEffect(() => {
     const el = viewerRef.current
     if (!el) return
-    const ro = new ResizeObserver(() => fitMode.current && fit())
+    const RO = (viewOf(el) as Window & { ResizeObserver: typeof ResizeObserver }).ResizeObserver
+    const ro = new RO(() => fitMode.current && fit())
     ro.observe(el)
     return () => ro.disconnect()
     // eslint-disable-next-line react-hooks/exhaustive-deps

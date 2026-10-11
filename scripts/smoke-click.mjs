@@ -55,6 +55,7 @@ await check('CTA als tweede klikgebied', async () => (await page.locator('.exit-
 await shot('c1-klikgebieden')
 
 // 4. Uitlijnen: Klikgebied + CTA links op elkaar, daarna CTA horizontaal centreren op de banner
+await page.evaluate(() => window.__bsStore.getState().setTime(window.__bsStore.getState().project.compositions[0].duration - 0.1)) // alles in beeld (uitlijnen werkt op de zichtbare stand)
 await row('Klikgebied 1').click()
 await row('CTA').click({ modifiers: ['Shift'] })
 await page.locator('.align-to button', { hasText: 'Selectie' }).click()

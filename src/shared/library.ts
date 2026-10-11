@@ -1,10 +1,11 @@
-import { baseValue, round } from './anim'
+import { baseValue, layerStateAt, round } from './anim'
+import { bakeMotion, effectiveLayer } from './motion'
 import type { AnimProp, Composition, Emphasis, EmphasisType, Keyframe, Layer, Motion } from './types'
 import { ANIM_PROPS } from './types'
 
-// De animatiebibliotheek: kant-en-klare animaties die je op een laag sleept.
-// Elke animatie wordt een binnenkomst, uitgang of accent op de laag, die je daarna
-// gewoon kunt aanpassen (tijd, duur, easing, afstand, sterkte).
+// De animatiebibliotheek: kant-en-klare animaties (presets) die je op een laag sleept of klikt.
+// Een preset zet gewone keyframes op de laag, vanaf de playhead; daarna werk je er gewoon
+// met keyframes verder aan (verschuiven, easing, waarden).
 
 export type LibraryKind = 'intro' | 'outro' | 'emphasis'
 
@@ -62,38 +63,13 @@ export const LIBRARY_GROUPS: { kind: LibraryKind; label: string }[] = [
 const DEFAULT_DURATION: Record<LibraryKind, number> = { intro: 0.6, emphasis: 1, outro: 0.4 }
 
 /**
- * Past een bibliotheek-animatie toe op een laag. `at` is het moment waarop hij
- * begint (bijv. waar je hem in de tijdlijn losliet); zonder `at` blijft een
- * bestaande starttijd staan.
+ * Past een bibliotheek-animatie toe als gewone keyframes (zoals een animatiepreset in After Effects).
+ * `at` is het moment waarop hij begint (de playhead, of waar je hem in de tijdlijn losliet). Bestaande
+ * keyframes binnen die periode worden vervangen; daarbuiten blijven ze staan.
  */
 export function applyLibraryItem(l: Layer, item: LibraryItem, comp: Composition, at?: number): void {
-  if (item.kind === 'emphasis') {
-    const prev = l.emphasis
-    const e: Emphasis = {
-      type: item.emphasis!,
-      start: round(at ?? prev?.start ?? Math.min(comp.duration - 1, 3)),
-      duration: prev?.duration ?? DEFAULT_DURATION.emphasis,
-      repeat: prev?.repeat ?? (item.emphasis === 'pulse' ? 2 : 1),
-      strength: prev?.strength ?? 1
-    }
-    l.emphasis = e
-    return
-  }
-  const prev = l[item.kind]
-  const fallbackStart = item.kind === 'intro' ? 0.3 : Math.max(0, comp.duration - 0.6)
-  const spec = item.motion!
-  const motion: Motion = {
-    fade: true,
-    dx: 0,
-    dy: 0,
-    scale: 1,
-    rotation: 0,
-    reveal: false,
-    ease: 'easeOut',
-    ...spec,
-    start: round(at ?? prev?.start ?? fallbackStart),
-    duration: spec.duration ?? prev?.duration ?? DEFAULT_DURATION[item.kind]
-  }
+  const fallback = item.kind === 'intro' ? 0.3 : item.kind === 'emphasis' ? Math.min(comp.duration - 1, 3) : Math.max(0, comp.duration - 0.6)
+  const start = round(Math.max(0, at ?? fallback))
   if (item.reveal === 'wipeLeft' || item.reveal === 'wipeUp') {
     if (l.type !== 'writeon') l.revealMode = item.reveal
   }
@@ -101,7 +77,28 @@ export function applyLibraryItem(l: Layer, item: LibraryItem, comp: Composition,
     // Write-on kan alleen op een write-on laag; op andere lagen een wipe van links.
     l.revealMode = 'wipeLeft'
   }
-  l[item.kind] = motion
+  // Tijdelijke laag zonder keyframes, met als rustwaarden de stand van de laag op het rustmoment
+  const tmp: Layer = { ...structuredClone({ ...l, children: undefined }), tracks: {}, intro: null, outro: null, emphasis: null }
+  let restT = start
+  if (item.kind === 'emphasis') {
+    tmp.emphasis = { type: item.emphasis!, start, duration: DEFAULT_DURATION.emphasis, repeat: item.emphasis === 'pulse' ? 2 : 1, strength: 1 }
+  } else {
+    const spec = item.motion!
+    const motion: Motion = { fade: true, dx: 0, dy: 0, scale: 1, rotation: 0, reveal: false, ease: 'easeOut', ...spec, start, duration: spec.duration ?? DEFAULT_DURATION[item.kind] }
+    tmp[item.kind] = motion
+    if (item.kind === 'intro') restT = start + motion.duration
+  }
+  const st = layerStateAt(l, restT)
+  Object.assign(tmp, { x: st.x, y: st.y, scale: st.scale, scaleY: st.scaleY, rotation: st.rotation, opacity: st.opacity })
+  for (const [p, kfs] of Object.entries(effectiveLayer(tmp).tracks) as [AnimProp, Keyframe[]][]) {
+    if (!kfs?.length) continue
+    const a = kfs[0].t - 1e-4
+    const b = kfs[kfs.length - 1].t + 1e-4
+    const keep = (l.tracks[p] ?? []).filter((k) => k.t < a || k.t > b)
+    l.tracks[p] = [...keep, ...structuredClone(kfs)].sort((x, y) => x.t - y.t)
+  }
+  // Oud model: niet meer gebruiken
+  bakeMotion(l)
 }
 
 /** Welk bibliotheek-item hoort bij de huidige binnenkomst/uitgang/accent (voor de UI)? */
@@ -164,4 +161,6 @@ export function applyUserPreset(l: Layer, preset: UserPreset, at?: number) {
       v: REL_DIFF.includes(p) ? round(baseValue(l, p) + k.v, 2) : p === 'scale' || p === 'scaleY' ? round(baseValue(l, p) * k.v, 3) : k.v
     }))
   }
+  // Oudere presets met binnenkomst/uitgang: als keyframes op de laag
+  bakeMotion(l)
 }

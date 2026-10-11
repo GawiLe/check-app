@@ -35,6 +35,7 @@ import { contextOf, currentComp, setLayerValue, toggleScaleLink, updateComp, upd
 import { EASE_LABEL } from './Inspector'
 import { DRAG_TYPE } from './Library'
 import { formatTime, InlineRename, Scrub } from './ui'
+import { viewOf } from '../lib/windows'
 
 const FPS = 30
 const snap = (t: number) => Math.round(t * FPS) / FPS
@@ -160,17 +161,18 @@ export function Timeline() {
       s().selectKey({ layerId, prop, t: nt })
       s().setTime(nt + offset)
     }
+    const w = viewOf(e.currentTarget as Node)
     const up = () => {
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
-      window.removeEventListener('pointercancel', up)
-      window.removeEventListener('blur', up)
+      w.removeEventListener('pointermove', move)
+      w.removeEventListener('pointerup', up)
+      w.removeEventListener('pointercancel', up)
+      w.removeEventListener('blur', up)
     }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
+    w.addEventListener('pointermove', move)
+    w.addEventListener('pointerup', up)
     // Ook opruimen als de muis buiten het venster wordt losgelaten of de app de focus verliest
-    window.addEventListener('pointercancel', up)
-    window.addEventListener('blur', up)
+    w.addEventListener('pointercancel', up)
+    w.addEventListener('blur', up)
   }
 
   /** Hele laag in de tijd verschuiven (balk slepen), of in/uit trimmen (randen slepen). */
@@ -191,59 +193,6 @@ export function Timeline() {
         },
         `bar-${mode}`
       )
-    )
-  }
-
-  const motionSegment = (l: Layer, kind: 'intro' | 'outro', offset: number) => {
-    const m = l[kind]
-    if (!m) return null
-    const orig = { ...m }
-    return (
-      <div
-        key={kind}
-        className={`seg-motion ${kind}`}
-        style={{ left: xOf(offset + m.start), width: Math.max(6, m.duration * pps) }}
-        title={`${kind === 'intro' ? 'Binnenkomst' : 'Uitgang'} · sleep om te verschuiven, rand = duur`}
-        onPointerDown={(e) => {
-          s().select([l.id])
-          s().setTab('motion')
-          drag(e, (dt) => updateLayer(l.id, (x) => void (x[kind] && (x[kind]!.start = Math.max(0, round(orig.start + dt)))), `seg-${kind}`))
-        }}
-      >
-        {m.duration * pps > 50 && (kind === 'intro' ? 'IN' : 'UIT')}
-        <div
-          className="edge"
-          onPointerDown={(e) =>
-            drag(e, (dt) => updateLayer(l.id, (x) => void (x[kind] && (x[kind]!.duration = Math.max(0.05, round(orig.duration + dt)))), `edge-${kind}`))
-          }
-        />
-      </div>
-    )
-  }
-
-  const emphasisSegment = (l: Layer, offset: number) => {
-    const em = l.emphasis
-    if (!em) return null
-    const orig = { ...em }
-    return (
-      <div
-        className="seg-motion emphasis"
-        style={{ left: xOf(offset + em.start), width: Math.max(6, em.duration * pps) }}
-        title="Accent · sleep om te verschuiven, rand = duur"
-        onPointerDown={(e) => {
-          s().select([l.id])
-          s().setTab('motion')
-          drag(e, (dt) => updateLayer(l.id, (x) => void (x.emphasis && (x.emphasis.start = Math.max(0, round(orig.start + dt)))), 'seg-em'))
-        }}
-      >
-        {em.duration * pps > 60 && 'ACCENT'}
-        <div
-          className="edge"
-          onPointerDown={(e) =>
-            drag(e, (dt) => updateLayer(l.id, (x) => void (x.emphasis && (x.emphasis.duration = Math.max(0.1, round(orig.duration + dt)))), 'edge-em'))
-          }
-        />
-      </div>
     )
   }
 
@@ -468,9 +417,6 @@ export function Timeline() {
           <div className="trim in" onPointerDown={(e) => barDrag(e, l, 'in')} />
           <div className="trim out" onPointerDown={(e) => barDrag(e, l, 'out', (ranged ? barEnd : Math.max(barEnd, comp.duration)) - offset)} />
         </div>
-        {motionSegment(l, 'intro', offset)}
-        {emphasisSegment(l, offset)}
-        {motionSegment(l, 'outro', offset)}
         {!open &&
           [...new Set(ANIM_PROPS.flatMap((p) => (l.tracks[p] ?? []).map((k) => k.t)))].map((t) => (
             <div key={'s' + t} className="diamond summary" style={{ left: xOf(offset + t) }} />

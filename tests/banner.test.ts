@@ -361,7 +361,7 @@ describe('groepen (pre-comps) en in/uit-punten', () => {
   it('in-punt verschuift de inhoud van een groep en uit-punt verbergt hem', async () => {
     const { tree, p, comp, cta, ctaText } = await setup()
     const g = tree.groupLayers(comp, [cta.id, ctaText.id])!
-    const introStart = cta.intro!.start
+    const introStart = cta.tracks.opacity![0].t
     tree.shiftTiming(g, 2)
     g.end = 6
     const dom = new JSDOM(build(p, 'preview').html, { runScripts: 'dangerously', pretendToBeVisual: true })
@@ -441,7 +441,9 @@ describe('eigen presets', () => {
       [0, -40],
       [1, 10]
     ])
-    expect(b.emphasis!.start).toBe(2)
+    // Accent (oud model) wordt bij toepassen gewone keyframes, relatief op dezelfde plek in de tijd
+    expect(b.emphasis).toBeUndefined()
+    expect(b.tracks.scale![0].t).toBe(2)
   })
 })
 
@@ -542,13 +544,14 @@ describe('lagen verslepen', () => {
     const sub = comp.layers.find((l) => l.name === 'Subline')!
     const g = groupLayers(comp, [cta.id])!
     shiftTiming(g, 1)
-    const before = { x: sub.x, y: sub.y, t: sub.intro!.start }
+    const before = { x: sub.x, y: sub.y, t: sub.tracks.opacity![0].t, ky: sub.tracks.y![0].v }
     reorderLayer(comp, sub.id, cta.id, 'before')
     const f = findDeep(comp.layers, sub.id)!
     expect(f.ancestors[0].id).toBe(g.id)
     expect(sub.x + g.x).toBeCloseTo(before.x)
     expect(sub.y + g.y).toBeCloseTo(before.y)
-    expect(sub.intro!.start + g.start!).toBeCloseTo(before.t)
+    expect(sub.tracks.opacity![0].t + g.start!).toBeCloseTo(before.t)
+    expect(sub.tracks.y![0].v + g.y).toBeCloseTo(before.ky)
   })
 })
 
@@ -1241,5 +1244,69 @@ describe('formaat overnemen', () => {
     // Basis blijft onaangeroerd, en de basis kan niet overschreven worden
     sync.copyFormat(p, a.id, base.id)
     expect(head(base).x).not.toBe(0)
+  })
+})
+
+describe('animeren met keyframes (presets zetten keyframes)', () => {
+  it('preset uit de bibliotheek zet gewone keyframes vanaf de playhead', async () => {
+    const { applyLibraryItem, LIBRARY } = await import('../src/shared/library')
+    const comp = createStarterProject().compositions[0]
+    const l = createLayer('shape', comp)
+    Object.assign(l, { x: 100, y: 200 })
+    l.tracks.x = [
+      { t: 0, v: 0, e: 'linear' },
+      { t: 5, v: 100, e: 'linear' }
+    ]
+    applyLibraryItem(l, LIBRARY.find((i) => i.id === 'slideUp')!, comp, 1)
+    expect(l.intro).toBeUndefined()
+    expect(l.tracks.y!.map((k) => k.t)).toEqual([1, 1.6])
+    expect(l.tracks.y![0].v).toBe(230)
+    expect(l.tracks.y![1].v).toBe(200)
+    expect(l.tracks.opacity!.map((k) => [k.t, k.v])).toEqual([
+      [1, 0],
+      [1.6, 1]
+    ])
+    // Bestaande keyframes buiten de preset blijven staan
+    expect(l.tracks.x!.map((k) => k.t)).toEqual([0, 5])
+    // Accent: op de playhead, rond de huidige stand
+    applyLibraryItem(l, LIBRARY.find((i) => i.id === 'pulse')!, comp, 3)
+    expect(l.emphasis).toBeUndefined()
+    expect(l.tracks.scale![0].t).toBe(3)
+  })
+
+  it('oude projecten: binnenkomst/uitgang worden keyframes die er precies hetzelfde uitzien', async () => {
+    const { normalizeProject } = await import('../src/shared/sync')
+    const { effectiveLayer } = await import('../src/shared/motion')
+    const p = createStarterProject()
+    const l = p.compositions[0].layers.find((x) => x.name === 'Headline')!
+    l.tracks = {}
+    l.intro = { start: 0.2, duration: 0.6, ease: 'easeOut', fade: true, dx: 0, dy: 30, scale: 1, rotation: 0, reveal: false }
+    l.emphasis = { type: 'pulse', start: 3, duration: 1, repeat: 2, strength: 1 }
+    l.outro = { start: 7, duration: 0.4, ease: 'easeIn', fade: true, dx: 0, dy: 0, scale: 1, rotation: 0, reveal: false }
+    const before = structuredClone(effectiveLayer(l))
+    normalizeProject(p)
+    const after = p.compositions[0].layers.find((x) => x.name === 'Headline')!
+    expect(after.intro).toBeUndefined()
+    expect(after.outro).toBeUndefined()
+    expect(after.emphasis).toBeUndefined()
+    for (const t of [0, 0.3, 0.5, 1, 3.2, 3.7, 7.2, 7.5]) expect(layerStateAt(after, t)).toEqual(layerStateAt(before, t))
+    // De voorbeeld-boilerplate heeft ook alleen keyframes
+    expect(createStarterProject().compositions[0].layers.some((x) => x.intro || x.outro || x.emphasis)).toBe(false)
+  })
+})
+
+describe('eindbeeld', () => {
+  it('blijft vóór een omgezette uitgang en is daarna zelf in te stellen', async () => {
+    const { normalizeProject } = await import('../src/shared/sync')
+    const { endFrameTime } = await import('../src/shared/motion')
+    const p = createStarterProject()
+    const c = p.compositions[0]
+    c.layers[0].outro = { start: 7, duration: 0.5, ease: 'easeIn', fade: true, dx: 0, dy: 0, scale: 1, rotation: 0, reveal: false }
+    normalizeProject(p)
+    expect(c.layers[0].outro).toBeUndefined()
+    expect(endFrameTime(c)).toBe(7)
+    expect(build(p).html).toContain('"e":7')
+    c.endFrame = null
+    expect(endFrameTime(c)).toBe(c.duration)
   })
 })

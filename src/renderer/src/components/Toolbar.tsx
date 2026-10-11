@@ -191,6 +191,7 @@ function Tools() {
 function WindowMenu() {
   const [open, setOpen] = useState(false)
   const root = useDock((d) => d.root)
+  const detached = useDock((d) => d.detached)
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!open) return
@@ -198,7 +199,7 @@ function WindowMenu() {
     window.addEventListener('pointerdown', close)
     return () => window.removeEventListener('pointerdown', close)
   }, [open])
-  const shown = visiblePanels(root)
+  const shown = [...visiblePanels(root), ...detached]
   return (
     <div className="menu-wrap" ref={ref}>
       <button className="ghost" onClick={() => setOpen(!open)} title="Panelen tonen/verbergen en indeling">
@@ -209,7 +210,8 @@ function WindowMenu() {
           {ALL_PANELS.map((p) => (
             <button key={p} onClick={() => useDock.getState().toggle(p, !shown.includes(p))}>
               <span style={{ width: 14, color: 'var(--accent)' }}>{shown.includes(p) ? '✓' : ''}</span>
-              {PANEL_TITLE[p]}
+              <span className="grow">{PANEL_TITLE[p]}</span>
+              {detached.includes(p) && <span className="faint">eigen venster</span>}
             </button>
           ))}
           <div className="ctx-sep" />
@@ -224,7 +226,7 @@ function WindowMenu() {
           </button>
           <div className="hint-text" style={{ padding: '4px 10px 6px', maxWidth: 230 }}>
             Sleep een tabblad naar een andere groep, of naar de rand van een paneel om het ernaast of eronder te zetten. Dubbelklik op een tab om te
-            maximaliseren.
+            maximaliseren. Sleep een tab buiten de app (of klik ↗ rechtsboven in een paneel) voor een eigen venster, bijv. op een tweede scherm.
           </div>
         </div>
       )}

@@ -29,5 +29,11 @@ Object.assign(w, { name: 'Write-on', x: 276 - g.width, y: 180, width: g.width, h
 Object.assign(w.writeon!, { content: 'Nu!', fontId: font.id, glyphs: g.glyphs, viewBox: g.viewBox, color: '#e30613' })
 w.intro = { start: 1.2, duration: 1.4, ease: 'easeInOut', fade: false, dx: 0, dy: 0, scale: 1, rotation: 0, reveal: true }
 comp.layers.unshift(w, logo)
+// Testdemo: lagen staan stil op hun plek (geen positie-keyframes), zodat uitlijnen en slepen voorspelbaar zijn.
+// Dekking, schaal en de write-on (oud model: binnenkomst) blijven, en worden bij openen keyframes.
+for (const l of p.compositions[0].layers) {
+  delete l.tracks.x
+  delete l.tracks.y
+}
 await writeFile(join(dir, PROJECT_FILE), JSON.stringify(p, null, 2))
 console.log('demo-project:', dir)

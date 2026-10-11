@@ -1,5 +1,5 @@
 import { Fragment, useRef, useState, type ReactNode } from 'react'
-import { Maximize2, Minimize2, X } from 'lucide-react'
+import { ExternalLink, Maximize2, Minimize2, X } from 'lucide-react'
 import { PANEL_TITLE, type DockNode, type PanelId, type SplitNode, type TabsNode, type Zone } from './model'
 import { useDock } from './store'
 
@@ -108,10 +108,15 @@ function TabsView({ node, render, maximized }: { node: TabsNode; render: (id: Pa
             key={p}
             className={`dock-tab${p === node.active ? ' on' : ''}`}
             draggable={!maximized}
-            title="Sleep naar een andere groep of naar een rand · dubbelklik = maximaliseren"
+            title="Sleep naar een andere groep, naar een rand, of buiten de app voor een eigen venster · dubbelklik = maximaliseren"
             onDragStart={(e) => {
               e.dataTransfer.setData(PANEL_DRAG, p)
               e.dataTransfer.effectAllowed = 'move'
+            }}
+            onDragEnd={(e) => {
+              // Losgelaten buiten het app-venster: paneel in een eigen venster op die plek
+              const outside = e.screenX < window.screenX || e.screenY < window.screenY || e.screenX > window.screenX + window.outerWidth || e.screenY > window.screenY + window.outerHeight
+              if (e.dataTransfer.dropEffect === 'none' && outside && (e.screenX || e.screenY)) dock().detach(p, { x: e.screenX, y: e.screenY })
             }}
             onClick={() => dock().activate(p)}
             onDoubleClick={() => dock().setMaximized(maximized ? null : p)}
@@ -132,6 +137,11 @@ function TabsView({ node, render, maximized }: { node: TabsNode; render: (id: Pa
           </div>
         ))}
         <span className="dock-head-space" />
+        {!maximized && (
+          <button className="icon sm dock-max-btn" title={`${PANEL_TITLE[node.active]} in een eigen venster (bijv. op een ander scherm)`} onClick={() => dock().detach(node.active)}>
+            <ExternalLink size={12} />
+          </button>
+        )}
         <button
           className="icon sm dock-max-btn"
           title={maximized ? 'Terug naar de indeling' : 'Maximaliseren'}

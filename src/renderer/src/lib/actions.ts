@@ -640,7 +640,7 @@ export function staggerIntros(libraryId: string, gap: number) {
     const last = targets.length ? 0.2 + (targets.length - 1) * gap + 1.2 : 0
     comp.duration = Math.max(comp.duration, Math.ceil(last + 2))
   })
-  S().setStatus('Binnenkomst toegepast. Per laag bij te stellen in de tab Animatie.')
+  S().setStatus('Keyframes gezet, laag na laag. Per laag bij te stellen in de tijdlijn.')
 }
 
 /** Bibliotheek-animatie toepassen op lagen (na slepen of klikken). `at` = starttijd. */
@@ -649,24 +649,31 @@ export function applyLibrary(itemId: string, layerIds: string[], at?: number) {
   const user = itemId.startsWith('user:') ? presets.find((p) => `user:${p.id}` === itemId) : undefined
   const item = user ? { label: user.name } : LIBRARY.find((i) => i.id === itemId)
   if (!item || !layerIds.length) return
+  const time = S().time
   S().update((p) => {
     const comp = findComp(p, compId)
     for (const id of layerIds) {
-      const l = findDeep(comp.layers, id)?.layer
-      if (!l) continue
-      if (user) applyUserPreset(l, user, at)
-      else applyLibraryItem(l, item as (typeof LIBRARY)[number], comp, at)
+      const f = findDeep(comp.layers, id)
+      if (!f) continue
+      // Zonder losplek: vanaf de playhead (in de tijd van de compositie waar de laag in zit)
+      const start = at ?? localTime(time, f.ancestors)
+      if (user) applyUserPreset(f.layer, user, start)
+      else {
+        const li = item as (typeof LIBRARY)[number]
+        applyLibraryItem(f.layer, li, comp, start)
+        // Een "uit"-preset: het eindbeeld (backup, einde laatste loop) vóór de uitgang, als het nog niet is ingesteld
+        if (li.kind === 'outro' && !f.ancestors.length && comp.endFrame == null) comp.endFrame = Math.round(start * 100) / 100
+      }
     }
-    // Duur verlengen als de animatie er buiten valt
-    const ends = comp.layers.flatMap((l) => [
-      l.intro ? l.intro.start + l.intro.duration : 0,
-      l.emphasis ? l.emphasis.start + l.emphasis.duration : 0
-    ])
-    comp.duration = Math.max(comp.duration, Math.ceil(Math.max(...ends) + 1))
+    // Duur verlengen als de keyframes er buiten vallen
+    const ends = allLayers(comp.layers).flatMap((l) => Object.values(l.tracks).flatMap((k) => (k ?? []).map((x) => x.t)))
+    if (ends.length) comp.duration = Math.max(comp.duration, Math.ceil(Math.max(...ends) + 0.5))
   })
   S().select(layerIds)
-  S().setTab('motion')
-  S().setStatus(`${item.label} toegepast. Pas tijd, duur en afstand aan in de tab Animatie.`)
+  // Keyframes laten zien in de tijdlijn
+  S().setExpanded({ ...S().expanded, ...Object.fromEntries(layerIds.map((id) => [id, true])) })
+  S().setShownProps(Object.fromEntries(Object.entries(S().shownProps).filter(([k]) => !layerIds.includes(k))))
+  S().setStatus(`${item.label}: keyframes gezet${at == null ? ' vanaf de playhead' : ''}. Verschuif of pas ze aan in de tijdlijn.`)
 }
 
 export function resetLayerOverrides(layerId: string, keys?: string[]) {

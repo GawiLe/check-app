@@ -87,49 +87,39 @@ Hoe het koppelen werkt:
 - **Een ander formaat als begin:** bij *Formaat toevoegen* kies je *Uitgaan van* (bijv. je uitgewerkte 300×250 voor de 336×280), of je doet later *Lay-out overnemen van …*. Het formaat blijft gekoppeld aan de basis; wat afwijkt wordt een aanpassing van dat formaat.
 - Met het **koppel-icoon** in het paneel zet je het koppelen uit. Dan zijn alle formaten los.
 
-### Animatiebibliotheek
+### Animeren met keyframes
 
-Links staat onder **Animaties** een bibliotheek. Beweeg over een tegel voor een voorbeeld en sleep hem op een laag:
+Je animeert met **keyframes**, zoals in After Effects.
 
-- **op het canvas**: de animatie gaat op die laag;
-- **in de tijdlijn op een spoor**: de animatie begint waar je hem loslaat;
-- **of klik** op een tegel om hem op de geselecteerde lagen te zetten.
+- **Keyframe zetten:** klik ◆ bij een eigenschap (in de tijdlijn of in de tab *Animatie*), of zet **Auto-key** (de rode stip in de tijdlijn) aan. Daarna zet elke wijziging in positie, schaal, rotatie of dekking een keyframe op de playhead.
+- **Keyframes bewerken:** sleep ze in de tijdlijn, kies een easing per keyframe (rechtermuisknop, of F9 voor Easy Ease), en pas waarden direct aan in de uitgeklapte eigenschappen.
+- **Transform zoals in After Effects:** positie (X en Y) en schaal staan elk op één regel met één ◆. Schaal X/Y is standaard gekoppeld (🔗); ontkoppel om breedte en hoogte apart te schalen.
+- **Hele laag verschuiven:** sleep de balk van een laag in de tijdlijn; alle keyframes gaan mee.
 
-| Binnenkomst | Accent | Uitgang |
+**Presets (paneel Animaties)** zijn een snelle start, en zetten gewone keyframes op de laag:
+
+- **klik** op een preset: keyframes op de geselecteerde lagen, vanaf de playhead;
+- **sleep** op een laag in het canvas, of op een spoor in de tijdlijn: daar begint hij waar je loslaat;
+- bestaande keyframes binnen die periode worden vervangen, daarbuiten blijven ze staan.
+
+| Binnen | Accent | Uit |
 |---|---|---|
-| Fade in, Slide up/down, Slide in links/rechts, **Bounce in**, Pop in, Elastic in, Zoom in/uit, Draai in, Write-on, Wipe links/omhoog | Pulse, Heartbeat, Shake, Wiebel, Spring, Flash | Fade out, Slide out omhoog/omlaag/links, Zoom out, Pop out |
+| Fade in, Slide up/down, Slide in links/rechts, Bounce in, Pop in, Elastic in, Zoom in/uit, Draai in, Write-on, Wipe links/omhoog | Pulse, Heartbeat, Shake, Wiebel, Spring, Flash | Fade out, Slide out omhoog/omlaag/links, Zoom out, Pop out |
 
-Daarna pas je alles aan in de tab **Animatie**:
+Er zit niets "verborgens" meer op een laag: wat je ziet zijn de keyframes. Oudere projecten met binnenkomst/accent/uitgang worden bij het openen omgezet naar keyframes die er precies hetzelfde uitzien.
 
-- binnenkomst en uitgang: start, duur, easing, afstand, schaal, rotatie en fade;
-- accent: start, duur, aantal herhalingen en kracht.
-
-In de tijdlijn staan ze als groene (IN), gele (ACCENT) en oranje (UIT) blokken, die je kunt slepen en verlengen.
-
-### Animeren
-
-- **Binnenkomst, accent en uitgang** (makkelijkste manier): sleep een animatie uit de bibliotheek, of zet ze per laag aan in de tab *Animatie*.
-  - Daarna stel je start, duur, easing, verschuiving, schaal, rotatie en fade bij.
-  - De laag beweegt naar zijn eigen positie. Verplaats je de laag, dan beweegt de animatie mee; je hoeft geen keyframes te zetten.
-  - In de tijdlijn staan ze als groene (IN) en oranje (UIT) blokken. Die sleep je om te verschuiven, en met de rechterrand verander je de duur.
-- **Alles laten binnenkomen**: zonder selectie (of met meerdere lagen geselecteerd) geeft de tab *Animatie* alle lagen dezelfde binnenkomst, van boven naar onder na elkaar.
-- **Keyframes** voor eigen bewegingen:
-  - Klik ◆ bij een eigenschap, of zet **Auto-key** (de rode stip in de tijdlijn) aan. Dan zet elke wijziging in positie, schaal, rotatie of dekking een keyframe op de huidige tijd.
-  - Sleep keyframes, en kies een easing per keyframe. Alleen het keyframe beweegt; de laagbalk blijft staan. Een plek waar al een keyframe staat wordt overgeslagen.
-- **Transform zoals in After Effects**: positie (X en Y) en schaal staan elk op één regel, met één ◆. Eén klik zet een keyframe voor X én Y tegelijk; in de tijdlijn is het ook één regel *Positie* en één regel *Schaal*.
-  - **Schaal X% / Y%** zijn standaard gekoppeld (🔗). Ontkoppel om breedte en hoogte apart te schalen; opnieuw koppelen zet Y weer gelijk aan X.
-  - **Maat B / H** (pixels) kun je ook koppelen: dan blijft de verhouding gelijk bij typen en bij slepen aan de hoeken.
-- **Hele laag verschuiven**: sleep de balk van een laag in de tijdlijn. Alle keyframes en de binnenkomst/uitgang gaan mee.
-- Het **eindframe** ligt vóór de eerste uitgang. De laatste loop stopt daar, zodat het eindbeeld en de backup-afbeelding alles tonen.
+- **Na elkaar laten binnenkomen:** zonder selectie (of met meerdere lagen geselecteerd) zet de tab *Animatie* dezelfde preset op alle lagen, van boven naar onder na elkaar.
+- **Eindbeeld** (Ontwerp → formaat): hier stopt de laatste loop en hiervan wordt de backup-afbeelding gemaakt. Standaard het einde; zet het vóór een uitgaande animatie (*Playhead*). Een *uit*-preset zet het eindbeeld automatisch vóór de uitgang.
 
 ### Werkruimte indelen
 
-Alle panelen (Canvas, Code, Tijdlijn, Animaties, Assets & fonts, Ontwerp, Animatie, AI) zijn los, zoals in After Effects:
+Alle panelen (Canvas, Code, Tijdlijn, Formaten, Animaties, Assets & fonts, Ontwerp, Animatie, AI) zijn los, zoals in After Effects:
 
 - **Verplaatsen**: sleep een tabblad naar een andere paneelgroep (wordt een tab) of naar de rand van een paneel (links/rechts = naast elkaar, boven/onder = onder elkaar).
 - **Groter/kleiner**: sleep de lijnen tussen panelen.
 - **Aan/uit**: × op een tab sluit het paneel; terug via **Venster** (werkbalk of menubalk).
 - **Maximaliseren**: dubbelklik op een tab, de knop rechtsboven, of ` (backtick) met de muis boven een paneel.
+- **Eigen venster (tweede scherm):** sleep een tab buiten de app, of klik ↗ rechtsboven in een paneel. Het paneel komt in een eigen venster dat je overal neer kunt zetten; het werkt gewoon mee (selectie, tijd en sneltoetsen). Sluit het venster of klik op het terugzet-icoon en het paneel staat weer in de werkruimte. Losse vensters en hun plek worden onthouden.
 - **Indeling herstellen** staat in het menu Venster. Je indeling wordt onthouden.
 
 ### Code bekijken

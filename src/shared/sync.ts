@@ -1,4 +1,5 @@
 import { mapLayerToFormat } from './factory'
+import { bakeMotion, endFrameTime } from './motion'
 import type { Composition, Layer, Project } from './types'
 import { ANIM_PROPS, PROJECT_VERSION } from './types'
 
@@ -12,7 +13,15 @@ export function normalizeProject(p: Project): Project {
   p.syncFormats ??= true
   p.politeLoad ??= true
   p.embedFonts ??= true
-  for (const c of p.compositions) for (const l of c.layers) l.linkId ??= l.id
+  for (const c of p.compositions) {
+    // Oud model: het eindbeeld lag vóór de eerste uitgang; dat blijft zo na het omzetten naar keyframes
+    if (c.endFrame === undefined && c.layers.some((l) => l.visible && l.outro)) c.endFrame = endFrameTime(c)
+    for (const l of c.layers) {
+      l.linkId ??= l.id
+      // Binnenkomst/accent/uitgang (oud) worden gewone keyframes
+      bakeMotion(l)
+    }
+  }
   p.version = PROJECT_VERSION
   return p
 }
@@ -57,7 +66,7 @@ function setKey(l: Layer, key: string, value: unknown) {
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
 
-const COMP_KEYS = ['duration', 'loops', 'background', 'border'] as const
+const COMP_KEYS = ['duration', 'loops', 'background', 'border', 'endFrame'] as const
 
 /** Leesbare naam van een override-sleutel (voor de UI). */
 export const OVERRIDE_LABEL: Record<string, string> = {
@@ -100,7 +109,8 @@ export const OVERRIDE_LABEL: Record<string, string> = {
   duration: 'duur',
   loops: 'loops',
   background: 'achtergrond',
-  border: 'rand'
+  border: 'rand',
+  endFrame: 'eindbeeld'
 }
 export const overrideLabel = (k: string) =>
   OVERRIDE_LABEL[k] ?? (k.startsWith('tracks.') ? `keyframes ${k.slice(7)}` : k.replace('.', ' '))

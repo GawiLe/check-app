@@ -47,7 +47,7 @@ function Tile(props: { id: string; label: string; kind: string; apply: (l: Layer
     <div
       className={`lib-tile ${props.kind}`}
       draggable
-      title={`Sleep op een laag (canvas of tijdlijn)${selection.length ? ', of klik om toe te passen op de selectie' : ''}`}
+      title={`Zet keyframes: sleep op een laag (canvas of tijdlijn)${selection.length ? ', of klik voor de selectie vanaf de playhead' : ''}`}
       onDragStart={(e) => {
         e.dataTransfer.setData(DRAG_TYPE, props.id)
         e.dataTransfer.effectAllowed = 'copy'
@@ -158,7 +158,8 @@ export function Library() {
         )
       })}
       <div className="hint-text" style={{ padding: '0 12px 14px' }}>
-        Sleep een animatie op een laag in het canvas of in de tijdlijn. In de tijdlijn begint hij waar je loslaat.
+        Presets zetten gewone keyframes op de laag. Klik om ze op de selectie te zetten vanaf de playhead, of sleep op een laag; in de tijdlijn
+        beginnen ze waar je loslaat. Daarna pas je de keyframes gewoon aan.
       </div>
     </div>
   )

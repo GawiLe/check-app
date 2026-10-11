@@ -44,6 +44,7 @@ let win: BrowserWindow | null = null
 let dirty = false
 let forceClose = false
 let quitting = false
+let mainClosing = false
 
 async function askSave(): Promise<'save' | 'discard' | 'cancel'> {
   if (!win) return 'discard'
@@ -400,9 +401,15 @@ async function createWindow() {
     backgroundColor: '#1d1d1f',
     title: 'Bnnr Studio',
     icon: APP_ICON,
-    webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false, contextIsolation: true }
+    webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false, contextIsolation: true, backgroundThrottling: false }
   })
-  win.on('closed', () => (win = null))
+  win.on('closed', () => {
+    // De losse panelen sluiten mee, maar blijven "los" voor de volgende keer
+    mainClosing = true
+    win = null
+    // Losgekoppelde panelen horen bij het hoofdvenster
+    for (const w of BrowserWindow.getAllWindows()) w.destroy()
+  })
   win.on('close', (e) => {
     if (!dirty || forceClose) return
     e.preventDefault()
@@ -421,8 +428,25 @@ async function createWindow() {
   })
   // Een bestand dat naast het canvas wordt losgelaten mag de app niet wegnavigeren
   win.webContents.on('will-navigate', (e) => e.preventDefault())
-  // Nooit nieuwe vensters vanuit de app of de preview (banner-code kan window.open aanroepen)
-  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  // Geen nieuwe vensters, behalve een los paneel (leeg venster dat de editor zelf vult, zie Popouts.tsx).
+  // Banner-code in de preview kan dit niet: die iframes mogen geen pop-ups openen (sandbox zonder allow-popups).
+  win.webContents.setWindowOpenHandler(({ url, frameName }) => {
+    if (url === 'about:blank' && /^bs-panel-[a-z]{2,20}$/.test(frameName))
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: { backgroundColor: '#1d1d1f', autoHideMenuBar: true, minWidth: 260, minHeight: 180, icon: APP_ICON }
+      }
+    return { action: 'deny' }
+  })
+  win.webContents.on('did-create-window', (child, { frameName }) => {
+    child.setMenuBarVisibility(false)
+    // Zelf dichtgeklikt (niet bij afsluiten van de app): paneel terug in de werkruimte
+    child.on('close', () => {
+      if (!quitting && !mainClosing && win && !win.isDestroyed()) win.webContents.send('bs:menu', `attachPanel:${frameName.replace(/^bs-panel-/, '')}`)
+    })
+    child.webContents.on('will-navigate', (e) => e.preventDefault())
+    child.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  })
   if (process.env.ELECTRON_RENDERER_URL) await win.loadURL(process.env.ELECTRON_RENDERER_URL)
   else await win.loadFile(join(__dirname, '../renderer/index.html'))
 }

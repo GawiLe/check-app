@@ -2943,3 +2943,21 @@ kbd {
   width: 110px;
   padding-right: 8px;
 }
+
+/* Los paneel in een eigen venster */
+body.popout-window {
+  margin: 0;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+}
+.popout-root {
+  height: 100vh;
+  display: flex;
+}
+.popout-root > .dock-tabs.popout {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100vh;
+}

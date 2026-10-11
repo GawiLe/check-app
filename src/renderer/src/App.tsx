@@ -48,7 +48,7 @@ const alignTarget = (): 'selection' | 'canvas' => {
 import { anyDirty, autosaveAll, closeDocument, cycleDocument, useDocs } from './lib/documents'
 import { DocTabs } from './components/DocTabs'
 import { toggleMaximizeUnderPointer } from './dock/Dock'
-import type { PanelId } from './dock/model'
+import { ALL_PANELS, type PanelId } from './dock/model'
 
 const isTyping = () => {
   const el = document.activeElement
@@ -69,6 +69,10 @@ export function App() {
         if (action === 'new') s.setDialog('new')
         if (action === 'open') void openProject()
         if (action.startsWith('openRecent:')) void openProject(action.slice('openRecent:'.length))
+        if (action.startsWith('attachPanel:')) {
+          const p = action.slice('attachPanel:'.length) as PanelId
+          if (ALL_PANELS.includes(p)) useDock.getState().attach(p)
+        }
         if (action === 'closeTab') {
           const active = useDocs.getState().active
           if (active) void closeDocument(active)

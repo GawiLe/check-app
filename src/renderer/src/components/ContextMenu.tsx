@@ -1,10 +1,15 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
+import { getActiveDoc } from '../lib/windows'
 import { useStore } from '../store'
 
 /** Rechtermuisknop-menu. Wordt geopend via useStore.openMenu(x, y, items). */
 export function ContextMenu() {
   const menu = useStore((s) => s.menu)
   const ref = useRef<HTMLDivElement>(null)
+  // Openen in het venster waar geklikt is (hoofdvenster of een los paneel)
+  const doc = useMemo(() => (menu ? getActiveDoc() : document), [menu])
+  const w = doc.defaultView ?? window
   useEffect(() => {
     if (!menu) return
     const close = (e: Event) => {
@@ -12,21 +17,21 @@ export function ContextMenu() {
       useStore.getState().closeMenu()
     }
     const key = (e: KeyboardEvent) => e.key === 'Escape' && useStore.getState().closeMenu()
-    window.addEventListener('pointerdown', close)
-    window.addEventListener('blur', close)
-    window.addEventListener('keydown', key)
+    w.addEventListener('pointerdown', close)
+    w.addEventListener('blur', close)
+    w.addEventListener('keydown', key)
     return () => {
-      window.removeEventListener('pointerdown', close)
-      window.removeEventListener('blur', close)
-      window.removeEventListener('keydown', key)
+      w.removeEventListener('pointerdown', close)
+      w.removeEventListener('blur', close)
+      w.removeEventListener('keydown', key)
     }
-  }, [menu])
+  }, [menu, w])
   if (!menu) return null
   // Binnen het venster houden
   const h = menu.items.reduce((a, i) => a + ('separator' in i ? 9 : 28), 8)
-  const x = Math.min(menu.x, window.innerWidth - 240)
-  const y = Math.min(menu.y, window.innerHeight - h - 8)
-  return (
+  const x = Math.min(menu.x, w.innerWidth - 240)
+  const y = Math.min(menu.y, w.innerHeight - h - 8)
+  const el = (
     <div ref={ref} className="ctx-menu" style={{ left: x, top: y }} onContextMenu={(e) => e.preventDefault()}>
       {menu.items.map((item, i) =>
         'separator' in item ? (
@@ -48,4 +53,5 @@ export function ContextMenu() {
       )}
     </div>
   )
+  return doc === document ? el : createPortal(el, doc.body)
 }

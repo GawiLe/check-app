@@ -3,6 +3,7 @@ import { ChevronDown, Download, FilePlus2, Loader2, Search } from 'lucide-react'
 import { newId } from '@shared/factory'
 import type { FontAsset } from '@shared/types'
 import { fontFileUrl, POPULAR_FONTS, POPULAR_IDS, SYSTEM_FONTS, WEIGHT_NAME, type WebFont } from '@shared/webfonts'
+import { viewOf } from '../lib/windows'
 import { useStore } from '../store'
 import { importFonts } from '../lib/actions'
 
@@ -43,8 +44,9 @@ export function FontPicker(props: { value: string | null; onPick: (fontId: strin
     if (!open) return
     void loadCatalog().then(setFonts)
     const close = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && setOpen(false)
-    window.addEventListener('pointerdown', close)
-    return () => window.removeEventListener('pointerdown', close)
+    const w = viewOf(ref.current)
+    w.addEventListener('pointerdown', close)
+    return () => w.removeEventListener('pointerdown', close)
   }, [open])
 
   const list = useMemo(() => {

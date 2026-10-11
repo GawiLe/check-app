@@ -135,6 +135,7 @@ export function effectiveLayer(l: Layer): Layer {
  * zodat het eindbeeld (en de backup-afbeelding) alles toont.
  */
 export function endFrameTime(comp: Composition): number {
+  if (comp.endFrame != null && Number.isFinite(comp.endFrame)) return round(Math.max(0, Math.min(comp.duration, comp.endFrame)))
   let end = comp.duration
   for (const l of comp.layers) if (l.visible && l.outro) end = Math.min(end, l.outro.start)
   return round(Math.max(0, end))
@@ -144,4 +145,16 @@ export function endFrameTime(comp: Composition): number {
 export function scaleMotion(m: Motion | null | undefined, s: number): Motion | null {
   if (!m) return null
   return { ...m, dx: round(m.dx * s, 1), dy: round(m.dy * s, 1) }
+}
+
+/**
+ * Binnenkomst, accent en uitgang (oud model) omzetten naar gewone keyframes, ook in groepen.
+ * Het resultaat ziet er precies hetzelfde uit; daarna werk je alleen nog met keyframes.
+ */
+export function bakeMotion(l: Layer): void {
+  if (l.intro || l.outro || l.emphasis) l.tracks = structuredClone(effectiveLayer(l).tracks)
+  delete l.intro
+  delete l.outro
+  delete l.emphasis
+  l.children?.forEach(bakeMotion)
 }

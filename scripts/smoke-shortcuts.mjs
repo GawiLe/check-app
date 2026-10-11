@@ -129,6 +129,7 @@ await posNav.locator('.kf-nav', { hasText: '◀' }).click()
 await check('◀: precies terug op het vorige keyframe', async () => (await st()).time === xKeys[0])
 
 // 6. Uitlijnen en verdelen met Option/Alt
+await page.evaluate(() => window.__bsStore.getState().setTime(window.__bsStore.getState().project.compositions[0].duration - 0.1)) // alles in beeld (uitlijnen werkt op de zichtbare stand)
 await select(['Headline', 'CTA'])
 await key('Alt+KeyA')
 await check('⌥A: links uitgelijnd', async () => (await layer('Headline')).x === (await layer('CTA')).x)

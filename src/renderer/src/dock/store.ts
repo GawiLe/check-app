@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { activate, defaultLayout, dropPanel, removePanel, resize, showPanel, validLayout, withPanel, type DockNode, type PanelId, type Zone } from './model'
+import { activate, ALL_PANELS, defaultLayout, dropPanel, removePanel, resize, showPanel, validLayout, visiblePanels, withPanel, type DockNode, type PanelId, type Zone } from './model'
 
 const KEY = 'bs-dock-v1'
 
@@ -27,8 +27,26 @@ function save(root: DockNode) {
   }
 }
 
+const DETACHED = 'bs-dock-detached'
+const loadDetached = (): PanelId[] => {
+  try {
+    const v = JSON.parse(localStorage.getItem(DETACHED) ?? '[]')
+    return Array.isArray(v) ? v.filter((p) => ALL_PANELS.includes(p)) : []
+  } catch {
+    return []
+  }
+}
+
 interface DockState {
   root: DockNode
+  /** Panelen in een eigen venster (bijv. op een tweede scherm). */
+  detached: PanelId[]
+  /** Paneel loskoppelen naar een eigen venster; `at` = schermpositie (bijv. waar je de tab losliet). */
+  detach(panel: PanelId, at?: { x: number; y: number }): void
+  /** Paneel terug in de werkruimte. */
+  attach(panel: PanelId): void
+  /** Gewenste plek voor een nieuw los venster (eenmalig). */
+  detachAt: Partial<Record<PanelId, { x: number; y: number }>>
   /** Gemaximaliseerd paneel (dubbelklik op tab, of ` zoals in AE). */
   maximized: PanelId | null
   drop(panel: PanelId, targetId: string, zone: Zone): void
@@ -46,20 +64,56 @@ export const useDock = create<DockState>((set, get) => {
     save(root)
     set({ root })
   }
+  const saveDetached = (d: PanelId[]) => {
+    try {
+      localStorage.setItem(DETACHED, JSON.stringify(d))
+    } catch {
+      /* alleen deze sessie */
+    }
+  }
+  const initial = load()
+  // Een paneel dat los stond, staat niet ook in de indeling
+  const detached0 = loadDetached()
   return {
-    root: load(),
+    root: detached0.reduce((r, p) => (visiblePanels(r).includes(p) && visiblePanels(r).length > 1 ? removePanel(r, p) : r), initial),
+    detached: detached0,
+    detachAt: {},
+    detach: (panel, at) => {
+      if (get().detached.includes(panel)) return
+      const root = get().root
+      // Het laatste paneel in de werkruimte blijft staan
+      if (visiblePanels(root).filter((p) => p !== panel).length === 0) return
+      if (get().maximized === panel) set({ maximized: null })
+      const detached = [...get().detached, panel]
+      saveDetached(detached)
+      set({ detached, detachAt: at ? { ...get().detachAt, [panel]: at } : get().detachAt })
+      apply(removePanel(root, panel))
+    },
+    attach: (panel) => {
+      if (!get().detached.includes(panel)) return
+      const detached = get().detached.filter((p) => p !== panel)
+      saveDetached(detached)
+      set({ detached })
+      apply(showPanel(get().root, panel))
+    },
     maximized: null,
     drop: (panel, targetId, zone) => apply(dropPanel(get().root, panel, targetId, zone)),
     close: (panel) => {
+      if (get().detached.includes(panel)) {
+        const detached = get().detached.filter((p) => p !== panel)
+        saveDetached(detached)
+        return set({ detached })
+      }
       if (get().maximized === panel) set({ maximized: null })
       apply(removePanel(get().root, panel))
     },
-    show: (panel) => apply(showPanel(get().root, panel)),
+    show: (panel) => (get().detached.includes(panel) ? get().attach(panel) : apply(showPanel(get().root, panel))),
     toggle: (panel, visible) => (visible ? get().show(panel) : get().close(panel)),
     activate: (panel) => apply(activate(get().root, panel)),
     resize: (splitId, sizes) => apply(resize(get().root, splitId, sizes)),
     reset: () => {
-      set({ maximized: null })
+      saveDetached([])
+      set({ maximized: null, detached: [] })
       apply(defaultLayout())
     },
     setMaximized: (p) => set({ maximized: p })

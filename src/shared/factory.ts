@@ -1,3 +1,4 @@
+import { bakeMotion } from './motion'
 import { round } from './anim'
 import { scaleMotion } from './motion'
 import { BASE_SIZE } from './specs'
@@ -151,6 +152,8 @@ export function createStarterProject(name = 'Nieuwe campagne'): Project {
   ctaText.intro = motion(1.9, 0.4, {})
 
   comp.layers = [ctaText, ctaBg, pack, sub, headline, bg]
+  // Alles als gewone keyframes (zoals een animator werkt)
+  comp.layers.forEach(bakeMotion)
 
   return {
     version: PROJECT_VERSION,

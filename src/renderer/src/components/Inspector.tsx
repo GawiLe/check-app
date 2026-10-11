@@ -1,16 +1,16 @@
 import { useState } from 'react'
 import { AlignCenter, AlignLeft, AlignRight, BookmarkPlus, Folder, Plus, Image as ImageIcon, Link2, Link2Off, ListOrdered, PenLine, RotateCcw, Sparkles, Square, Timer, Trash2, Type, Wand2, X } from 'lucide-react'
 import { layerStateAt } from '@shared/anim'
-import { applyLibraryItem, LIBRARY, matchLibraryItem } from '@shared/library'
-import { defaultIntro, defaultOutro } from '@shared/motion'
+import { endFrameTime } from '@shared/motion'
+import { LIBRARY } from '@shared/library'
 import { baseComp, isLinkedToBase, overrideLabel } from '@shared/sync'
 import { GROUP_LABEL, groupProps, layerGroups, type PropGroupId } from '@shared/propgroups'
 import { findDeep, layerLength, trimIn, trimOut } from '@shared/tree'
 import { PRESETS } from '@shared/presets'
 import { TARGET_IDS, TARGETS } from '@shared/specs'
 import { exitLayers } from '@shared/build'
-import type { AnimProp, BlendMode, EaseName, Emphasis, EmphasisType, Layer, Motion, RevealMode, Shadow, ShapeProps } from '@shared/types'
-import { BLEND_MODES, EASES } from '@shared/types'
+import type { AnimProp, BlendMode, EaseName, Layer, RevealMode, Shadow, ShapeProps } from '@shared/types'
+import { BLEND_MODES } from '@shared/types'
 import {
   aiAnimate,
   applyPreset,
@@ -226,6 +226,28 @@ function CompDesign() {
             <option value={3}>3× afspelen</option>
           </select>
         </div>
+        <Row label="Eindbeeld">
+          <span title="Hier stopt de laatste loop, en hiervan wordt de backup-afbeelding gemaakt. Zet hem vóór een uitgaande animatie." style={{ display: 'contents' }}>
+            <Num
+              label="op"
+              value={endFrameTime(comp)}
+              step={0.05}
+              min={0}
+              max={comp.duration}
+              decimals={2}
+              suffix="s"
+              onChange={(v, co) => updateComp((c) => void (c.endFrame = v >= c.duration ? null : v), co ? 'ef' : undefined)}
+            />
+            <button className="ghost sm" title="Eindbeeld op de playhead" onClick={() => updateComp((c) => void (c.endFrame = Math.round(useStore.getState().time * 100) / 100))}>
+              Playhead
+            </button>
+            {comp.endFrame != null && (
+              <button className="ghost sm" title="Eindbeeld = einde" onClick={() => updateComp((c) => void (c.endFrame = null))}>
+                Einde
+              </button>
+            )}
+          </span>
+        </Row>
         <Row label="Achtergrond">
           <input type="color" value={comp.background} onChange={(e) => updateComp((c) => void (c.background = e.target.value), 'bg')} />
           <TextInput value={comp.background} onCommit={(v) => updateComp((c) => void (c.background = v))} />
@@ -919,10 +941,10 @@ function CompMotion() {
   const selection = useStore((s) => s.selection)
   const [gap, setGap] = useState(0.2)
   return (
-    <Section title="Alles laten binnenkomen">
+    <Section title="Na elkaar laten binnenkomen">
       <div className="hint-text" style={{ marginTop: 0, marginBottom: 10 }}>
-        Geeft {selection.length > 1 ? 'de geselecteerde lagen' : 'alle lagen (behalve vergrendelde)'} dezelfde binnenkomst, van boven naar onder
-        na elkaar.
+        Zet op {selection.length > 1 ? 'de geselecteerde lagen' : 'alle lagen (behalve vergrendelde)'} dezelfde keyframes, van boven naar onder na
+        elkaar.
       </div>
       <div className="chips">
         {LIBRARY.filter((i) => i.kind === 'intro' && !i.reveal).map((i) => (
@@ -943,55 +965,17 @@ function CompMotion() {
 }
 
 function LayerMotion({ layer }: { layer: Layer }) {
-  const comp = useStore(currentComp)!
   const time = useStore((s) => s.time)
-  const project_ = useStore.getState().project!
-  const st = layerStateAt(layer, layerLocalTime(project_, useStore.getState().compId, layer.id, time))
   const [dur, setDur] = useState(0.6)
-  const canReveal = layer.type === 'writeon' || layer.revealMode !== 'none'
-
-  const setMotion = (kind: 'intro' | 'outro', m: Motion | null, co?: string) =>
-    updateLayer(layer.id, (l) => void (l[kind] = m), co)
-  const pick = (id: string) => {
-    const item = LIBRARY.find((i) => i.id === id)!
-    updateLayer(layer.id, (l) => applyLibraryItem(l, item, comp))
-  }
 
   return (
     <>
-      <MotionCard
-        kind="intro"
-        title="Binnenkomst"
-        motion={layer.intro ?? null}
-        canReveal={canReveal}
-        onToggle={(on) => setMotion('intro', on ? defaultIntro(layer) : null)}
-        onChange={(m, co) => setMotion('intro', m, co)}
-        onPick={pick}
-        active={matchLibraryItem(layer, 'intro')}
-      />
-      <EmphasisCard layer={layer} onPick={pick} />
-      <MotionCard
-        kind="outro"
-        title="Uitgang"
-        motion={layer.outro ?? null}
-        canReveal={canReveal}
-        onToggle={(on) => setMotion('outro', on ? defaultOutro(comp) : null)}
-        onChange={(m, co) => setMotion('outro', m, co)}
-        onPick={pick}
-        active={matchLibraryItem(layer, 'outro')}
-      />
-      {layer.outro && (
-        <div className="hint-text" style={{ padding: '0 12px 8px' }}>
-          De laatste loop stopt vóór de uitgang, zodat het eindbeeld (en de backup) alles toont.
-        </div>
-      )}
-
       <SavePreset layer={layer} />
 
-      <Section id="keyframes" title={<><Timer size={13} /> Keyframes</>} defaultOpen={Object.keys(layer.tracks).length > 0}>
+      <Section id="keyframes" title={<><Timer size={13} /> Keyframes</>}>
         <div className="hint-text" style={{ marginTop: 0, marginBottom: 8 }}>
-          Klik op ◆ om een eigenschap te animeren; elke wijziging zet dan een keyframe op de huidige tijd. Positie zet X én Y tegelijk. Eigen keyframes gaan
-          vóór de binnenkomst/uitgang.
+          Klik op ◆ om een eigenschap te animeren; elke wijziging zet dan een keyframe op de playhead. Positie zet X én Y tegelijk. Een preset uit het paneel
+          Animaties (klik of sleep op de laag) zet ook gewone keyframes, vanaf de playhead.
         </div>
         <TransformRows layer={layer} showSize={false} />
         {layer.type !== 'writeon' && (
@@ -1034,68 +1018,6 @@ function LayerMotion({ layer }: { layer: Layer }) {
   )
 }
 
-function MotionCard(props: {
-  kind: 'intro' | 'outro'
-  title: string
-  motion: Motion | null
-  canReveal: boolean
-  onToggle: (on: boolean) => void
-  onChange: (m: Motion, coalesce?: string) => void
-  onPick: (libraryId: string) => void
-  active: string | null
-}) {
-  const { kind, motion: m, canReveal } = props
-  const set = (patch: Partial<Motion>, co?: string) => m && props.onChange({ ...m, ...patch }, co)
-  const active = props.active
-
-  return (
-    <div className="section">
-      <div className={`motion-card ${kind}`}>
-        <div className="row" style={{ marginBottom: m ? 10 : 0 }}>
-          <span className="grow" style={{ fontWeight: 600 }}>
-            {props.title}
-          </span>
-          <Switch checked={!!m} onChange={props.onToggle} />
-        </div>
-        {m && (
-          <>
-            <div className="chips">
-              {LIBRARY.filter((i) => i.kind === kind && (!i.reveal || canReveal || i.reveal !== 'writeon')).map((i) => (
-                <button key={i.id} className={active === i.id ? 'on' : ''} onClick={() => props.onPick(i.id)}>
-                  {i.label}
-                </button>
-              ))}
-            </div>
-            <div className="grid2">
-              <Num label="Start" value={m.start} step={0.05} min={0} max={30} decimals={2} suffix="s" onChange={(v, co) => set({ start: v }, co ? `${kind}-s` : undefined)} />
-              <Num label="Duur" value={m.duration} step={0.05} min={0.05} max={10} decimals={2} suffix="s" onChange={(v, co) => set({ duration: v }, co ? `${kind}-d` : undefined)} />
-            </div>
-            <select value={m.ease} onChange={(e) => set({ ease: e.target.value as EaseName })} style={{ marginBottom: 6 }}>
-              {EASES.filter((e) => e !== 'hold').map((e) => (
-                <option key={e} value={e}>
-                  {EASE_LABEL[e]}
-                </option>
-              ))}
-            </select>
-            <div className="grid2">
-              <Num label="↔" title="Verschuiving X (px)" value={m.dx} onChange={(v, co) => set({ dx: v }, co ? `${kind}-dx` : undefined)} />
-              <Num label="↕" title="Verschuiving Y (px)" value={m.dy} onChange={(v, co) => set({ dy: v }, co ? `${kind}-dy` : undefined)} />
-            </div>
-            <div className="grid2">
-              <Num label="%" title="Schaal" value={Math.round(m.scale * 100)} min={0} max={500} onChange={(v, co) => set({ scale: v / 100 }, co ? `${kind}-sc` : undefined)} />
-              <Num label="°" title="Rotatie" value={m.rotation} onChange={(v, co) => set({ rotation: v }, co ? `${kind}-r` : undefined)} />
-            </div>
-            <Row label="Fade">
-              <Switch checked={m.fade} onChange={(v) => set({ fade: v })} />
-            </Row>
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
-/** Animatie van deze laag bewaren als eigen preset in de bibliotheek. */
 function SavePreset({ layer }: { layer: Layer }) {
   const [name, setName] = useState('')
   const has = !!(layer.intro || layer.outro || layer.emphasis || Object.keys(layer.tracks).length)
@@ -1120,52 +1042,6 @@ function SavePreset({ layer }: { layer: Layer }) {
     </div>
   )
 }
-
-function EmphasisCard({ layer, onPick }: { layer: Layer; onPick: (id: string) => void }) {
-  const em = layer.emphasis
-  const comp = useStore(currentComp)!
-  const set = (patch: Partial<Emphasis>, co?: string) => em && updateLayer(layer.id, (l) => void (l.emphasis = { ...em, ...patch }), co)
-  return (
-    <div className="section">
-      <div className="motion-card emphasis">
-        <div className="row" style={{ marginBottom: em ? 10 : 0 }}>
-          <span className="grow" style={{ fontWeight: 600 }}>
-            Accent
-          </span>
-          <Switch
-            checked={!!em}
-            onChange={(on) =>
-              updateLayer(layer.id, (l) => {
-                l.emphasis = on ? { type: 'pulse', start: Math.min(3, Math.max(0, comp.duration - 2)), duration: 1, repeat: 2, strength: 1 } : null
-              })
-            }
-          />
-        </div>
-        {em && (
-          <>
-            <div className="chips">
-              {LIBRARY.filter((i) => i.kind === 'emphasis').map((i) => (
-                <button key={i.id} className={em.type === (i.emphasis as EmphasisType) ? 'on' : ''} onClick={() => onPick(i.id)}>
-                  {i.label}
-                </button>
-              ))}
-            </div>
-            <div className="grid2">
-              <Num label="Start" value={em.start} step={0.05} min={0} max={30} decimals={2} suffix="s" onChange={(v, co) => set({ start: v }, co ? 'em-s' : undefined)} />
-              <Num label="Duur" value={em.duration} step={0.05} min={0.1} max={10} decimals={2} suffix="s" onChange={(v, co) => set({ duration: v }, co ? 'em-d' : undefined)} />
-            </div>
-            <div className="grid2">
-              <Num label="×" title="Herhalingen" value={em.repeat} min={1} max={10} onChange={(v, co) => set({ repeat: Math.round(v) }, co ? 'em-r' : undefined)} />
-              <Num label="Kracht" value={em.strength} step={0.1} min={0.1} max={5} decimals={1} onChange={(v, co) => set({ strength: v }, co ? 'em-k' : undefined)} />
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ---------------- AI ----------------
 
 function AiPanel() {
   const selection = useStore((s) => s.selection)

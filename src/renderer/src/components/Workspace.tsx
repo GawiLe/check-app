@@ -1,3 +1,4 @@
+import { Popouts } from './Popouts'
 import { FormatsPanel } from './FormatsPanel'
 import { useState } from 'react'
 import { Code2, Columns2, PenTool } from 'lucide-react'
@@ -81,6 +82,7 @@ export function Workspace() {
   return (
     <div className="dock-root">
       <Dock render={(id) => PANELS[id]()} />
+      <Popouts render={(id) => PANELS[id]()} />
     </div>
   )
 }
