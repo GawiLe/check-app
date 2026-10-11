@@ -20,7 +20,7 @@ await page.locator('.welcome .list-item').first().click()
 await page.waitForSelector('.app')
 await page.evaluate(() => {
   const d = window.__bsDock.getState()
-  const col = d.root.children.find((c) => c.kind === 'split')
+  const col = d.root.children.find((c) => c.kind === 'split' && JSON.stringify(c).includes('"timeline"'))
   d.resize(col.id, [0.35, 0.65])
 })
 
@@ -51,7 +51,7 @@ await check('en weer terug', async () => {
 await row('CTA tekst').click()
 await row('CTA').click({ modifiers: ['Shift'] })
 await page.getByRole('button', { name: 'Nieuwe compositie' }).click()
-await row('Comp 1').locator('button').first().click() // openklappen
+await row('Comp 1').locator('button[title^="Inhoud tonen"]').click() // openklappen
 await page.locator('.timeline .body').evaluate((el) => (el.scrollTop = 0))
 
 await dragRow('logo.svg', 'CTA', 'before')

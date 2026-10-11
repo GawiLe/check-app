@@ -2,12 +2,13 @@
 // (naast/onder elkaar) met op de bladeren tabgroepen van panelen. Pure functies,
 // zodat ze los te testen zijn.
 
-export type PanelId = 'viewer' | 'code' | 'timeline' | 'library' | 'assets' | 'design' | 'motion' | 'ai'
+export type PanelId = 'viewer' | 'code' | 'timeline' | 'formats' | 'library' | 'assets' | 'design' | 'motion' | 'ai'
 
 export const PANEL_TITLE: Record<PanelId, string> = {
   viewer: 'Canvas',
   code: 'Code',
   timeline: 'Tijdlijn',
+  formats: 'Formaten',
   library: 'Animaties',
   assets: 'Assets & fonts',
   design: 'Ontwerp',
@@ -15,7 +16,7 @@ export const PANEL_TITLE: Record<PanelId, string> = {
   ai: 'AI'
 }
 
-export const ALL_PANELS: PanelId[] = ['viewer', 'code', 'timeline', 'library', 'assets', 'design', 'motion', 'ai']
+export const ALL_PANELS: PanelId[] = ['viewer', 'code', 'timeline', 'formats', 'library', 'assets', 'design', 'motion', 'ai']
 
 export interface TabsNode {
   kind: 'tabs'
@@ -50,7 +51,11 @@ export const split = (dir: 'row' | 'col', children: DockNode[], sizes?: number[]
 export function defaultLayout(): DockNode {
   return split(
     'row',
-    [tabs(['library', 'assets']), split('col', [tabs(['viewer', 'code']), tabs(['timeline'])], [0.62, 0.38]), tabs(['design', 'motion', 'ai'])],
+    [
+      split('col', [tabs(['formats']), tabs(['library', 'assets'])], [0.34, 0.66]),
+      split('col', [tabs(['viewer', 'code']), tabs(['timeline'])], [0.62, 0.38]),
+      tabs(['design', 'motion', 'ai'])
+    ],
     [0.17, 0.6, 0.23]
   )
 }
@@ -71,6 +76,22 @@ export function findNode(node: DockNode, id: string): DockNode | null {
     if (f) return f
   }
   return null
+}
+
+/**
+ * Nieuw paneel in een opgeslagen indeling van vóór dat paneel bestond: boven de tabgroep met `near`
+ * (of anders naast de hele indeling) toevoegen. Bewust weggeklikte panelen komen niet terug: alleen
+ * voor indelingen zonder `seen`-markering van dit paneel.
+ */
+export function withPanel(root: DockNode, panel: PanelId, near: PanelId): DockNode {
+  if (visiblePanels(root).includes(panel)) return root
+  const r = clone(root)
+  const t = findTabsWith(r, near)
+  if (!t) return normalize(split('row', [tabs([panel]), r], [0.17, 0.83])) ?? r
+  const wrapped = split('col', [tabs([panel]), { ...t }], [0.34, 0.66])
+  // De tabgroep op zijn plek vervangen door de splitsing
+  const replace = (n: DockNode): DockNode => (n.id === t.id ? wrapped : n.kind === 'split' ? { ...n, children: n.children.map(replace) } : n)
+  return normalize(replace(r)) ?? r
 }
 
 export function visiblePanels(node: DockNode): PanelId[] {
@@ -157,10 +178,12 @@ export function dropPanel(root: DockNode, panel: PanelId, targetId: string, zone
 /** Paneel tonen dat niet in de indeling staat: bij zijn gebruikelijke buren, anders bij de grootste groep. */
 export function showPanel(root: DockNode, panel: PanelId): DockNode {
   if (findTabsWith(root, panel)) return activate(root, panel)
+  if (panel === 'formats') return withPanel(root, 'formats', 'library')
   const near: Record<PanelId, PanelId[]> = {
     viewer: ['code', 'timeline'],
     code: ['viewer', 'timeline'],
     timeline: ['viewer'],
+    formats: ['library'],
     library: ['assets'],
     assets: ['library'],
     design: ['motion', 'ai'],

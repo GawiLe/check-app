@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 
 /**
  * Getal-veld zoals in After Effects: sleep horizontaal om de waarde te wijzigen,
@@ -118,18 +118,115 @@ export function Switch(props: { checked: boolean; onChange: (v: boolean) => void
   )
 }
 
+/** Volgorde van de blokken in een paneel (Ontwerp, Animatie), zelf te schikken door de kop te slepen. */
+const StackCtx = createContext<{
+  orderOf: (key: string) => number
+  move: (dragged: string, target: string, after: boolean) => void
+} | null>(null)
+const SECTION_DRAG = 'application/x-bs-section'
+const loadOrder = (id: string): string[] => {
+  try {
+    const v = JSON.parse(localStorage.getItem(`bs-sections-${id}`) ?? '[]')
+    return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Paneel waarin je de blokken (Sections) kunt verslepen naar de volgorde die je zelf wilt.
+ * De volgorde wordt per paneel onthouden; blokken die er nog niet in staan komen achteraan in hun gewone volgorde.
+ */
+export function SectionStack(props: { id: string; className?: string; children: ReactNode }) {
+  const [order, setOrder] = useState(() => loadOrder(props.id))
+  const ref = useRef<HTMLDivElement>(null)
+  const orderOf = (key: string) => {
+    const i = order.indexOf(key)
+    return i < 0 ? 1000 : 1 + i
+  }
+  const move = (dragged: string, target: string, after: boolean) => {
+    if (dragged === target || !ref.current) return
+    // Huidige zichtbare volgorde (van boven naar onder), dan het gesleepte blok verplaatsen
+    const els = [...ref.current.querySelectorAll<HTMLElement>(':scope > [data-section]')].sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)
+    const visible = els.map((e) => e.dataset.section!).filter((k) => k !== dragged)
+    const at = visible.indexOf(target)
+    if (at < 0) return
+    visible.splice(after ? at + 1 : at, 0, dragged)
+    // Blokken die nu niet zichtbaar zijn (andere laagsoort) houden hun plek achter de zichtbare
+    const next = [...visible, ...order.filter((k) => !visible.includes(k))]
+    setOrder(next)
+    try {
+      localStorage.setItem(`bs-sections-${props.id}`, JSON.stringify(next))
+    } catch {
+      /* alleen deze sessie */
+    }
+  }
+  return (
+    <StackCtx.Provider value={{ orderOf, move }}>
+      <div ref={ref} className={`section-stack ${props.className ?? ''}`}>
+        {props.children}
+      </div>
+    </StackCtx.Provider>
+  )
+}
+
 export function Section(props: {
   title: ReactNode
   actions?: ReactNode
   children: ReactNode
   /** Inklapbaar; undefined = altijd open. */
   defaultOpen?: boolean
+  /** Sleutel om de plek te onthouden als de titel geen tekst is. */
+  id?: string
 }) {
   const collapsible = props.defaultOpen !== undefined
   const [open, setOpen] = useState(props.defaultOpen ?? true)
+  const stack = useContext(StackCtx)
+  const key = props.id ?? (typeof props.title === 'string' ? props.title : undefined)
+  const [drop, setDrop] = useState<'before' | 'after' | null>(null)
+  const sortable = !!stack && !!key
   return (
-    <div className={`section${collapsible ? ' collapsible' : ''}${open ? ' open' : ''}`}>
-      <div className="section-head" onClick={collapsible ? () => setOpen(!open) : undefined}>
+    <div
+      className={`section${collapsible ? ' collapsible' : ''}${open ? ' open' : ''}${drop ? ` drop-${drop}` : ''}`}
+      data-section={sortable ? key : undefined}
+      style={sortable ? { order: stack!.orderOf(key!) } : undefined}
+      onDragOver={
+        sortable
+          ? (e) => {
+              if (!e.dataTransfer.types.includes(SECTION_DRAG)) return
+              e.preventDefault()
+              const r = e.currentTarget.getBoundingClientRect()
+              setDrop(e.clientY > r.top + r.height / 2 ? 'after' : 'before')
+            }
+          : undefined
+      }
+      onDragLeave={sortable ? () => setDrop(null) : undefined}
+      onDrop={
+        sortable
+          ? (e) => {
+              const dragged = e.dataTransfer.getData(SECTION_DRAG)
+              setDrop(null)
+              if (!dragged) return
+              e.preventDefault()
+              stack!.move(dragged, key!, drop === 'after')
+            }
+          : undefined
+      }
+    >
+      <div
+        className={`section-head${sortable ? ' sortable' : ''}`}
+        draggable={sortable}
+        title={sortable ? 'Sleep om dit blok te verplaatsen' : undefined}
+        onDragStart={
+          sortable
+            ? (e) => {
+                e.dataTransfer.setData(SECTION_DRAG, key!)
+                e.dataTransfer.effectAllowed = 'move'
+              }
+            : undefined
+        }
+        onClick={collapsible ? () => setOpen(!open) : undefined}
+      >
         <span className="title">
           {collapsible && <span className="faint">{open ? '▾' : '▸'}</span>}
           {props.title}

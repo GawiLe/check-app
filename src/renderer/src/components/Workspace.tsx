@@ -1,3 +1,4 @@
+import { FormatsPanel } from './FormatsPanel'
 import { useState } from 'react'
 import { Code2, Columns2, PenTool } from 'lucide-react'
 import { Dock } from '../dock/Dock'
@@ -64,6 +65,7 @@ const PANELS: Record<PanelId, () => React.ReactNode> = {
   viewer: () => <CanvasPanel />,
   code: () => <CodeView />,
   timeline: () => <Timeline />,
+  formats: () => <FormatsPanel />,
   library: () => (
     <div className="panel-scroll">
       <Library />

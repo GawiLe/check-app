@@ -2,7 +2,7 @@ import { anyDirty, openDocument, saveAll } from './documents'
 import { createLayer, deriveComposition, newId } from '@shared/factory'
 import { applyLibraryItem, applyUserPreset, LIBRARY, presetFromLayer } from '@shared/library'
 import { mergeTracks, PRESETS } from '@shared/presets'
-import { resetCompOverrides, resetOverrides } from '@shared/sync'
+import { copyFormat, resetCompOverrides, resetOverrides } from '@shared/sync'
 import { allLayers, cloneLayer, findDeep, groupLayers, layerLength, localTime, reorderLayer, sequenceLayers, shiftTiming, ungroup } from '@shared/tree'
 import { effectiveLayer } from '@shared/motion'
 import type { PropGroupId } from '@shared/propgroups'
@@ -565,12 +565,18 @@ export async function regenerateWriteOn(layerId: string) {
   }
 }
 
-export function addFormat(width: number, height: number, name?: string) {
+/** Nieuw formaat, afgeleid van de basis; met `fromId` neemt het de lay-out van dat formaat over (bijv. 300x250 → 336x280). */
+export function addFormat(width: number, height: number, name?: string, fromId?: string) {
   const { project, compId } = S()
   if (!project) return
   const base = project.compositions.find((c) => c.id === project.baseCompositionId) ?? findComp(project, compId)
   const comp = deriveComposition(base, width, height, name)
-  S().update((p) => p.compositions.push(comp))
+  delete comp.disabled
+  delete comp.overrides
+  S().update((p) => {
+    p.compositions.push(comp)
+    if (fromId && fromId !== base.id) copyFormat(p, fromId, comp.id)
+  }, undefined, true)
   S().setComp(comp.id)
   S().setDialog(null)
 }

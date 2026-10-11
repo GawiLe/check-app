@@ -2657,3 +2657,289 @@ kbd {
 .kf-nav:not(:disabled):hover {
   color: var(--key);
 }
+
+/* Bewerkbare waarden in de uitgeklapte eigenschappen (tijdlijn) */
+.tl-vals {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+.tl-val input {
+  width: 46px;
+  height: 18px;
+  padding: 0 4px;
+  font-size: 11px;
+  text-align: right;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  cursor: ew-resize;
+}
+.tl-val input.animated {
+  color: var(--key);
+}
+.tl-val input:hover,
+.tl-val input:focus {
+  border-color: var(--line);
+  background: var(--input, rgba(255, 255, 255, 0.04));
+}
+.tl-val input:not(.scrub) {
+  cursor: text;
+  text-align: left;
+}
+.tl-link {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--faint);
+  border-radius: 3px;
+}
+.tl-link.on {
+  color: var(--accent);
+}
+
+/* Oogje: laag verbergen (in een afgeleid formaat alleen daar) */
+.tl-eye {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  border-radius: 3px;
+}
+.tl-eye:hover {
+  color: var(--text);
+}
+.tl-eye.off {
+  color: var(--faint);
+  opacity: 0.6;
+}
+/* Afgeleid formaat: aangepaste lagen oranje, eigen lagen (alleen in dit formaat) blauwgroen */
+.tl-name.overridden .grow {
+  color: #f5a524;
+}
+.tl-name.own .grow {
+  color: #3ecfcf;
+}
+
+/* Uitlijnknoppen bovenin de werkbalk */
+.toolbar-align {
+  padding: 2px 6px;
+}
+.align-bar.inline {
+  padding: 0;
+  border: 0;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+.align-bar.inline .align-to button {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+.align-bar button:disabled {
+  opacity: 0.35;
+}
+
+/* ---------- Paneel Formaten ---------- */
+.formats-panel {
+  display: flex;
+  flex-direction: column;
+}
+.fp-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.fp-head .ghost.on {
+  background: var(--hover);
+  color: var(--text);
+}
+.fp-head .icon.on {
+  color: var(--accent);
+}
+.fp-list {
+  padding: 4px 0;
+}
+.fp-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 8px 0 12px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+}
+.fp-item:hover {
+  background: var(--hover);
+}
+.fp-item.on {
+  background: var(--hover);
+  border-left-color: var(--accent);
+}
+.fp-item.off .fp-label {
+  opacity: 0.45;
+}
+.fp-label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.fp-size {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  flex-shrink: 0;
+}
+.fp-badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.fp-badge {
+  flex-shrink: 0;
+}
+.fp-name {
+  color: var(--muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.fp-badge.base {
+  color: var(--accent);
+  background: rgba(124, 140, 255, 0.14);
+}
+.fp-badge.changed {
+  color: #f5a524;
+  background: rgba(245, 165, 36, 0.14);
+}
+.fp-badge.own {
+  color: #3ecfcf;
+  background: rgba(62, 207, 207, 0.14);
+}
+.fp-more {
+  opacity: 0;
+}
+.fp-item:hover .fp-more,
+.fp-item.on .fp-more {
+  opacity: 1;
+}
+.fp-hint {
+  padding: 8px 12px;
+}
+.fp-c-changed {
+  color: #f5a524;
+}
+.fp-c-own {
+  color: #3ecfcf;
+}
+
+/* Blokken in een paneel zelf schikken (kop slepen) */
+.section-stack {
+  display: flex;
+  flex-direction: column;
+}
+.section-stack > * {
+  flex-shrink: 0;
+}
+.section-head.sortable {
+  cursor: grab;
+}
+.section-head.sortable:active {
+  cursor: grabbing;
+}
+.section-head.sortable {
+  position: relative;
+}
+.section-head.sortable::before {
+  content: '⋮⋮';
+  position: absolute;
+  left: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 9px;
+  letter-spacing: -2px;
+  color: var(--faint);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.section-head.sortable:hover::before {
+  opacity: 1;
+}
+.section.drop-before {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+.section.drop-after {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+/* Exportvenster: platforms met uitleg */
+.target-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.target-row:hover {
+  background: var(--hover);
+}
+.target-row.on {
+  background: var(--hover);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.target-row .meta {
+  color: var(--faint);
+  font-size: 11px;
+}
+.target-info {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.target-info p {
+  margin: 4px 0 8px;
+  color: var(--muted);
+}
+.target-info table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.target-info td {
+  padding: 3px 0;
+  vertical-align: top;
+}
+.target-info td:first-child {
+  color: var(--faint);
+  width: 110px;
+  padding-right: 8px;
+}

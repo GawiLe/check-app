@@ -64,7 +64,8 @@ let watcher: FSWatcher | null = null
 // Preview van de banner: eigen document met een eigen, strenge CSP (alleen het eigen inline-script,
 // geen netwerk; afbeeldingen en fonts alleen uit het project). Zo erft hij niets van de editor.
 const PREVIEW_HOST = 'bs-preview'
-const previews = ['', '']
+// Per preview-iframe een eigen HTML (het overzicht toont alle formaten tegelijk)
+const previews = new Map<string, string>()
 let previewRev = 0
 const PREVIEW_CSP =
   "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src bsproj: data:; font-src bsproj: data:; media-src 'none'; connect-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'"
@@ -233,9 +234,13 @@ const handlers: Handlers = {
     else win?.close()
   },
   async setPreview(slot, html) {
-    const i = slot === 1 ? 1 : 0
-    previews[i] = String(html)
-    return `bsproj://${PREVIEW_HOST}/${i}?v=${++previewRev}`
+    const key = String(slot)
+    if (!/^[a-z0-9_-]{1,64}$/i.test(key)) throw new Error('Ongeldige preview')
+    previews.delete(key)
+    previews.set(key, String(html))
+    // Begrensd houden: de oudste (niet meer gebruikte) previews vallen af
+    while (previews.size > 64) previews.delete(previews.keys().next().value!)
+    return `bsproj://${PREVIEW_HOST}/${key}?v=${++previewRev}`
   },
 
   async revealInFolder(path) {
@@ -429,7 +434,7 @@ app.whenReady().then(async () => {
     try {
       const url = new URL(req.url)
       if (url.hostname === PREVIEW_HOST)
-        return new Response(previews[url.pathname === '/1' ? 1 : 0], {
+        return new Response(previews.get(url.pathname.slice(1)) ?? '', {
           headers: { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': PREVIEW_CSP, 'cache-control': 'no-store' }
         })
       const rel = decodeURIComponent(`${url.hostname}${url.pathname}`)

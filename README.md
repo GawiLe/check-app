@@ -53,7 +53,7 @@ mijn-campagne/
   project.bsproj   ← het project (JSON: formaten, lagen, keyframes)
   assets/          ← afbeeldingen (png, jpg, svg, gif, webp)
   fonts/           ← woff, woff2, ttf, otf
-  export/          ← output per platform + rapport.json
+  export/          ← export/<projectnaam>/<platform>/ met de zips, backups en rapport.json
 ```
 
 - Zet bestanden direct in `assets/` of `fonts/`. De app houdt de map in de gaten en ververst de preview als je een bestand vervangt (bijvoorbeeld een nieuwe packshot vanuit Photoshop).
@@ -61,7 +61,7 @@ mijn-campagne/
 
 ## Workflow
 
-1. **Nieuw project** vanuit een boilerplate. De ingebouwde starter is **300×600**: achtergrond, headline, subline, packshot-plek en CTA, al geanimeerd.
+1. **Nieuw project:** standaard **leeg** (alleen een 300×600-basis). Wil je een begin, kies dan *Voorbeeld 300×600* (achtergrond, headline, subline, packshot-plek en CTA, al geanimeerd) of een eigen boilerplate.
 2. **Lagen** voeg je toe via *+ Laag*: tekst, vorm, write-on of een afbeelding. Een asset links aanklikken maakt er ook een laag van.
 3. **Formaten** staan als tabs bovenin. Met *+* voeg je een IAB- of eigen formaat toe; dat wordt afgeleid van de basis 300×600.
 4. **Animeren** in de tab *Animatie* (zie hieronder).
@@ -70,19 +70,22 @@ mijn-campagne/
 
 ### Meerdere formaten: de basis is leidend
 
-- Alle formaten zitten in één project. De **basis** (300×600, gemarkeerd met ●) is leidend.
-- Met **Alle** zie je de formaten naast elkaar, synchroon afspelend. Klik op een formaat om het te bewerken.
-- **Wijzig je iets in de basis**, dan gaat het mee naar alle andere formaten. Dat geldt voor:
-  - tekst, font, kleuren, afbeelding en animaties;
-  - positie en maat, omgerekend naar dat formaat;
-  - nieuwe en verwijderde lagen, en de volgorde.
-- **Wijzig je iets in een afgeleid formaat**, dan geldt dat alleen daar. Die eigenschap wordt onthouden als *afwijkend van basis*, en latere wijzigingen in de basis overschrijven hem niet meer.
-  - In de inspector zie je welke eigenschappen afwijken (oranje labels). Met × herstel je één eigenschap naar de basis, met *Alles* de hele laag.
-  - In de tijdlijn hebben afwijkende lagen een oranje stip.
-  - Lagen die je alleen in een afgeleid formaat toevoegt, zijn *eigen lagen* van dat formaat.
+Alle formaten staan in het paneel **Formaten** (links boven, of via Venster → Formaten):
+
+- Klik op een formaat om het te bewerken; dubbelklik om de naam te wijzigen. Met **+** voeg je een formaat toe.
+- Het **vinkje** zet een formaat aan of uit: uitgezette formaten staan niet in het overzicht en zijn standaard niet aangevinkt bij exporteren.
+- **Alle formaten** toont de aangevinkte formaten naast elkaar, synchroon afspelend, elk met zijn eigen inhoud.
+- Rechtermuisknop of **⋯**: naam wijzigen, *Lay-out overnemen van …* een ander formaat, alle aanpassingen terug naar de basis, verwijderen.
+
+Hoe het koppelen werkt:
+
+- De **basis** (300×600, label *basis*) is leidend. Wat je daarin toevoegt, verwijdert of wijzigt, gaat naar alle formaten: tekst, font, kleuren, afbeeldingen en animaties, en positie en maat (omgerekend naar dat formaat).
+- **In een ander formaat** pas je inhoud, plek en maat aan, verberg je lagen met het oogje of voeg je eigen lagen toe. Dat geldt alleen voor dat formaat en de basis overschrijft het daarna niet meer.
+  - In de tijdlijn: **oranje** = aangepast in dit formaat, **blauwgroen** = eigen laag van dit formaat. Het formatenpaneel telt ze (● 2, +1).
+  - In het paneel Ontwerp zie je welke eigenschappen afwijken. Met × herstel je één eigenschap naar de basis, met *Alles* de hele laag.
 - Hetzelfde geldt voor de formaatinstellingen (duur, loops, achtergrond, rand).
-- Met het **koppel-icoon** zet je dit uit. Dan zijn alle formaten los.
-- Een nieuw formaat wordt automatisch afgeleid. Bij een sterk afwijkende verhouding (zoals 728×90 van 300×600) moet je de layout daar zelf bijstellen; dat blijft daarna staan.
+- **Een ander formaat als begin:** bij *Formaat toevoegen* kies je *Uitgaan van* (bijv. je uitgewerkte 300×250 voor de 336×280), of je doet later *Lay-out overnemen van …*. Het formaat blijft gekoppeld aan de basis; wat afwijkt wordt een aanpassing van dat formaat.
+- Met het **koppel-icoon** in het paneel zet je het koppelen uit. Dan zijn alle formaten los.
 
 ### Animatiebibliotheek
 
@@ -164,6 +167,10 @@ Lagen: selecteer en druk **Enter**, dubbelklik op de naam in de tijdlijn, of rec
   - **T** tekst: klik op het canvas, of **sleep een tekstvak** in de maat die je wilt
   - **Q** rechthoek en **E** ellips: sleep, met Shift voor een vierkant of cirkel
   - **G** pen tool: klik voor punten en sleep voor een bocht. Klik op het eerste punt om de vorm te sluiten. Enter of de rechtermuisknop geeft een open lijn, Esc stopt.
+- **Lagen verbergen:** het oogje links in de tijdlijn. In een ander formaat dan de basis geldt dat alleen voor dat formaat.
+- **Waarden in de tijdlijn:** klap een laag uit (pijltje, of P/S/R/O/U) en pas positie, schaal (X 🔗 Y), rotatie en dekking direct aan: slepen of klikken en typen. Is de eigenschap geanimeerd, dan komt er een keyframe op de playhead.
+- **Uitlijnen:** de uitlijnknoppen staan bovenin de werkbalk (selectie of banner).
+- **Panelen schikken:** sleep de kop van een blok in Ontwerp of Animatie (bijv. *Transform*) naar een andere plek. De volgorde wordt onthouden.
 - **Tekst bewerken:** dubbelklik op een tekstlaag (of Enter) en typ direct op het canvas. Esc of Cmd/Ctrl+Enter bevestigt.
 - **Slimme hulplijnen:** tijdens het slepen klikt een laag vast op de randen en het midden van de banner en van andere lagen (roze lijn). De afstanden in pixels tot de buren of de bannerrand staan erbij. Houd Cmd/Ctrl ingedrukt om even niet vast te klikken.
 - **Formaat wijzigen:** acht grepen rondom de selectie, in elke hoek en midden op elke rand. De tegenoverliggende hoek of rand blijft staan (ook bij rotatie). Shift of het slotje bij *Maat* houdt de verhouding vast.
@@ -412,7 +419,9 @@ De validator controleert per banner:
 - of er een rand is bij een lichte achtergrond;
 - de backup-afbeelding.
 
-De uitkomst staat in het exportvenster en in `export/rapport.json`.
+De uitkomst staat in het exportvenster en in `export/<projectnaam>/rapport.json`.
+
+**Waar komt de export?** In `export/<projectnaam>/<platform>/`, bijvoorbeeld `export/Zomeractie/CM360/zomeractie_300x600.zip`. In het exportvenster klik je op een platform om te zien wat het is en welke eisen gelden. *Azerion* is een Europees advertentieplatform (o.a. Improve Digital) dat banners op websites en in games plaatst; kies het alleen als de campagne daar loopt.
 
 ## Architectuur
 

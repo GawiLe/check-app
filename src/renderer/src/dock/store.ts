@@ -1,11 +1,19 @@
 import { create } from 'zustand'
-import { activate, defaultLayout, dropPanel, removePanel, resize, showPanel, validLayout, type DockNode, type PanelId, type Zone } from './model'
+import { activate, defaultLayout, dropPanel, removePanel, resize, showPanel, validLayout, withPanel, type DockNode, type PanelId, type Zone } from './model'
 
 const KEY = 'bs-dock-v1'
 
+const SEEN = 'bs-dock-seen-formats'
+
 function load(): DockNode {
   try {
-    return validLayout(JSON.parse(localStorage.getItem(KEY) ?? 'null')) ?? defaultLayout()
+    let root = validLayout(JSON.parse(localStorage.getItem(KEY) ?? 'null')) ?? defaultLayout()
+    // Eenmalig: het paneel Formaten toevoegen aan een indeling van vóór dat paneel
+    if (!localStorage.getItem(SEEN)) {
+      root = withPanel(root, 'formats', 'library')
+      localStorage.setItem(SEEN, '1')
+    }
+    return root
   } catch {
     return defaultLayout()
   }

@@ -225,3 +225,40 @@ export function resetCompOverrides(p: Project, compId: string, keys?: string[]):
 export function isLinkedToBase(p: Project, l: Layer): boolean {
   return !!baseComp(p)?.layers.some((b) => b.linkId === l.linkId)
 }
+
+/**
+ * Lay-out van formaat `fromId` overnemen in `toId`: posities, maten, zichtbaarheid en inhoud, omgerekend
+ * naar het doelformaat (bijv. een uitgewerkte 300x250 als begin voor de 336x280). Wat afwijkt van de basis
+ * wordt een override in het doelformaat, zodat latere wijzigingen in de basis het niet overschrijven.
+ * Eigen lagen van het doelformaat (die niet in het bronformaat staan) blijven bovenaan bewaard.
+ */
+export function copyFormat(p: Project, fromId: string, toId: string): void {
+  const from = p.compositions.find((c) => c.id === fromId)
+  const to = p.compositions.find((c) => c.id === toId)
+  const base = baseComp(p)
+  if (!from || !to || from === to || to.id === p.baseCompositionId) return
+  const fromLinks = new Set(from.layers.map((l) => l.linkId))
+  const baseLinks = new Set(base?.layers.map((l) => l.linkId))
+  const keepOwn = to.layers.filter((l) => !fromLinks.has(l.linkId) && !baseLinks.has(l.linkId))
+  const layers = from.layers.map((fl) => {
+    const mapped = mapLayerToFormat(fl, from, to.width, to.height)
+    mapped.id = to.layers.find((x) => x.linkId === fl.linkId)?.id ?? mapped.id
+    const bl = base?.layers.find((b) => b.linkId === fl.linkId)
+    if (base && bl) {
+      const fromBase = mapLayerToFormat(bl, base, to.width, to.height)
+      // Groepsinhoud vergelijken zonder ids (die zijn per kopie nieuw)
+      const val = (l: Layer, k: string) => (k === 'children' ? JSON.parse(JSON.stringify(getKey(l, k) ?? null, (key, v) => (key === 'id' ? undefined : v))) : getKey(l, k))
+      const ov = layerKeys(mapped, fromBase).filter((k) => !same(val(mapped, k), val(fromBase, k)))
+      if (ov.length) mapped.overrides = ov
+    }
+    return mapped
+  })
+  to.layers = [...keepOwn, ...layers]
+  const compOv: string[] = []
+  for (const k of COMP_KEYS) {
+    ;(to as unknown as Record<string, unknown>)[k] = structuredClone(from[k])
+    if (base && !same(from[k], base[k])) compOv.push(k)
+  }
+  if (compOv.length) to.overrides = compOv
+  else delete to.overrides
+}

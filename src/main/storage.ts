@@ -4,7 +4,7 @@ import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promi
 import { existsSync } from 'node:fs'
 import { basename, extname, join } from 'node:path'
 import type { Boilerplate, OpenedProject } from '@shared/api'
-import { createStarterProject, newId } from '@shared/factory'
+import { createEmptyProject, createStarterProject, newId } from '@shared/factory'
 import { normalizeProject } from '@shared/sync'
 import type { Project } from '@shared/types'
 import type { UserPreset } from '@shared/library'
@@ -118,9 +118,13 @@ export async function listAssets(dir: string): Promise<string[]> {
 
 const bpRoot = () => join(app.getPath('userData'), 'boilerplates')
 export const BUILTIN_STARTER = 'builtin:starter-300x600'
+export const BUILTIN_EMPTY = 'builtin:empty'
 
 export async function listBoilerplates(): Promise<Boilerplate[]> {
-  const list: Boilerplate[] = [{ id: BUILTIN_STARTER, name: 'Starter 300×600 (headline, packshot, CTA)', builtIn: true }]
+  const list: Boilerplate[] = [
+    { id: BUILTIN_EMPTY, name: 'Leeg (300×600)', builtIn: true },
+    { id: BUILTIN_STARTER, name: 'Voorbeeld 300×600 (headline, packshot, CTA)', builtIn: true }
+  ]
   try {
     for (const id of await readdir(bpRoot())) {
       try {
@@ -137,7 +141,8 @@ export async function listBoilerplates(): Promise<Boilerplate[]> {
 }
 
 export async function boilerplateSource(id: string | null): Promise<{ project: Project; dir?: string }> {
-  if (!id || id === BUILTIN_STARTER) return { project: createStarterProject() }
+  if (!id || id === BUILTIN_EMPTY) return { project: createEmptyProject() }
+  if (id === BUILTIN_STARTER) return { project: createStarterProject() }
   if (!safeName(id)) throw new Error('Ongeldige boilerplate.')
   const dir = join(bpRoot(), id)
   return { project: (await readProject(dir)).project, dir }

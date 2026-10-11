@@ -94,7 +94,24 @@ const motion = (start: number, duration: number, spec: Partial<Motion>): Motion 
   ...spec
 })
 
-/** Standaard-boilerplate: 300×600 met achtergrond, headline, subline, packshot-plek en CTA. */
+/** Leeg project: alleen een 300×600-basis, zonder lagen. Standaard bij "Nieuw". */
+export function createEmptyProject(name = 'Nieuwe campagne'): Project {
+  const comp = createComposition(BASE_SIZE.width, BASE_SIZE.height, 'Basis 300x600')
+  return {
+    version: PROJECT_VERSION,
+    name,
+    clickTag: 'https://www.example.com',
+    targets: ['cm360'],
+    syncFormats: true,
+    politeLoad: true,
+    embedFonts: true,
+    fonts: [],
+    baseCompositionId: comp.id,
+    compositions: [comp]
+  }
+}
+
+/** Voorbeeld-boilerplate: 300×600 met achtergrond, headline, subline, packshot-plek en CTA. */
 export function createStarterProject(name = 'Nieuwe campagne'): Project {
   const comp = createComposition(BASE_SIZE.width, BASE_SIZE.height, 'Basis 300x600')
   const W = comp.width

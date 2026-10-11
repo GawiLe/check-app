@@ -7,13 +7,10 @@ import {
   FolderOpen,
   ImagePlus,
   Circle,
-  LayoutGrid,
   MousePointer2,
   PanelsTopLeft,
   PenTool,
   MousePointerClick,
-  Link2,
-  Link2Off,
   PenLine,
   Plus,
   Redo2,
@@ -24,9 +21,9 @@ import {
   Undo2,
   Upload
 } from 'lucide-react'
-import { addClickArea, addLayer, importImages, regenerateWriteOn, renameComposition, save } from '../lib/actions'
+import { addClickArea, addLayer, importImages, regenerateWriteOn, save } from '../lib/actions'
 import { OpenMenu } from './DocTabs'
-import { InlineRename } from './ui'
+import { AlignBar } from './AlignBar'
 import { ALL_PANELS, PANEL_TITLE, visiblePanels } from '../dock/model'
 import { useDock } from '../dock/store'
 import { useStore } from '../store'
@@ -35,8 +32,7 @@ export function Toolbar() {
   const project = useStore((s) => s.project)!
   const compId = useStore((s) => s.compId)
   const dirty = useStore((s) => s.dirty)
-  const overview = useStore((s) => s.overview)
-  const renaming = useStore((s) => s.renaming)
+  const selCount = useStore((s) => s.selection.length)
   const canUndo = useStore((s) => s.past.length > 0)
   const canRedo = useStore((s) => s.future.length > 0)
   const s = useStore.getState
@@ -73,56 +69,8 @@ export function Toolbar() {
         <AddMenu />
       </div>
 
-      <div className="formats">
-        <button
-          className={overview ? 'on' : ''}
-          title="Alle formaten naast elkaar"
-          onClick={() => s().setOverview(!overview)}
-        >
-          <LayoutGrid size={14} /> Alle
-        </button>
-        {project.compositions.map((c) =>
-          renaming === c.id ? (
-            <InlineRename
-              key={c.id}
-              value={c.name}
-              className="format-rename"
-              onDone={(v) => {
-                if (v) renameComposition(c.id, v)
-                s().setRenaming(null)
-              }}
-            />
-          ) : (
-            <button
-              key={c.id}
-              className={!overview && c.id === compId ? 'on' : ''}
-              onClick={() => {
-                s().setComp(c.id)
-                s().setOverview(false)
-              }}
-              onDoubleClick={() => s().setRenaming(c.id)}
-              title={`${c.name} (${c.width}×${c.height}) · dubbelklik om de naam te wijzigen`}
-            >
-              {c.width}×{c.height}
-              {!/^(basis )?\d+x\d+$/i.test(c.name) && <span className="format-name">{c.name}</span>}
-              {c.id === project.baseCompositionId && <span className="base-mark">●</span>}
-            </button>
-          )
-        )}
-        <button className="icon sm" title="Formaat toevoegen" onClick={() => s().setDialog('addFormat')}>
-          <Plus size={14} />
-        </button>
-        <button
-          className={`icon sm${project.syncFormats ? ' on' : ''}`}
-          title={
-            project.syncFormats
-              ? 'Formaten gekoppeld: tekst, kleuren, afbeeldingen en timing gelden voor alle formaten. Positie en maat per formaat.'
-              : 'Formaten los: wijzigingen gelden alleen voor dit formaat.'
-          }
-          onClick={() => s().update((p) => void (p.syncFormats = !p.syncFormats))}
-        >
-          {project.syncFormats ? <Link2 size={14} /> : <Link2Off size={14} />}
-        </button>
+      <div className="formats toolbar-align">
+        <AlignBar count={selCount} inline />
       </div>
 
       <div className="group end">

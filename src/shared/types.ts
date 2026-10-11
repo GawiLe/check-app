@@ -259,6 +259,8 @@ export interface Composition {
   border: { color: string; width: number } | null
   /** Lagen van boven (index 0) naar onder. */
   layers: Layer[]
+  /** Uitgezet in het formatenpaneel: niet in het overzicht en standaard niet in de export. */
+  disabled?: boolean
   /** Alleen afgeleide formaten: compositie-instellingen die afwijken van de basis. */
   overrides?: string[]
 }

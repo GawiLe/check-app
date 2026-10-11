@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BookmarkPlus, Folder, Plus, Image as ImageIcon, Link2, Link2Off, ListOrdered, PenLine, RotateCcw, Sparkles, Square, Timer, Trash2, Type, Wand2, X } from 'lucide-react'
+import { AlignCenter, AlignLeft, AlignRight, BookmarkPlus, Folder, Plus, Image as ImageIcon, Link2, Link2Off, ListOrdered, PenLine, RotateCcw, Sparkles, Square, Timer, Trash2, Type, Wand2, X } from 'lucide-react'
 import { layerStateAt } from '@shared/anim'
 import { applyLibraryItem, LIBRARY, matchLibraryItem } from '@shared/library'
 import { defaultIntro, defaultOutro } from '@shared/motion'
@@ -30,9 +30,8 @@ import {
   ungroupSelection
 } from '../lib/actions'
 import { currentComp, layerLocalTime, setLayerValue, toggleStopwatch, updateComp, updateLayer, useStore } from '../store'
-import { AlignBar } from './AlignBar'
 import { FontPicker } from './FontPicker'
-import { Num, Row, Scrub, Section, Switch, TextInput } from './ui'
+import { Num, Row, Scrub, Section, SectionStack, Switch, TextInput } from './ui'
 
 export const EASE_LABEL: Record<EaseName, string> = {
   linear: 'Lineair',
@@ -58,11 +57,10 @@ function useSelectedLayer() {
 export function DesignPanel() {
   const { layer, count } = useSelectedLayer()
   return (
-    <div className="panel-scroll">
+    <SectionStack id="design" className="panel-scroll">
       <FormatNotice />
-      {count > 0 && <AlignBar count={count} />}
       {layer ? <LayerDesign layer={layer} /> : count > 1 ? <Multi n={count} /> : <CompDesign />}
-    </div>
+    </SectionStack>
   )
 }
 
@@ -70,10 +68,10 @@ export function DesignPanel() {
 export function MotionPanel() {
   const { layer } = useSelectedLayer()
   return (
-    <div className="panel-scroll">
+    <SectionStack id="motion" className="panel-scroll">
       <FormatNotice />
       {layer ? <LayerMotion layer={layer} /> : <CompMotion />}
-    </div>
+    </SectionStack>
   )
 }
 
@@ -323,7 +321,7 @@ function LayerDesign({ layer }: { layer: Layer }) {
     <>
       {derived && <Overrides keys={layer.overrides} onReset={(keys) => resetLayerOverrides(layer.id, keys)} />}
       {own && <div className="notice">Eigen laag: bestaat alleen in dit formaat.</div>}
-      <Section title={<Icon size={14} />} actions={<span className="faint">{{ text: 'Tekst', image: 'Afbeelding', shape: 'Vorm', writeon: 'Write-on', group: 'Compositie' }[layer.type]}</span>}>
+      <Section id="soort" title={<Icon size={14} />} actions={<span className="faint">{{ text: 'Tekst', image: 'Afbeelding', shape: 'Vorm', writeon: 'Write-on', group: 'Compositie' }[layer.type]}</span>}>
         <TextInput value={layer.name} onCommit={(v) => up((l) => void (l.name = v))} />
       </Section>
 
@@ -356,13 +354,19 @@ function LayerDesign({ layer }: { layer: Layer }) {
           <div className="grid3">
             <div className="seg" style={{ gridColumn: 'span 1' }}>
               {(['left', 'center', 'right'] as const).map((a) => (
-                <button key={a} className={layer.text!.align === a ? 'on' : ''} onClick={() => up((l) => void (l.text!.align = a))} style={{ flex: 1, padding: 0 }}>
-                  {a === 'left' ? '⇤' : a === 'center' ? '↔' : '⇥'}
+                <button
+                  key={a}
+                  className={layer.text!.align === a ? 'on' : ''}
+                  title={a === 'left' ? 'Links uitlijnen' : a === 'center' ? 'Centreren' : 'Rechts uitlijnen'}
+                  onClick={() => up((l) => void (l.text!.align = a))}
+                  style={{ flex: 1, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  {a === 'left' ? <AlignLeft size={14} /> : a === 'center' ? <AlignCenter size={14} /> : <AlignRight size={14} />}
                 </button>
               ))}
             </div>
             <Num label="↕" title="Regelhoogte" value={layer.text.lineHeight} step={0.01} min={0.5} max={3} decimals={2} onChange={(v, co) => up((l) => void (l.text!.lineHeight = v), co ? 'lh' : undefined)} />
-            <Num label="↔" title="Letterspatiëring" value={layer.text.letterSpacing} step={0.1} decimals={1} onChange={(v, co) => up((l) => void (l.text!.letterSpacing = v), co ? 'ls' : undefined)} />
+            <Num label="VA" title="Letterspatiëring" value={layer.text.letterSpacing} step={0.1} decimals={1} onChange={(v, co) => up((l) => void (l.text!.letterSpacing = v), co ? 'ls' : undefined)} />
           </div>
           <Row label="Passend">
             <Switch checked={!!layer.text.fit} onChange={(v) => up((l) => void (l.text!.fit = v))} />
@@ -984,7 +988,7 @@ function LayerMotion({ layer }: { layer: Layer }) {
 
       <SavePreset layer={layer} />
 
-      <Section title={<><Timer size={13} /> Keyframes</>} defaultOpen={Object.keys(layer.tracks).length > 0}>
+      <Section id="keyframes" title={<><Timer size={13} /> Keyframes</>} defaultOpen={Object.keys(layer.tracks).length > 0}>
         <div className="hint-text" style={{ marginTop: 0, marginBottom: 8 }}>
           Klik op ◆ om een eigenschap te animeren; elke wijziging zet dan een keyframe op de huidige tijd. Positie zet X én Y tegelijk. Eigen keyframes gaan
           vóór de binnenkomst/uitgang.

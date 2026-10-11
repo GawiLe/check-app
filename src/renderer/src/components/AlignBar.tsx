@@ -32,7 +32,7 @@ const ALIGN: [AlignMode, typeof AlignStartVertical, string][] = [
 ]
 
 /** Uitlijnen en verdelen. Eén laag wordt altijd op de banner uitgelijnd. */
-export function AlignBar({ count }: { count: number }) {
+export function AlignBar({ count, inline }: { count: number; inline?: boolean }) {
   const [to, setTo] = useState(load)
   const target = count === 1 ? 'canvas' : to
   const pick = (v: 'selection' | 'canvas') => {
@@ -43,12 +43,12 @@ export function AlignBar({ count }: { count: number }) {
       /* alleen deze sessie */
     }
   }
-  const canDistribute = target === 'canvas' || count >= 3
+  const canDistribute = count > 0 && (target === 'canvas' || count >= 3)
   return (
-    <div className="align-bar">
+    <div className={`align-bar${inline ? ' inline' : ''}`}>
       <div className="align-buttons">
         {ALIGN.map(([m, Icon, label]) => (
-          <button key={m} className="icon sm" title={`${label} (op ${target === 'canvas' ? 'de banner' : 'de selectie'})`} onClick={() => alignSelection(m, target)}>
+          <button key={m} className="icon sm" disabled={!count} title={count ? `${label} (op ${target === 'canvas' ? 'de banner' : 'de selectie'})` : `${label}: selecteer eerst een laag`} onClick={() => alignSelection(m, target)}>
             <Icon size={15} />
           </button>
         ))}
@@ -71,7 +71,7 @@ export function AlignBar({ count }: { count: number }) {
         </button>
       </div>
       <div className="seg align-to">
-        <button className={target === 'selection' ? 'on' : ''} disabled={count === 1} onClick={() => pick('selection')} title="Lagen op elkaar uitlijnen">
+        <button className={target === 'selection' ? 'on' : ''} disabled={count <= 1} onClick={() => pick('selection')} title="Lagen op elkaar uitlijnen">
           Selectie
         </button>
         <button className={target === 'canvas' ? 'on' : ''} onClick={() => pick('canvas')} title="Op de banner uitlijnen">

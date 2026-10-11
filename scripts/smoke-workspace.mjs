@@ -80,8 +80,8 @@ await page.locator('.inline-rename').fill('Kop')
 await page.locator('.inline-rename').press('Enter')
 await check('laag hernoemd met dubbelklik', async () => !!(await layer('Kop')))
 
-// 5. Formaat (compositie) hernoemen met dubbelklik op het tabblad
-await page.locator('button[title*="dubbelklik om de naam"]', { hasText: '300×600' }).first().dblclick()
+// 5. Formaat (compositie) hernoemen met dubbelklik in het paneel Formaten
+await page.locator('.fp-item', { hasText: '300×600' }).first().dblclick()
 await page.locator('.inline-rename').fill('Halfpage')
 await page.locator('.inline-rename').press('Enter')
 await check('formaat hernoemd', async () => (await project()).compositions[0].name === 'Halfpage')

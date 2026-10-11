@@ -299,6 +299,21 @@ export function setLayerValue(layerId: string, prop: AnimProp, value: number, co
   }, coalesce)
 }
 
+/** Schaal X en Y koppelen of loskoppelen (los: Y begint gelijk aan X, ook de keyframes). */
+export function toggleScaleLink(layerId: string) {
+  updateLayer(layerId, (l) => {
+    if (l.scaleLinked === false) {
+      l.scaleLinked = true
+      delete l.scaleY
+      delete l.tracks.scaleY
+    } else {
+      l.scaleLinked = false
+      l.scaleY = l.scale
+      if (l.tracks.scale) l.tracks.scaleY = structuredClone(l.tracks.scale)
+    }
+  })
+}
+
 /** Stopwatch aan/uit voor een hele groep (Positie, Schaal, …): aan = keyframe op de huidige tijd. */
 export function toggleStopwatch(layerId: string, prop: AnimProp) {
   const { compId, project } = useStore.getState()

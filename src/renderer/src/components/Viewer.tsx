@@ -25,6 +25,8 @@ function BannerFrame(props: { project: Project; comp: Composition; time: number;
   const active = useRef(0)
   const timeRef = useRef(time)
   timeRef.current = time
+  // Eigen naam per frame, zodat het overzicht (alle formaten tegelijk) niet dezelfde HTML deelt
+  const [slotId] = useState(() => `f${Math.random().toString(36).slice(2, 10)}`)
 
   // De preview meldt welke tekstlagen niet in hun kader passen
   useEffect(() => {
@@ -72,7 +74,7 @@ function BannerFrame(props: { project: Project; comp: Composition; time: number;
         }, 40)
       }
       // Via bsproj:// (eigen document met eigen CSP) in plaats van srcdoc, dat de CSP van de editor zou erven
-      const url = await window.bs.setPreview(next, html)
+      const url = await window.bs.setPreview(`${slotId}-${next}`, html)
       if (mine === seq.current) f.src = url
     }, 30)
     return () => clearTimeout(t)
@@ -116,7 +118,7 @@ function Overview() {
   return (
     <div className="viewer">
       <div className="overview">
-        {project.compositions.map((c) => {
+        {project.compositions.filter((c) => !c.disabled).map((c) => {
           const z = Math.min(1, maxH / c.height, 560 / c.width)
           return (
             <div

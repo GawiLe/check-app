@@ -100,7 +100,7 @@ export interface BannerStudioApi {
   /** Venster sluiten nadat er is opgeslagen (of de app afsluiten als daarom gevraagd was). */
   closeWindow(): Promise<void>
   /** Preview-HTML klaarzetten; geeft de bsproj://-URL voor het preview-iframe terug. */
-  setPreview(slot: number, html: string): Promise<string>
+  setPreview(slot: string, html: string): Promise<string>
   revealInFolder(path: string): Promise<void>
   listBoilerplates(): Promise<Boilerplate[]>
   saveBoilerplate(dir: string, project: Project, name: string): Promise<Boilerplate>

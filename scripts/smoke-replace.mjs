@@ -31,7 +31,7 @@ await page.locator('.welcome .list-item').first().click()
 await page.waitForSelector('.app')
 await page.evaluate(() => {
   const d = window.__bsDock.getState()
-  const col = d.root.children.find((c) => c.kind === 'split')
+  const col = d.root.children.find((c) => c.kind === 'split' && JSON.stringify(c).includes('"timeline"'))
   d.resize(col.id, [0.4, 0.6])
 })
 const name0 = (await logo()).name

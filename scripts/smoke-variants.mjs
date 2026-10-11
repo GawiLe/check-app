@@ -25,6 +25,8 @@ const shot = async (name) => {
 const check = async (label, fn) => console.log(label, (await fn()) ? 'OK' : 'MISLUKT')
 const readProject = async (d) => JSON.parse(await readFile(join(d, 'project.bsproj'), 'utf8'))
 const layersOf = (p) => p.compositions.flatMap((c) => c.layers)
+/** Exportmap: export/<projectnaam>/<platform> */
+const cmDir = async (d) => join(d, 'export', (await readProject(d)).name, 'CM360')
 
 await page.waitForSelector('.welcome')
 await page.evaluate((d) => window.bs.openProject(d), dir)
@@ -101,14 +103,14 @@ await check('Winter: zelfde headline, geüpload logo (ook in assets/)', async ()
 })
 await check('elke variant meteen geëxporteerd (zip + backup)', async () => {
   for (const d of [zomer, winter]) {
-    const files = await readdir(join(d, 'export', 'cm360'))
+    const files = await readdir(await cmDir(d))
     if (!files.some((f) => f.endsWith('.zip')) || !files.some((f) => f.endsWith('.jpg'))) return false
   }
   return true
 })
 await check('export Zomer bevat de nieuwe tekst en het nieuwe logo', async () => {
-  const folder = (await readdir(join(zomer, 'export', 'cm360'))).find((f) => !f.includes('.'))
-  const html = await readFile(join(zomer, 'export', 'cm360', folder, 'index.html'), 'utf8')
+  const folder = (await readdir(await cmDir(zomer))).find((f) => !f.includes('.'))
+  const html = await readFile(join(await cmDir(zomer), folder, 'index.html'), 'utf8')
   return html.includes('Zomeractie!') && html.includes('zomer.svg')
 })
 await check('origineel ongewijzigd (alleen de variantinstellingen erbij)', async () => {

@@ -642,6 +642,16 @@ describe('werkruimte-indeling (dock)', () => {
     expect(mid.dir).toBe('col')
     expect(m.visiblePanels(mid)).toEqual(['viewer', 'code', 'timeline'])
   })
+  it('oude opgeslagen indeling krijgt het paneel Formaten boven de animaties', async () => {
+    const m = await import('../src/renderer/src/dock/model')
+    const old = m.split('row', [m.tabs(['library', 'assets']), m.tabs(['viewer', 'timeline']), m.tabs(['design'])])
+    const root = m.withPanel(old, 'formats', 'library')
+    const left = (root as m.SplitNode).children[0] as m.SplitNode
+    expect(left.dir).toBe('col')
+    expect(m.visiblePanels(left)).toEqual(['formats', 'library', 'assets'])
+    expect(m.withPanel(root, 'formats', 'library')).toBe(root)
+    expect(m.validLayout(root)).not.toBeNull()
+  })
   it('paneel als tab naar een andere groep, en naast/onder een groep', async () => {
     const m = await import('../src/renderer/src/dock/model')
     let root = m.defaultLayout()
@@ -673,7 +683,7 @@ describe('werkruimte-indeling (dock)', () => {
     root = m.showPanel(root, 'ai')
     expect(m.findTabsWith(root, 'ai')!.panels).toContain('design')
     // alle panelen van een groep sluiten ruimt de groep op
-    root = m.removePanel(m.removePanel(root, 'library'), 'assets')
+    root = m.removePanel(m.removePanel(m.removePanel(root, 'library'), 'assets'), 'formats')
     expect(root.kind === 'split' && root.children.length).toBe(2)
     expect(m.validLayout({ kind: 'tabs', id: 'x', panels: ['viewer', 'viewer'], active: 'viewer' })).toBeNull()
     expect(m.validLayout(root)).not.toBeNull()
@@ -1199,5 +1209,37 @@ describe('eigenschappen tonen met P/S/R/O/U', () => {
     expect(visibleGroups(l, 'keyed')).toEqual(['opacity'])
     expect(visibleGroups(l, ['scale', 'position'])).toEqual(['position', 'scale'])
     expect(visibleGroups(l)).toEqual(['position', 'scale', 'rotation', 'opacity'])
+  })
+})
+
+describe('formaat overnemen', () => {
+  it('neemt de lay-out van een ander formaat over, met overrides t.o.v. de basis', async () => {
+    const sync = await import('../src/shared/sync')
+    const p = createStarterProject()
+    const base = p.compositions[0]
+    const a = deriveComposition(base, 300, 250)
+    const b = deriveComposition(base, 336, 280)
+    p.compositions.push(a, b)
+    const head = (c: typeof a) => c.layers.find((l) => l.name === 'Headline')!
+    // In 300x250: headline helemaal links en verborgen logo-achtige laag, plus een eigen laag
+    head(a).x = 0
+    head(a).visible = false
+    const own = createLayer('shape', a)
+    own.name = 'Alleen 300x250'
+    a.layers.unshift(own)
+    const ownB = createLayer('shape', b)
+    ownB.name = 'Alleen 336x280'
+    b.layers.unshift(ownB)
+    const bHeadId = head(b).id
+    sync.copyFormat(p, a.id, b.id)
+    expect(head(b).id).toBe(bHeadId)
+    expect(head(b).x).toBe(0)
+    expect(head(b).visible).toBe(false)
+    expect(head(b).overrides).toEqual(expect.arrayContaining(['x', 'visible']))
+    expect(b.layers.map((l) => l.name)).toContain('Alleen 300x250')
+    expect(b.layers.map((l) => l.name)).toContain('Alleen 336x280')
+    // Basis blijft onaangeroerd, en de basis kan niet overschreven worden
+    sync.copyFormat(p, a.id, base.id)
+    expect(head(base).x).not.toBe(0)
   })
 })

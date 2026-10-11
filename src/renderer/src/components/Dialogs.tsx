@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Boilerplate, Settings, VersionInfo } from '@shared/api'
 import { IAB_SIZES, TARGET_IDS, TARGETS } from '@shared/specs'
-import type { ExportTarget } from '@shared/types'
+import type { ExportTarget, Project } from '@shared/types'
 import { addFormat, newProject, rememberedSvgMode, replaceImage, runExport, saveAsBoilerplate, setRememberedSvgMode, uploadAndReplace } from '../lib/actions'
 import { FolderOpen, Image as ImageIcon, Shapes } from 'lucide-react'
 import { assetUrl, currentComp, useStore } from '../store'
@@ -10,7 +10,7 @@ import { Modal, Row } from './ui'
 import { VariantsDialog } from './Variants'
 import { SHORTCUT_GROUPS } from '../lib/shortcuts'
 
-const kb = (b: number) => `${(b / 1024).toFixed(1)} KB`
+const kb = (b: number) => (b >= 1024 * 1024 ? `${+(b / 1024 / 1024).toFixed(1)} MB` : `${+(b / 1024).toFixed(1)} KB`)
 
 export function Dialogs() {
   const dialog = useStore((s) => s.dialog)
@@ -101,16 +101,30 @@ function AddFormatDialog({ onClose }: { onClose: () => void }) {
   const existing = new Set(project.compositions.map((c) => `${c.width}x${c.height}`))
   const [w, setW] = useState(300)
   const [h, setH] = useState(250)
+  const [from, setFrom] = useState(project.baseCompositionId ?? '')
+  const add = (width: number, height: number) => addFormat(width, height, undefined, from)
   return (
     <Modal title="Formaat toevoegen" onClose={onClose}>
+      <Row label="Uitgaan van">
+        <select value={from} onChange={(e) => setFrom(e.target.value)}>
+          {project.compositions.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.width}×{c.height}
+              {c.id === project.baseCompositionId ? ' (basis)' : ''}
+            </option>
+          ))}
+        </select>
+      </Row>
       <div className="hint-text">
-        Het nieuwe formaat wordt afgeleid van de basis (posities relatief, maten geschaald). Daarna kun je het per formaat bijstellen.
+        {from === project.baseCompositionId
+          ? 'Het nieuwe formaat wordt afgeleid van de basis (posities relatief, maten geschaald). Daarna kun je het per formaat bijstellen.'
+          : 'Het nieuwe formaat neemt de lay-out van dit formaat over (omgerekend naar de nieuwe maat). Het blijft gekoppeld aan de basis: teksten en afbeeldingen uit de basis lopen gewoon door.'}
       </div>
       <div className="list" style={{ marginBottom: 12 }}>
         {IAB_SIZES.map((s) => {
           const key = `${s.width}x${s.height}`
           return (
-            <div key={key} className="list-item" onClick={() => !existing.has(key) && addFormat(s.width, s.height)}>
+            <div key={key} className="list-item" onClick={() => !existing.has(key) && add(s.width, s.height)}>
               <span className="grow">{s.name}</span>
               <span className="meta">{existing.has(key) ? 'bestaat al' : `${s.width}×${s.height}`}</span>
             </div>
@@ -121,7 +135,7 @@ function AddFormatDialog({ onClose }: { onClose: () => void }) {
         <input type="number" value={w} onChange={(e) => setW(+e.target.value)} />
         <span className="muted" style={{ flex: '0 0 auto' }}>×</span>
         <input type="number" value={h} onChange={(e) => setH(+e.target.value)} />
-        <button className="primary" disabled={w < 10 || h < 10} onClick={() => addFormat(w, h)}>
+        <button className="primary" disabled={w < 10 || h < 10} onClick={() => add(w, h)}>
           Toevoegen
         </button>
       </Row>
@@ -132,9 +146,10 @@ function AddFormatDialog({ onClose }: { onClose: () => void }) {
 function ExportDialog({ onClose }: { onClose: () => void }) {
   const project = useStore((s) => s.project)!
   const results = useStore((s) => s.exportResults)
-  const [comps, setComps] = useState<string[]>(project.compositions.map((c) => c.id))
+  const [comps, setComps] = useState<string[]>(project.compositions.filter((c) => !c.disabled).map((c) => c.id))
   const [targets, setTargets] = useState<ExportTarget[]>(project.targets.length ? project.targets : ['cm360'])
   const [busy, setBusy] = useState(false)
+  const [info, setInfo] = useState<ExportTarget>(targets[0] ?? 'cm360')
   const toggle = <T,>(list: T[], v: T, on: boolean) => (on ? [...list, v] : list.filter((x) => x !== v))
 
   return (
@@ -150,13 +165,15 @@ function ExportDialog({ onClose }: { onClose: () => void }) {
           ))}
         </div>
         <div>
-          <div className="sub">Platform</div>
+          <div className="sub">Platform (klik op de naam voor de eisen)</div>
           {TARGET_IDS.map((t) => (
-            <label key={t} className="check" title={TARGETS[t].notes}>
-              <input type="checkbox" checked={targets.includes(t)} onChange={(e) => setTargets(toggle(targets, t, e.target.checked))} />
-              {TARGETS[t].label}
-            </label>
+            <div key={t} className={`target-row${info === t ? ' on' : ''}`} onClick={() => setInfo(t)}>
+              <input type="checkbox" checked={targets.includes(t)} onClick={(e) => e.stopPropagation()} onChange={(e) => setTargets(toggle(targets, t, e.target.checked))} />
+              <span className="grow">{TARGETS[t].label}</span>
+              <span className="meta">max. {kb(TARGETS[t].maxZipBytes)}</span>
+            </div>
           ))}
+          <TargetInfo target={info} project={project} />
           <div className="hint-text">clickTag: {project.clickTag}</div>
           <div className="hint-text">Polite loading: {project.politeLoad ? 'aan' : 'uit'} · rand en backup volgens formaat-instellingen</div>
           <label className="check" style={{ marginTop: 8 }} title="JPG en PNG verkleinen tot de getoonde maat (2× voor retina) en opnieuw comprimeren. De originelen blijven staan.">
@@ -206,6 +223,39 @@ function ExportDialog({ onClose }: { onClose: () => void }) {
         </button>
       </div>
     </Modal>
+  )
+}
+
+/** Wat een platform is en welke eisen (presets) de export daarvoor gebruikt. */
+function TargetInfo({ target, project }: { target: ExportTarget; project: Project }) {
+  const t = TARGETS[target]
+  const folder = (project.name.replace(/[\\/:*?"<>|]+/g, '-').replace(/^[.\s-]+/, '').trim() || 'banner').slice(0, 80)
+  const rows: [string, string][] = [
+    ['Max. ZIP', kb(t.maxZipBytes)],
+    ['Initial load', `${kb(t.initialLoadBytes)} (richtlijn)`],
+    ['Max. bestanden', String(t.maxFiles)],
+    ['Bestandstypen', t.allowedExtensions.join(', ')],
+    ['Fonts', t.inlineFonts ? 'altijd ingebed (Base64)' : project.embedFonts !== false ? 'ingebed (Base64), instelbaar' : 'losse .woff2, instelbaar'],
+    ['Animatie', `max. ${t.maxAnimationSeconds} s, ${t.maxLoops} loops`],
+    ['Backup-JPG', t.backupImage ? 'ja, van het eindframe (≤ 40 KB)' : 'ja (handig als statische variant)'],
+    ['Klik', t.click],
+    ['Map', `export/${folder}/${t.folder}/`]
+  ]
+  return (
+    <div className="target-info">
+      <b>{t.label}</b>
+      <p>{t.about}</p>
+      <table>
+        <tbody>
+          {rows.map(([k, v]) => (
+            <tr key={k}>
+              <td>{k}</td>
+              <td>{v}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 

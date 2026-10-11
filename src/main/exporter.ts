@@ -19,6 +19,17 @@ const slug = (s: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'banner'
 
+/** Leesbare, veilige mapnaam van het project (geen scheidingstekens of verborgen map). */
+export const projectFolder = (name: string) =>
+  name
+    .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '-')
+    .replace(/^[.\s-]+/, '')
+    .trim()
+    .slice(0, 80) || 'banner'
+
+/** Exportmap: export/<projectnaam>/<platform>/ (bijv. export/Zomeractie/CM360). */
+export const exportDir = (dir: string, project: Project, target: ExportTarget) => join(dir, 'export', projectFolder(project.name), TARGETS[target].folder)
+
 const MIME: Record<string, string> = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
@@ -126,7 +137,7 @@ async function exportOne(
   fonts: Record<string, Buffer>
 ): Promise<ExportResult> {
   const name = `${slug(project.name)}_${comp.width}x${comp.height}`
-  const targetDir = join(dir, 'export', target)
+  const targetDir = exportDir(dir, project, target)
   const outDir = join(targetDir, name)
   await rm(outDir, { recursive: true, force: true })
   await mkdir(outDir, { recursive: true })
@@ -225,7 +236,8 @@ export async function exportBanners(req: ExportRequest): Promise<ExportResult[]>
     const fonts = await prepareFonts(req.dir, req.project, comp)
     for (const target of targets) results.push(await exportOne(req.dir, req.project, comp, target, fonts))
   }
-  await writeFile(join(req.dir, 'export', 'rapport.json'), JSON.stringify(results, null, 2))
+  await mkdir(join(req.dir, 'export', projectFolder(req.project.name)), { recursive: true })
+  await writeFile(join(req.dir, 'export', projectFolder(req.project.name), 'rapport.json'), JSON.stringify(results, null, 2))
   return results
 }
 

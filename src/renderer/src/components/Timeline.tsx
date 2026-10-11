@@ -9,6 +9,8 @@ import {
   EyeOff,
   Folder,
   Image as ImageIcon,
+  Link2,
+  Link2Off,
   Lock,
   Pause,
   PenLine,
@@ -29,10 +31,10 @@ import { ANIM_PROPS, EASES } from '@shared/types'
 import { applyLibrary, keyAssist, moveLayer, openComp, renameLayer, reorderTo, replaceImage } from '../lib/actions'
 import { ASSET_DRAG } from './LeftPanel'
 import { openEmptyMenu, openKeyMenu, openLayerMenu } from '../lib/menus'
-import { contextOf, currentComp, updateComp, updateLayer, useStore } from '../store'
+import { contextOf, currentComp, setLayerValue, toggleScaleLink, updateComp, updateLayer, useStore } from '../store'
 import { EASE_LABEL } from './Inspector'
 import { DRAG_TYPE } from './Library'
-import { formatTime, InlineRename } from './ui'
+import { formatTime, InlineRename, Scrub } from './ui'
 
 const FPS = 30
 const snap = (t: number) => Math.round(t * FPS) / FPS
@@ -372,7 +374,7 @@ export function Timeline() {
     rows.push(
       <div
         key={l.id + 'n'}
-        className={`tl-name${active ? ' active' : ''}${l.visible ? '' : ' hidden'}${dropOn === l.id ? ' drop-hint' : ''}${dropLine?.id === l.id ? ` drop-${dropLine.where}` : ''}`}
+        className={`tl-name${active ? ' active' : ''}${l.visible ? '' : ' hidden'}${derived && depth === 0 && l.overrides?.length ? ' overridden' : ''}${derived && depth === 0 && !baseLinks.has(l.linkId) ? ' own' : ''}${dropOn === l.id ? ' drop-hint' : ''}${dropLine?.id === l.id ? ` drop-${dropLine.where}` : ''}`}
         draggable
         onDragStart={(e) => {
           e.dataTransfer.setData(LAYER_DRAG, l.id)
@@ -386,6 +388,16 @@ export function Timeline() {
         onContextMenu={(e) => openLayerMenu(e, l.id)}
         {...dropProps(l.id, offset, false)}
       >
+        <button
+          className={`tl-eye${l.visible ? '' : ' off'}`}
+          title={l.visible ? `Verbergen${derived ? ' (alleen in dit formaat)' : ''}` : 'Weer tonen'}
+          onClick={(e) => {
+            e.stopPropagation()
+            updateLayer(l.id, (x) => void (x.visible = !x.visible))
+          }}
+        >
+          {l.visible ? <Eye size={12} /> : <EyeOff size={12} />}
+        </button>
         <button
           className="icon sm"
           style={{ width: 16 }}
@@ -438,9 +450,6 @@ export function Timeline() {
           <button className={l.locked ? 'keep' : ''} title="Vergrendelen" onClick={() => updateLayer(l.id, (x) => void (x.locked = !x.locked))}>
             {l.locked ? <Lock size={12} /> : <Unlock size={12} />}
           </button>
-          <button className={l.visible ? '' : 'keep'} title="Zichtbaar" onClick={() => updateLayer(l.id, (x) => void (x.visible = !x.visible))}>
-            {l.visible ? <Eye size={12} /> : <EyeOff size={12} />}
-          </button>
         </span>
       </div>,
       <div
@@ -484,16 +493,6 @@ export function Timeline() {
         s().setTime(t)
       }
       const on = members.some((m) => l.tracks[m]?.length)
-      const value =
-        g === 'position'
-          ? `${Math.round(st.x)}, ${Math.round(st.y)}`
-          : g === 'scale'
-            ? l.scaleLinked === false
-              ? `${Math.round(st.scale * 100)}, ${Math.round(st.scaleY * 100)}%`
-              : `${Math.round(st.scale * 100)}%`
-            : g === 'rotation'
-              ? `${Math.round(st.rotation)}°`
-              : `${Math.round(st[g] * 100)}%`
       rows.push(
         <div key={l.id + g + 'n'} className="tl-name sub" style={{ paddingLeft: 30 + depth * 16 }}>
           <button className="kf-nav" title="Naar vorig keyframe" disabled={prevKey == null} onClick={() => goTo(prevKey)}>
@@ -510,9 +509,7 @@ export function Timeline() {
             ▶
           </button>
           <span className="grow">{GROUP_LABEL[g]}</span>
-          <span className={on ? 'kf-val' : 'faint'} style={{ fontVariantNumeric: 'tabular-nums' }}>
-            {value}
-          </span>
+          <PropValues layer={l} group={g} st={st} animated={on} />
         </div>,
         <div key={l.id + g + 't'} className="tl-track sub">
           {groupDiamonds(l, g, offset)}
@@ -682,4 +679,42 @@ export function Timeline() {
       </div>
     </div>
   )
+}
+
+/**
+ * Waarden in de uitgeklapte eigenschap-regel, direct te bewerken (slepen of klikken en typen), zoals in After Effects.
+ * Schaal: X 🔗 Y. Is de eigenschap geanimeerd, dan komt er een keyframe op de playhead.
+ */
+function PropValues({ layer, group, st, animated }: { layer: Layer; group: PropGroupId; st: ReturnType<typeof layerStateAt>; animated: boolean }) {
+  const set = (p: AnimProp, f = 1) => (v: number, co: boolean) => setLayerValue(layer.id, p, v / f, co ? `tl-${p}` : undefined)
+  const field = (p: AnimProp, value: number, opts: { f?: number; suffix?: string; min?: number; max?: number } = {}) => (
+    <span className="tl-val">
+      <Scrub value={Math.round(value * (opts.f ?? 1))} animated={animated} suffix={opts.suffix} min={opts.min} max={opts.max} decimals={0} onChange={set(p, opts.f)} />
+    </span>
+  )
+  if (group === 'position')
+    return (
+      <span className="tl-vals">
+        {field('x', st.x)}
+        {field('y', st.y)}
+      </span>
+    )
+  if (group === 'scale') {
+    const linked = layer.scaleLinked !== false
+    return (
+      <span className="tl-vals">
+        {field('scale', st.scale, { f: 100, suffix: '%', min: 0, max: 2000 })}
+        <button
+          className={`tl-link${linked ? ' on' : ''}`}
+          title={linked ? 'Schaal X en Y gekoppeld (klik om los te maken)' : 'Schaal X en Y los (klik om te koppelen)'}
+          onClick={() => toggleScaleLink(layer.id)}
+        >
+          {linked ? <Link2 size={11} /> : <Link2Off size={11} />}
+        </button>
+        {field(linked ? 'scale' : 'scaleY', linked ? st.scale : st.scaleY, { f: 100, suffix: '%', min: 0, max: 2000 })}
+      </span>
+    )
+  }
+  if (group === 'rotation') return <span className="tl-vals">{field('rotation', st.rotation, { suffix: '°' })}</span>
+  return <span className="tl-vals">{field(group, st[group], { f: 100, suffix: '%', min: 0, max: 100 })}</span>
 }
