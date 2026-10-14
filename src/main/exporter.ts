@@ -1,4 +1,5 @@
 import { BrowserWindow } from 'electron'
+import { createHash } from 'node:crypto'
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -70,11 +71,29 @@ async function prepareFonts(dir: string, project: Project, comp: Composition, ca
 async function pack(dir: string, project: Project, comp: Composition, target: ExportTarget, fonts: Record<string, Buffer>) {
   const files: Record<string, Uint8Array> = {}
 
+  // Dezelfde afbeelding (byte voor byte) op meerdere lagen of onder meerdere namen: één bestand in de export.
+  // `canon` wijst elk pad naar het eerste pad met dezelfde inhoud.
+  const uses = imageUses(comp)
+  const canon: Record<string, string> = {}
+  const byHash = new Map<string, string>()
+  for (const src of Object.keys(uses)) {
+    const data = await readFile(inside(dir, src)).catch(() => null)
+    if (!data) continue
+    const h = createHash('sha1').update(data).digest('hex')
+    const first = byHash.get(h)
+    if (first) {
+      canon[src] = first
+      uses[first] = [...uses[first], ...uses[src]]
+    } else byHash.set(h, src)
+  }
+  const same = (p: string) => canon[p] ?? p
+
   // Afbeeldingen optimaliseren (optie): eerst, want een PNG kan een JPG worden (andere naam)
   const optimized: Record<string, OptimizedImage> = {}
   if (project.optimizeImages) {
-    for (const [src, uses] of Object.entries(imageUses(comp))) {
-      const o = await optimizeImage(dir, src, uses).catch(() => null)
+    for (const [src, u] of Object.entries(uses)) {
+      if (canon[src]) continue
+      const o = await optimizeImage(dir, src, u).catch(() => null)
       if (o) optimized[src] = o
     }
   }
@@ -82,7 +101,8 @@ async function pack(dir: string, project: Project, comp: Composition, target: Ex
   // Afbeeldingen plat in de root, met unieke, veilige namen.
   const assetNames: Record<string, string> = {}
   const taken = new Set(['index.html'])
-  const assetUrl = (p: string) => {
+  const assetUrl = (path: string) => {
+    const p = same(path)
     if (!assetNames[p]) {
       const ext = optimized[p]?.ext ?? extname(p).toLowerCase()
       const stem = slug(basename(p, extname(p)))
@@ -114,7 +134,7 @@ async function pack(dir: string, project: Project, comp: Composition, target: Ex
     if (m && !built.fontIds.includes(fid)) delete files[m[1]]
   }
   const imageNotes: string[] = []
-  for (const p of built.assets) {
+  for (const p of new Set(built.assets.map(same))) {
     const o = optimized[p]
     files[assetNames[p]] = o ? o.data : await readFile(inside(dir, p))
     if (o) {

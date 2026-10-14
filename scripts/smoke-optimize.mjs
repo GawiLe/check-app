@@ -40,6 +40,8 @@ const pngs = await app.evaluate(({ nativeImage }) => {
 })
 await writeFile(join(dir, 'assets', 'foto.png'), Buffer.from(pngs[0], 'base64'))
 await writeFile(join(dir, 'assets', 'vorm.png'), Buffer.from(pngs[1], 'base64'))
+// Zelfde afbeelding nog een keer onder een andere naam (bijv. twee keer geïmporteerd)
+await writeFile(join(dir, 'assets', 'vorm-kopie.png'), Buffer.from(pngs[1], 'base64'))
 
 await page.waitForSelector('.welcome')
 await page.evaluate((d) => window.bs.openProject(d), dir)
@@ -51,7 +53,12 @@ await page.evaluate(() =>
     const c = p.compositions[0]
     const base = c.layers.find((l) => l.type === 'image')
     const mk = (name, src, x, y, w, h) => ({ ...structuredClone(base), id: 'opt-' + name, linkId: 'opt-' + name, name, x, y, width: w, height: h, tracks: {}, intro: null, outro: null, image: { src, fit: 'cover' } })
-    c.layers.push(mk('foto', 'assets/foto.png', 0, 0, 300, 300), mk('vorm', 'assets/vorm.png', 100, 300, 100, 100))
+    c.layers.push(
+      mk('foto', 'assets/foto.png', 0, 0, 300, 300),
+      mk('vorm', 'assets/vorm.png', 100, 300, 100, 100),
+      mk('vorm2', 'assets/vorm.png', 0, 420, 60, 60),
+      mk('vorm3', 'assets/vorm-kopie.png', 200, 420, 60, 60)
+    )
     p.targets = ['cm360']
   })
 )
@@ -99,6 +106,10 @@ await check('vorm verkleind tot 200×200', async () => {
 })
 await check('HTML verwijst naar foto.jpg', async () => readFile(join(folder, 'index.html'), 'utf8').then((h) => h.includes('src="foto.jpg"') || h.includes('data-src="foto.jpg"')))
 await check('originelen in assets/ ongewijzigd', async () => (await stat(join(dir, 'assets', 'foto.png'))).size > 1024 * 1024 * 0.2)
+await check('dezelfde afbeelding op drie lagen (twee namen): één bestand', async () => {
+  const html = await readFile(join(folder, 'index.html'), 'utf8')
+  return !files.some((f) => f.startsWith('vorm-kopie') || f.startsWith('vorm-2')) && (html.match(/"vorm\.png"/g) ?? []).length === 3
+})
 await check('rapport noemt de optimalisatie', async () => results[0].issues.some((i) => i.rule === 'images' && i.message.includes('foto.png')))
 await check('initial load export ≈ KB-teller', async () => Math.abs(results[0].initialLoadBytes / 1024 - after) <= Math.max(3, after * 0.05))
 

@@ -394,6 +394,8 @@ Elke geëxporteerde banner begint met `<!-- This banner was proudly created by C
 
 **Afbeeldingen optimaliseren (optie):** zet in het paneel Ontwerp bij Export *Afbeeldingen* aan (of vink het aan in het exportvenster). Bij export worden JPG's en PNG's dan verkleind tot de maat waarop ze in dat formaat getoond worden (2× voor retina, met schaal-animaties en groepen meegerekend) en opnieuw gecomprimeerd. Een PNG zonder transparantie (zoals een foto) wordt een JPG als dat veel kleiner is. De originelen in `assets/` blijven staan; het rapport toont per afbeelding wat het opleverde.
 
+**Dubbele afbeeldingen:** staat dezelfde afbeelding op meerdere lagen, of twee keer in je assets onder een andere naam (byte voor byte gelijk), dan komt hij maar één keer in de export.
+
 **Live KB-teller:** linksonder op het canvas zie je hoe groot de export van het huidige formaat wordt, tegen de strengste grens van de gekozen platforms (ZIP of initial load). Groen is ruim binnen de grens, oranje bijna, rood te groot.
 
 **DV360:** banners die via DV360 worden ingekocht en via CM360 worden uitgeleverd: kies CM360. Rechtstreeks in DV360 uploaden werkt met dezelfde standaard HTML5-zip. Alleen voor Studio/rich media (Enabler) is iets anders nodig.
