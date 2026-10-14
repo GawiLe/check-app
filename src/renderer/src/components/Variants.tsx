@@ -5,7 +5,7 @@ import { newId } from '@shared/factory'
 import { TARGETS } from '@shared/specs'
 import type { VariantSet } from '@shared/types'
 import { tableToVariants, toCsv, variantsToTable } from '@shared/sheet'
-import { variantFields, type VariantField } from '@shared/variants'
+import { variantFieldGroups, type FieldGroup, type VariantField } from '@shared/variants'
 import { openInBackground, openProject, refreshAssets, save } from '../lib/actions'
 import { assetUrl, useStore } from '../store'
 import { Modal } from './ui'
@@ -29,7 +29,8 @@ function edit(fn: (v: VariantSet) => void, coalesce?: string) {
 export function VariantsDialog({ onClose }: { onClose: () => void }) {
   const project = useStore((s) => s.project)!
   const dir = useStore((s) => s.dir)!
-  const fields = useMemo(() => variantFields(project), [project])
+  const groups = useMemo(() => variantFieldGroups(project), [project])
+  const fields = useMemo(() => groups.flatMap((g) => [g.base, ...(g.formats.length > 1 ? g.formats : [])]), [groups])
   const set = project.variants ?? EMPTY
   const chosen = fields.filter((f) => set.fields.includes(f.key))
   const [step, setStep] = useState<1 | 2>(chosen.length ? 2 : 1)
@@ -69,15 +70,28 @@ export function VariantsDialog({ onClose }: { onClose: () => void }) {
   }
   const sheetNote = sheetMsg && <div className={`sheet-msg ${sheetMsg.level}`}>{sheetMsg.text}</div>
 
+  // Een veld is variabel voor alle formaten tegelijk (base.key), of per formaat (de formaat-sleutels)
+  const groupKeys = (g: FieldGroup) => [g.base.key, ...g.formats.map((f) => f.key)]
+  const isOn = (g: FieldGroup) => groupKeys(g).some((k) => set.fields.includes(k))
+  const isPerFormat = (g: FieldGroup) => g.formats.length > 1 && g.formats.some((f) => set.fields.includes(f.key))
+  const setGroup = (g: FieldGroup, mode: 'off' | 'all' | 'per') =>
+    edit((v) => {
+      const rest = v.fields.filter((k) => !groupKeys(g).includes(k))
+      v.fields = mode === 'off' ? rest : mode === 'all' ? [...rest, g.base.key] : [...rest, ...g.formats.map((f) => f.key)]
+    })
   const toggleField = (key: string, on: boolean) =>
     edit((v) => {
       v.fields = on ? [...new Set([...v.fields, key])] : v.fields.filter((k) => k !== key)
     })
   const toggleKind = (kind: VariantField['kind']) => {
-    const keys = fields.filter((f) => f.kind === kind).map((f) => f.key)
-    const all = keys.every((k) => set.fields.includes(k))
+    const list = groups.filter((g) => g.base.kind === kind)
+    const all = list.every(isOn)
     edit((v) => {
-      v.fields = all ? v.fields.filter((k) => !keys.includes(k)) : [...new Set([...v.fields, ...keys])]
+      for (const g of list) {
+        const rest = v.fields.filter((k) => !groupKeys(g).includes(k))
+        // Verschilt het origineel per formaat (bijv. een eigen achtergrond per formaat), dan per formaat
+        v.fields = all ? rest : isOn(g) ? v.fields : [...rest, ...(g.differs && g.formats.length > 1 ? g.formats.map((f) => f.key) : [g.base.key])]
+      }
     })
   }
   const addVariant = (copyOf?: string) =>
@@ -175,27 +189,57 @@ export function VariantsDialog({ onClose }: { onClose: () => void }) {
       {step === 1 ? (
         <>
           <p className="muted">
-            Dit bestand is de template. Vink aan wat per variant anders kan zijn. Een veld geldt voor alle formaten tegelijk; opmaak, positie en animatie blijven gelijk.
+            Dit bestand is de template; elke variant krijgt alle formaten. Vink aan wat per variant anders kan zijn, voor alle formaten tegelijk of per formaat (bijv. een eigen achtergrond per formaat). Opmaak, positie en animatie blijven gelijk.
           </p>
           {(['text', 'image'] as const).map((kind) => {
-            const list = fields.filter((f) => f.kind === kind)
+            const list = groups.filter((g) => g.base.kind === kind)
             if (!list.length) return null
             return (
               <div key={kind} className="variant-fieldgroup">
                 <div className="variant-grouphead">
                   <b>{kind === 'text' ? 'Teksten' : 'Afbeeldingen en SVG'}</b>
                   <button className="ghost sm" onClick={() => toggleKind(kind)}>
-                    {list.every((f) => set.fields.includes(f.key)) ? 'Niets' : 'Alles'}
+                    {list.every(isOn) ? 'Niets' : 'Alles'}
                   </button>
                 </div>
-                {list.map((f) => (
-                  <label key={f.key} className="variant-field">
-                    <input type="checkbox" checked={set.fields.includes(f.key)} onChange={(e) => toggleField(f.key, e.target.checked)} />
-                    {kind === 'text' ? <Type size={13} className="faint" /> : <ImageIcon size={13} className="faint" />}
-                    <span className="variant-label">{f.label}</span>
-                    {kind === 'text' ? <span className="variant-preview">{f.value.replace(/\n/g, ' ⏎ ')}</span> : <Thumb src={f.value} />}
-                  </label>
-                ))}
+                {list.map((g) => {
+                  const on = isOn(g)
+                  const per = isPerFormat(g)
+                  return (
+                    <div key={g.base.key} className={`variant-field-wrap${on ? ' on' : ''}`}>
+                      <label className="variant-field">
+                        <input
+                          type="checkbox"
+                          checked={on}
+                          onChange={(e) => setGroup(g, !e.target.checked ? 'off' : g.differs && g.formats.length > 1 ? 'per' : 'all')}
+                        />
+                        {kind === 'text' ? <Type size={13} className="faint" /> : <ImageIcon size={13} className="faint" />}
+                        <span className="variant-label">{g.base.label}</span>
+                        {kind === 'text' ? <span className="variant-preview">{g.base.value.replace(/\n/g, ' ⏎ ')}</span> : <Thumb src={g.base.value} />}
+                      </label>
+                      {on && g.formats.length > 1 && (
+                        <div className="variant-formats">
+                          <div className="seg">
+                            <button className={per ? '' : 'on'} onClick={() => setGroup(g, 'all')} title="Eén waarde per variant, voor alle formaten">
+                              Alle formaten
+                            </button>
+                            <button className={per ? 'on' : ''} onClick={() => setGroup(g, 'per')} title="Per formaat een eigen waarde (bijv. een eigen achtergrond per formaat)">
+                              Per formaat
+                            </button>
+                          </div>
+                          {g.differs && !per && <span className="variant-warn">Verschilt per formaat in het origineel</span>}
+                          {per &&
+                            g.formats.map((f) => (
+                              <label key={f.key} className="variant-format" title={kind === 'text' ? f.value : f.value.split('/').pop()}>
+                                <input type="checkbox" checked={set.fields.includes(f.key)} onChange={(e) => toggleField(f.key, e.target.checked)} />
+                                {f.label.split(' · ').pop()}
+                              </label>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )
           })}

@@ -8,7 +8,7 @@ import { GROUP_LABEL, groupProps, layerGroups, type PropGroupId } from '@shared/
 import { findDeep, layerLength, trimIn, trimOut } from '@shared/tree'
 import { PRESETS } from '@shared/presets'
 import { TARGET_IDS, TARGETS } from '@shared/specs'
-import { exitLayers } from '@shared/build'
+import { exitLayers, shadowCss, shadowPs } from '@shared/build'
 import type { AnimProp, BlendMode, EaseName, Layer, RevealMode, Shadow, ShapeProps } from '@shared/types'
 import { BLEND_MODES } from '@shared/types'
 import {
@@ -387,8 +387,31 @@ function LayerDesign({ layer }: { layer: Layer }) {
                 </button>
               ))}
             </div>
-            <Num label="↕" title="Regelhoogte" value={layer.text.lineHeight} step={0.01} min={0.5} max={3} decimals={2} onChange={(v, co) => up((l) => void (l.text!.lineHeight = v), co ? 'lh' : undefined)} />
-            <Num label="VA" title="Letterspatiëring" value={layer.text.letterSpacing} step={0.1} decimals={1} onChange={(v, co) => up((l) => void (l.text!.letterSpacing = v), co ? 'ls' : undefined)} />
+            <Num
+              label="↕pt"
+              title="Regelafstand in pt, zoals in Photoshop (blijft gelijk als je de lettergrootte wijzigt)"
+              value={layer.text.leading ?? Math.round(layer.text.size * layer.text.lineHeight * 10) / 10}
+              step={0.5}
+              min={1}
+              max={1000}
+              decimals={1}
+              onChange={(v, co) => up((l) => void (l.text!.leading = v), co ? 'lh' : undefined)}
+            />
+            <Num
+              label="VA"
+              title="Tracking in duizendsten van een em, zoals in Photoshop (bijv. -40)"
+              value={layer.text.tracking ?? Math.round((layer.text.letterSpacing / (layer.text.size || 1)) * 1000)}
+              step={5}
+              min={-500}
+              max={2000}
+              decimals={0}
+              onChange={(v, co) =>
+                up((l) => {
+                  l.text!.tracking = v
+                  l.text!.letterSpacing = 0
+                }, co ? 'ls' : undefined)
+              }
+            />
           </div>
           <Row label="Passend">
             <Switch checked={!!layer.text.fit} onChange={(v) => up((l) => void (l.text!.fit = v))} />
@@ -581,14 +604,21 @@ function LayerDesign({ layer }: { layer: Layer }) {
   )
 }
 
+/** Schaduw met Photoshop-waarden (hoek, afstand, spreiden, grootte); x/y/blur worden daaruit berekend. */
+const psShadow = (angle: number, distance: number, spread: number, size: number, color: string, opacity: number): Shadow => ({
+  ...shadowCss({ x: 0, y: 0, blur: 0, color, opacity, angle, distance, spread, size }),
+  color,
+  opacity,
+  angle,
+  distance,
+  spread,
+  size
+})
 const SHADOW_PRESETS: Record<string, Shadow[]> = {
-  Zacht: [{ x: 0, y: 4, blur: 12, color: '#000000', opacity: 0.25 }],
-  Hard: [{ x: 4, y: 4, blur: 0, color: '#000000', opacity: 0.4 }],
-  Dubbel: [
-    { x: 0, y: 1, blur: 2, color: '#000000', opacity: 0.3 },
-    { x: 0, y: 8, blur: 24, color: '#000000', opacity: 0.2 }
-  ],
-  Gloed: [{ x: 0, y: 0, blur: 16, color: '#ffffff', opacity: 0.8 }]
+  Zacht: [psShadow(90, 4, 0, 12, '#000000', 0.25)],
+  Hard: [psShadow(135, 6, 100, 0, '#000000', 0.4)],
+  Dubbel: [psShadow(90, 1, 0, 2, '#000000', 0.3), psShadow(90, 8, 0, 24, '#000000', 0.2)],
+  Gloed: [psShadow(90, 0, 0, 16, '#ffffff', 0.8)]
 }
 
 /** Schaduwen: één of meer (gestapeld), voor tekst, vormen, afbeeldingen en composities. */
@@ -725,12 +755,33 @@ function LookSection({ layer }: { layer: Layer }) {
   )
 }
 
+/** Veld zoals in een Photoshop-dialoog: label, waarde (slepen of typen) en eenheid. */
+function PsField(props: { label: string; unit: string; value: number; min: number; max: number; onChange: (v: number, coalesce: boolean) => void }) {
+  return (
+    <label className="ps-field">
+      <span className="ps-l">{props.label}</span>
+      <span className="ps-v">
+        <Scrub value={props.value} min={props.min} max={props.max} decimals={1} onChange={props.onChange} />
+      </span>
+      <span className="ps-u">{props.unit}</span>
+    </label>
+  )
+}
+
 function ShadowSection({ layer }: { layer: Layer }) {
   const list = layer.shadows ?? []
   const up = (fn: (l: Layer) => void, co?: string) => updateLayer(layer.id, fn, co)
   const set = (i: number, patch: Partial<Shadow>, co?: string) =>
     up((l) => {
       if (l.shadows?.[i]) Object.assign(l.shadows[i], patch)
+    }, co)
+  // Photoshop-waarden aanpassen (oudere schaduwen worden eerst omgerekend); x/y/blur rekenen mee
+  const setPs = (i: number, patch: Partial<ReturnType<typeof shadowPs>>, co?: string) =>
+    up((l) => {
+      const sh = l.shadows?.[i]
+      if (!sh) return
+      Object.assign(sh, shadowPs(sh), patch)
+      Object.assign(sh, shadowCss(sh))
     }, co)
   return (
     <Section
@@ -739,7 +790,7 @@ function ShadowSection({ layer }: { layer: Layer }) {
         <button
           className="icon sm"
           title="Schaduw toevoegen (meerdere = gestapeld, bijv. een dubbele schaduw)"
-          onClick={() => up((l) => void (l.shadows = [...(l.shadows ?? []), { x: 0, y: 4, blur: 12, color: '#000000', opacity: 0.25 }]))}
+          onClick={() => up((l) => void (l.shadows = [...(l.shadows ?? []), psShadow(120, 5, 0, 5, '#000000', 0.75)]))}
         >
           <Plus size={14} />
         </button>
@@ -757,26 +808,32 @@ function ShadowSection({ layer }: { layer: Layer }) {
           </button>
         )}
       </div>
-      {list.map((sh, i) => (
-        <div key={i} className="shadow-row">
-          <div className="shadow-line">
-            <Num label="X" value={sh.x} onChange={(v, co) => set(i, { x: v }, co ? `shx${i}` : undefined)} />
-            <Num label="Y" value={sh.y} onChange={(v, co) => set(i, { y: v }, co ? `shy${i}` : undefined)} />
-            <Num label="Blur" value={sh.blur} min={0} max={200} onChange={(v, co) => set(i, { blur: v }, co ? `shb${i}` : undefined)} />
+      {list.map((sh, i) => {
+        const ps = shadowPs(sh)
+        return (
+          <div key={i} className="shadow-row ps-shadow">
+            <div className="ps-head">
+              <input type="color" value={sh.color} title="Kleur" onChange={(e) => set(i, { color: e.target.value }, `shc${i}`)} />
+              <span className="faint">Slagschaduw {list.length > 1 ? i + 1 : ''}</span>
+              <span className="grow" />
+              <button className="icon sm" title="Schaduw verwijderen" onClick={() => up((l) => void (l.shadows = l.shadows!.filter((_, j) => j !== i)))}>
+                <Trash2 size={13} />
+              </button>
+            </div>
+            <div className="ps-grid">
+              <PsField label="Dekking" unit="%" value={Math.round(sh.opacity * 100)} min={0} max={100} onChange={(v, co) => set(i, { opacity: v / 100 }, co ? `sho${i}` : undefined)} />
+              <PsField label="Hoek" unit="°" value={ps.angle} min={-360} max={360} onChange={(v, co) => setPs(i, { angle: v }, co ? `sha${i}` : undefined)} />
+              <PsField label="Afstand" unit="px" value={ps.distance} min={0} max={1000} onChange={(v, co) => setPs(i, { distance: v }, co ? `shd${i}` : undefined)} />
+              <PsField label="Spreiden" unit="%" value={ps.spread} min={0} max={100} onChange={(v, co) => setPs(i, { spread: v }, co ? `shs${i}` : undefined)} />
+              <PsField label="Grootte" unit="px" value={ps.size} min={0} max={250} onChange={(v, co) => setPs(i, { size: v }, co ? `shz${i}` : undefined)} />
+            </div>
           </div>
-          <div className="shadow-line">
-            <input type="color" value={sh.color} onChange={(e) => set(i, { color: e.target.value }, `shc${i}`)} />
-            <input type="range" min={0} max={100} value={Math.round(sh.opacity * 100)} onChange={(e) => set(i, { opacity: +e.target.value / 100 }, `sho${i}`)} />
-            <span className="muted" style={{ width: 34, textAlign: 'right' }}>
-              {Math.round(sh.opacity * 100)}%
-            </span>
-            <button className="icon sm" title="Schaduw verwijderen" onClick={() => up((l) => void (l.shadows = l.shadows!.filter((_, j) => j !== i)))}>
-              <Trash2 size={13} />
-            </button>
-          </div>
-        </div>
-      ))}
+        )
+      })}
       {!list.length && <div className="hint-text">Geen schaduw. Kies een voorbeeld of voeg er een toe; met twee of meer krijg je een gestapelde (dubbele) schaduw.</div>}
+      {list.length > 0 && (
+        <div className="hint-text">Zoals de slagschaduw in Photoshop: neem dekking, hoek, afstand, spreiden en grootte over. Overvloeimodus wordt niet meegenomen (bij zwart maakt dat niets uit).</div>
+      )}
     </Section>
   )
 }

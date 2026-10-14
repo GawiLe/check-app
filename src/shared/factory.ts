@@ -211,6 +211,7 @@ export function mapLayerToFormat(l: Layer, src: { width: number; height: number 
   copy.intro = scaleMotion(l.intro, s)
   copy.outro = scaleMotion(l.outro, s)
   if (copy.text) copy.text.size = round(copy.text.size * s, 1)
+  if (copy.text?.leading != null) copy.text.leading = round(copy.text.leading * s, 1)
   if (copy.writeon) copy.writeon.size = round(copy.writeon.size * s, 1)
   if (copy.shape) copy.shape.radius = round(copy.shape.radius * s, 1)
   if (copy.children) copy.children = copy.children.map((c) => scaleLayer(c, s))
@@ -230,7 +231,7 @@ function scaleLayer(l: Layer, s: number): Layer {
   if (l.tracks.y) c.tracks.y = l.tracks.y.map((k) => ({ ...k, v: round(k.v * s, 1) }))
   c.intro = scaleMotion(l.intro, s)
   c.outro = scaleMotion(l.outro, s)
-  if (l.text) c.text = { ...l.text, size: round(l.text.size * s, 1) }
+  if (l.text) c.text = { ...l.text, size: round(l.text.size * s, 1), ...(l.text.leading != null ? { leading: round(l.text.leading * s, 1) } : {}) }
   if (l.writeon) c.writeon = { ...l.writeon, size: round(l.writeon.size * s, 1) }
   if (l.shape) c.shape = { ...l.shape, radius: round(l.shape.radius * s, 1) }
   if (l.children) c.children = l.children.map((x) => scaleLayer(x, s))

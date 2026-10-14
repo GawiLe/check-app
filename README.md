@@ -144,7 +144,19 @@ Alleen technieken die in alle moderne browsers werken (Chrome, Safari, Firefox, 
 
 ### Schaduw
 
-In het paneel *Ontwerp* → **Schaduw**: kies *Zacht*, *Hard*, *Dubbel* of *Gloed*, of voeg schaduwen toe met **+** (X, Y, blur, kleur, dekking). Meerdere schaduwen worden gestapeld, dus een dubbele schaduw is gewoon twee regels. Het werkt op tekst, vormen, afbeeldingen (volgt transparantie) en hele composities, en wordt geëxporteerd als CSS `filter: drop-shadow(…)`.
+Werkt zoals de **slagschaduw in Photoshop**: neem de waarden uit de laagstijl direct over.
+
+- **Dekking** (%), **Hoek** (°, de richting van het licht: 90 = van boven, de schaduw valt naar beneden), **Afstand** (px), **Spreiden** (%) en **Grootte** (px).
+- Meerdere schaduwen stapelen (zoals twee slagschaduwen in PS); voorbeelden: Zacht, Hard, Dubbel, Gloed.
+- Werkt op tekst, vormen, afbeeldingen en composities (CSS `drop-shadow`, volgt de vorm).
+- Niet over te nemen: de overvloeimodus van de schaduw (bij zwart maakt *Vermenigvuldigen* geen verschil) en *Contour*/*Ruis*.
+
+### Tekst zoals in Photoshop
+
+- **Lettergrootte** in pt (1 pt = 1 px, zoals in een webdocument van 72 ppi).
+- **Regelafstand** (↕pt) in pt, vast zoals in Photoshop: hij blijft gelijk als je de lettergrootte wijzigt (in andere formaten schaalt hij mee met de letter).
+- **Tracking** (VA) in duizendsten van een em, zoals in PS: neem bijv. *-40* direct over.
+- *Kerning: Optisch* bestaat niet in browsers; de banner gebruikt de kerning van het font (*Metrisch*).
 
 ### Hernoemen
 
@@ -308,6 +320,8 @@ Knop *Varianten* in de werkbalk: het project is het template.
 1. **Velden kiezen:** vink aan welke teksten en afbeeldingen per variant anders mogen zijn.
 2. **Varianten invullen:** per variant een kolom; vul alleen in wat anders is (leeg = zoals het origineel). Afbeeldingen kies je uit de assets of upload je uit een map.
 3. **Aanmaken:** elke variant wordt een eigen projectmap naast het template (`<project>-<variant>`), desgewenst meteen geëxporteerd, en verschijnt als tabblad.
+
+**Per formaat:** elke variant krijgt alle formaten. Per veld kies je *Alle formaten* (één waarde per variant) of *Per formaat* (bijv. een eigen achtergrond per formaat), en per formaat of het variabel is. Verschilt het origineel per formaat, dan staat *Per formaat* vanzelf aan. Een leeg vak = zoals het origineel van dat formaat.
 
 **Uit CSV/Excel (optie):** met *Uit CSV/Excel…* lees je varianten in uit een `.csv`, `.tsv` of Excel-bestand (`.xlsx`, eerste werkblad):
 

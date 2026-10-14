@@ -807,8 +807,8 @@ function TextEditor({ box, zoom, project }: { box: Box; zoom: number; project: P
         fontFamily: font?.system ? font.family : font ? `${font.family}, Arial` : 'Arial, Helvetica, sans-serif',
         fontSize: t.size * zoom,
         fontWeight: t.weight,
-        lineHeight: t.lineHeight,
-        letterSpacing: t.letterSpacing * zoom,
+        lineHeight: t.leading != null ? `${t.leading * zoom}px` : t.lineHeight,
+        letterSpacing: t.tracking != null ? `${t.tracking / 1000}em` : t.letterSpacing * zoom,
         textAlign: t.align,
         color: t.color
       }}

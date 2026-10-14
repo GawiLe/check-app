@@ -95,6 +95,8 @@ export const OVERRIDE_LABEL: Record<string, string> = {
   'text.align': 'uitlijning',
   'text.lineHeight': 'regelhoogte',
   'text.letterSpacing': 'letterspatiëring',
+  'text.leading': 'regelafstand',
+  'text.tracking': 'tracking',
   'image.src': 'afbeelding',
   'image.fit': 'passend',
   'shape.fill': 'vulling',

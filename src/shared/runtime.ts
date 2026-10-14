@@ -32,7 +32,7 @@ else if(l.w){var h=(1-C(v.v))*100+'%';s.clipPath=l.w==1?'inset(0 '+h+' 0 0)':l.w
 var T=D.d,N=D.l,Z=D.e,t0=0,cur=0,raf=0;
 function tick(n){var e=(n-t0)/1e3;if(e>=T*(N-1)+Z){cur=Z;R(Z);return}cur=e%T;R(cur);raf=requestAnimationFrame(tick)}
 var BS=window.BS={end:Z,seek:function(t){cancelAnimationFrame(raf);cur=Math.min(Math.max(t,0),T);R(cur)},play:function(){cancelAnimationFrame(raf);t0=performance.now()-cur*1e3;raf=requestAnimationFrame(tick)},pause:function(){cancelAnimationFrame(raf)}};
-function fit(){var F=document.querySelectorAll('[data-fit]'),i,el,z;for(i=0;i<F.length;i++){el=F[i];z=parseFloat(getComputedStyle(el).fontSize);while(z>6&&(el.scrollHeight>el.clientHeight+1||el.scrollWidth>el.clientWidth+1)){z-=.5;el.style.fontSize=z+'px'}}}
+function fit(){var F=document.querySelectorAll('[data-fit]'),i,el,z,q;for(i=0;i<F.length;i++){el=F[i];z=parseFloat(getComputedStyle(el).fontSize);q=parseFloat(getComputedStyle(el).lineHeight)/z;while(z>6&&(el.scrollHeight>el.clientHeight+1||el.scrollWidth>el.clientWidth+1)){z-=.5;el.style.fontSize=z+'px';if(q>0)el.style.lineHeight=z*q+'px'}}}
 function over(){var T=document.querySelectorAll('[data-t]'),o=[],i,el;for(i=0;i<T.length;i++){el=T[i];if(el.scrollHeight>el.clientHeight+1||el.scrollWidth>el.clientWidth+1)o.push(el.getAttribute('data-t'))}parent.postMessage({bs:'overflow',ids:o},'*')}
 function go(){fit();if(!D.a)over();R(0);document.body.className+=' r';if(D.a)BS.play()}
 function ready(){var fr=document.fonts&&document.fonts.ready;fr?fr.then(go):go()}

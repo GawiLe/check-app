@@ -151,8 +151,8 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
             `font-weight:${weightOf(t.weight)}`,
             `color:${cssValue(t.color)}`,
             `text-align:${oneOf(t.align, ['left', 'center', 'right'] as const, 'left')}`,
-            `line-height:${n(t.lineHeight)}`,
-            `letter-spacing:${n(t.letterSpacing)}px`,
+            t.leading != null && Number.isFinite(Number(t.leading)) ? `line-height:${n(Number(t.leading))}px` : `line-height:${n(t.lineHeight)}`,
+            t.tracking != null && Number.isFinite(Number(t.tracking)) ? `letter-spacing:${n(Number(t.tracking) / 1000)}em` : `letter-spacing:${n(t.letterSpacing)}px`,
             'white-space:pre-wrap'
           )
           inner = escapeHtml(t.content)
@@ -287,6 +287,28 @@ export function exitLayers(comp: Composition): Layer[] {
 }
 
 /** Schaduwen als CSS-filter: drop-shadow volgt de vorm (ook tekst, transparante afbeeldingen en groepen). */
+/**
+ * Schaduw in CSS-waarden. Met Photoshop-waarden (hoek, afstand, grootte, spreiden) gelijk aan de slagschaduw in PS:
+ * de schaduw valt tegenover het licht (hoek 90° = licht van boven, schaduw naar beneden), grootte = vervaging,
+ * spreiden maakt de rand harder (minder vervaging).
+ */
+export function shadowCss(s: Shadow): { x: number; y: number; blur: number } {
+  if (s.size == null || !Number.isFinite(Number(s.size))) return { x: Number(s.x) || 0, y: Number(s.y) || 0, blur: Math.max(0, Number(s.blur) || 0) }
+  const a = ((Number(s.angle) || 0) * Math.PI) / 180
+  const d = Number(s.distance) || 0
+  const spread = Math.min(100, Math.max(0, Number(s.spread) || 0)) / 100
+  const r = (v: number) => Math.round(v * 100) / 100 || 0
+  return { x: r(-Math.cos(a) * d), y: r(Math.sin(a) * d), blur: r(Math.max(0, Number(s.size)) * (1 - spread)) }
+}
+
+/** Photoshop-waarden bij een (oudere) schaduw met alleen x/y/vervaging. */
+export function shadowPs(s: Shadow): { angle: number; distance: number; spread: number; size: number } {
+  if (s.size != null) return { angle: s.angle ?? 90, distance: s.distance ?? 0, spread: s.spread ?? 0, size: s.size }
+  const distance = Math.round(Math.hypot(s.x, s.y) * 10) / 10
+  const angle = distance ? Math.round(((Math.atan2(s.y, -s.x) * 180) / Math.PI + 360) % 360) : 90
+  return { angle, distance, spread: 0, size: Math.max(0, s.blur) }
+}
+
 export function shadowFilter(shadows: Shadow[] | undefined): string {
   return (shadows ?? [])
     .filter((s) => s && Number(s.opacity) > 0)
@@ -294,7 +316,8 @@ export function shadowFilter(shadows: Shadow[] | undefined): string {
       const hex = /^#[0-9a-f]{6}$/i.test(s.color) ? s.color : '#000000'
       const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
       const a = Math.min(1, Math.max(0, Number(s.opacity) || 0))
-      return `drop-shadow(${n(s.x)}px ${n(s.y)}px ${n(Math.max(0, s.blur))}px rgba(${r},${g},${b},${n(a)}))`
+      const c = shadowCss(s)
+      return `drop-shadow(${n(c.x)}px ${n(c.y)}px ${n(c.blur)}px rgba(${r},${g},${b},${n(a)}))`
     })
     .join(' ')
 }

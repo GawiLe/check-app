@@ -54,6 +54,10 @@ export interface TextProps {
   align: 'left' | 'center' | 'right'
   lineHeight: number
   letterSpacing: number
+  /** Regelafstand in pt (= px), vast zoals in Photoshop. Leeg = `lineHeight` (factor van de lettergrootte). */
+  leading?: number
+  /** Tracking (letterspatiëring) in duizendsten van een em, zoals in Photoshop (bijv. -40). Leeg = `letterSpacing` in px. */
+  tracking?: number
   /** Automatisch passend maken: de lettergrootte wordt (in de browser, met het echte font) verkleind tot de tekst in het kader past. */
   fit?: boolean
 }
@@ -347,4 +351,12 @@ export interface Shadow {
   color: string
   /** 0–1 */
   opacity: number
+  /**
+   * Zoals de slagschaduw in Photoshop (als `size` gezet is gaan deze voor x/y/blur):
+   * hoek van het licht in graden (90 = van boven, schaduw naar beneden), afstand en grootte in px, spreiden in %.
+   */
+  angle?: number
+  distance?: number
+  spread?: number
+  size?: number
 }

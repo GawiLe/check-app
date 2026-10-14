@@ -72,6 +72,33 @@ await check('masker in de preview (clip-path ellips)', async () =>
 await page.waitForTimeout(400)
 await page.screenshot({ path: `${shots}/l1-weergave.png` })
 
+// 3b. Schaduw en tekst met Photoshop-waarden
+const typeIn = async (loc, v) => {
+  await loc.click()
+  await page.keyboard.press('Control+A')
+  await page.keyboard.type(String(v))
+  await page.keyboard.press('Enter')
+}
+await select('Headline')
+await page.waitForTimeout(200)
+await page.locator('.panel-scroll .section', { has: page.locator('.section-head', { hasText: 'Schaduw' }) }).locator('button[title^="Schaduw toevoegen"]').click()
+const sh = page.locator('.shadow-row').first()
+await typeIn(sh.locator('.ps-field', { hasText: 'Hoek' }).locator('input'), 90)
+await typeIn(sh.locator('.ps-field', { hasText: 'Afstand' }).locator('input'), 10)
+await typeIn(sh.locator('.ps-field', { hasText: 'Grootte' }).locator('input'), 20)
+await check('schaduw zoals Photoshop: 90°, 10 px, 20 px → 0 10 20', async () =>
+  !!(await previewStyle(() => [...document.querySelectorAll('.L')].some((el) => /drop-shadow\(rgba\(0, 0, 0, 0\.75\) 0px 10px 20px\)/.test(getComputedStyle(el).filter))))
+)
+const textNums = page.locator('.panel-scroll .section', { has: page.locator('.section-head .title', { hasText: /^Tekst$/ }) })
+await typeIn(textNums.locator('.num', { hasText: '↕pt' }).locator('input'), 30)
+await typeIn(textNums.locator('.num', { hasText: 'VA' }).locator('input'), -40)
+await sh.scrollIntoViewIfNeeded()
+await page.screenshot({ path: `${shots}/l2-schaduw-tekst.png` })
+await check('tekst: regelafstand 30 pt en tracking -40', async () => {
+  const t = (await layer('Headline')).text
+  return t.leading === 30 && t.tracking === -40
+})
+
 // 4. Export bevat alles
 const comp = await page.evaluate(() => window.__bsStore.getState().project.compositions[0].id)
 const [res] = await page.evaluate(([d, c]) => window.bs.exportBanners({ dir: d, project: window.__bsStore.getState().project, compositionIds: [c], targets: ['cm360'] }), [dir, comp])

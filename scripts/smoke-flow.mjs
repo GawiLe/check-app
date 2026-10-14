@@ -220,7 +220,13 @@ await page.keyboard.press('Escape')
 // 10. Varianten: headline per variant, aanmaken en exporteren
 await page.locator('button[title^="Varianten"]').click()
 await page.locator('.variant-field', { hasText: 'Headline' }).locator('input').check()
+// Per formaat: drie formaten; 336×280 niet variabel
+const hw = page.locator('.variant-field-wrap', { hasText: 'Headline' })
+await hw.getByRole('button', { name: 'Per formaat' }).click()
+await check('varianten: veld per formaat, alle drie de formaten', async () => (await hw.locator('.variant-format').count()) === 3)
+await hw.locator('.variant-format', { hasText: '336×280' }).locator('input').uncheck()
 await page.getByRole('button', { name: /Verder/ }).click()
+await check('stap 2: een rij per gekozen formaat', async () => (await page.locator('.variant-table tbody tr').count()) === 2)
 await page.locator('.variant-col-head input').first().fill('Winter')
 await page.locator('.variant-table tbody tr').first().locator('textarea').first().fill('Winterdeals!')
 await page.getByRole('button', { name: /variant\(en\) aanmaken/ }).click()
@@ -231,6 +237,11 @@ await check('variant aangemaakt en geëxporteerd met eigen tekst', async () => {
   const exp = join(variantDir, 'export', p.name, 'CM360')
   const html = await readFile(join(exp, (await readdir(exp)).find((f) => f.endsWith('_300x600')), 'index.html'), 'utf8')
   return html.includes('Winterdeals!')
+})
+await check('variant per formaat: 300×600 nieuwe tekst, 300×250 leeg = origineel, alle formaten aanwezig', async () => {
+  const p = JSON.parse(await readFile(join(variantDir, 'project.bsproj'), 'utf8'))
+  const head = (w, h) => p.compositions.find((c) => c.width === w && c.height === h).layers.find((l) => l.name === 'Headline').text.content
+  return p.compositions.length === 3 && head(300, 600) === 'Winterdeals!' && head(300, 250) === 'Zomerdeals!' && head(336, 280) === 'Zomerdeals!'
 })
 await check('variant als tabblad geopend', async () => (await page.locator('.doc-tab').count()) === 2)
 await page.keyboard.press('Escape')

@@ -1310,3 +1310,72 @@ describe('eindbeeld', () => {
     expect(endFrameTime(c)).toBe(c.duration)
   })
 })
+
+describe('varianten per formaat', () => {
+  it('per formaat een eigen waarde, alle formaten blijven in de variant', async () => {
+    const { variantFieldGroups, applyVariant, formatKey } = await import('../src/shared/variants')
+    const p = createStarterProject()
+    const base = p.compositions[0]
+    const bg = createLayer('image', base)
+    bg.name = 'background'
+    bg.image!.src = 'assets/bg_300x600.jpg'
+    base.layers.push(bg)
+    const c250 = deriveComposition(base, 300, 250)
+    const c728 = deriveComposition(base, 728, 90)
+    p.compositions.push(c250, c728)
+    c250.layers.find((l) => l.name === 'background')!.image!.src = 'assets/bg_300x250.jpg'
+    c728.layers.find((l) => l.name === 'background')!.image!.src = 'assets/bg_728x90.jpg'
+    const g = variantFieldGroups(p).find((x) => x.base.label === 'background')!
+    expect(g.differs).toBe(true)
+    expect(g.formats.map((f) => f.value)).toEqual(['assets/bg_300x600.jpg', 'assets/bg_300x250.jpg', 'assets/bg_728x90.jpg'])
+    const head = variantFieldGroups(p).find((x) => x.base.label === 'Headline')!
+    expect(head.differs).toBe(false)
+    // Achtergrond per formaat (728×90 niet variabel), headline voor alle formaten
+    const fields = [formatKey(g.base.key, base.id), formatKey(g.base.key, c250.id), head.base.key]
+    const out = applyVariant(
+      p,
+      { id: 'v', name: 'Winter', values: { [formatKey(g.base.key, base.id)]: 'assets/w_300x600.jpg', [formatKey(g.base.key, c250.id)]: 'assets/w_300x250.jpg', [head.base.key]: 'Winter!' } },
+      fields
+    )
+    const src = (i: number) => out.compositions[i].layers.find((l) => l.name.startsWith('background') || l.name.startsWith('w_'))!.image!.src
+    expect([src(0), src(1), src(2)]).toEqual(['assets/w_300x600.jpg', 'assets/w_300x250.jpg', 'assets/bg_728x90.jpg'])
+    expect(out.compositions.every((c) => c.layers.find((l) => l.type === 'text' && l.text!.content === 'Winter!'))).toBe(true)
+    expect(out.compositions.length).toBe(3)
+  })
+})
+
+describe('Photoshop-waarden', () => {
+  it('slagschaduw: hoek/afstand/spreiden/grootte zoals in Photoshop', async () => {
+    const { shadowCss, shadowPs, shadowFilter } = await import('../src/shared/build')
+    // Licht van boven (90°): schaduw recht naar beneden
+    expect(shadowCss({ x: 0, y: 0, blur: 0, color: '#000000', opacity: 1, angle: 90, distance: 10, spread: 0, size: 20 })).toEqual({ x: 0, y: 10, blur: 20 })
+    // PS-standaard 120°: schaduw rechtsonder
+    const c = shadowCss({ x: 0, y: 0, blur: 0, color: '#000000', opacity: 1, angle: 120, distance: 10, spread: 50, size: 20 })
+    expect(c.x).toBeCloseTo(5, 1)
+    expect(c.y).toBeCloseTo(8.66, 1)
+    expect(c.blur).toBe(10)
+    // Waarden uit het voorbeeld (104°, 0 px, 5 %, 106 px, 100 %)
+    expect(shadowFilter([{ x: 0, y: 0, blur: 0, color: '#000000', opacity: 1, angle: 104, distance: 0, spread: 5, size: 106 }])).toBe('drop-shadow(0px 0px 100.7px rgba(0,0,0,1))')
+    // Oude schaduw (x/y/blur) → PS-waarden en terug: zelfde beeld
+    const old = { x: 3, y: 4, blur: 12, color: '#000000', opacity: 0.5 }
+    const ps = shadowPs(old)
+    expect(ps).toEqual({ angle: 127, distance: 5, spread: 0, size: 12 })
+    const back = shadowCss({ ...old, ...ps })
+    expect(back.x).toBeCloseTo(3, 0)
+    expect(back.y).toBeCloseTo(4, 0)
+  })
+
+  it('tekst: regelafstand in pt en tracking in 1/1000 em', () => {
+    const p = createStarterProject()
+    const l = p.compositions[0].layers.find((x) => x.name === 'Headline')!
+    Object.assign(l.text!, { size: 48, leading: 42, tracking: -40 })
+    const html = build(p).html
+    expect(html).toContain('font-size:48px')
+    expect(html).toContain('line-height:42px')
+    expect(html).toContain('letter-spacing:-0.04em')
+    // Ander formaat: regelafstand schaalt mee met de letter
+    const d = deriveComposition(p.compositions[0], 300, 250)
+    const dl = d.layers.find((x) => x.name === 'Headline')!
+    expect(dl.text!.leading! / dl.text!.size).toBeCloseTo(42 / 48, 2)
+  })
+})

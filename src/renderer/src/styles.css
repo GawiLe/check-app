@@ -2961,3 +2961,73 @@ body.popout-window {
   min-height: 0;
   height: 100vh;
 }
+
+/* Varianten: per formaat */
+.variant-field-wrap {
+  border-radius: 6px;
+}
+.variant-field-wrap.on {
+  background: rgba(124, 140, 255, 0.06);
+}
+.variant-formats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 0 10px 8px 34px;
+  font-size: 12px;
+}
+.variant-formats .seg button {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+.variant-format {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.variant-warn {
+  color: #f5a524;
+  font-size: 11px;
+}
+
+/* Schaduw met Photoshop-velden */
+.ps-shadow .ps-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.ps-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+.ps-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.ps-field .ps-l {
+  flex: 0 0 74px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.ps-field .ps-v {
+  flex: 0 0 90px;
+  min-width: 0;
+}
+.ps-field .ps-v input {
+  width: 100%;
+  height: 26px;
+  text-align: right;
+}
+.ps-field .ps-u {
+  flex: 0 0 18px;
+  color: var(--faint);
+  font-size: 11px;
+}

@@ -24,7 +24,7 @@ export async function createVariants(req: VariantRequest): Promise<VariantResult
   for (const v of set.variants) {
     // Afbeeldingen moeten uit de eigen projectmap komen
     for (const [key, val] of Object.entries(v.values))
-      if (key.endsWith('|image') && val && (!val.startsWith('assets/') || !inside(src, val)))
+      if (key.includes('|image') && val && (!val.startsWith('assets/') || !inside(src, val)))
         throw new Error(`Variant "${v.name}": afbeelding moet in assets/ van het project staan.`)
     // Een bestaande map wordt alleen bijgewerkt als het déze variant van dít template is;
     // anders (bijv. een ander project met dezelfde naam) kiezen we een vrije naam.
