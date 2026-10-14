@@ -296,7 +296,15 @@ export function VariantsDialog({ onClose }: { onClose: () => void }) {
                 {chosen.map((f) => (
                   <tr key={f.key}>
                     <td className="variant-label" title={f.label}>
-                      {f.label}
+                      {f.compId ? (
+                        <>
+                          {/* Formaat altijd zichtbaar, ook als de naam lang is */}
+                          <span className="variant-size">{f.label.split(' · ').pop()}</span>
+                          <span className="variant-name">{f.label.split(' · ').slice(0, -1).join(' · ')}</span>
+                        </>
+                      ) : (
+                        f.label
+                      )}
                     </td>
                     <td>{f.kind === 'text' ? <div className="variant-orig">{f.value}</div> : <Thumb src={f.value} big />}</td>
                     {set.variants.map((v) => (

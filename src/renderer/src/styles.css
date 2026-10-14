@@ -3031,3 +3031,22 @@ body.popout-window {
   color: var(--faint);
   font-size: 11px;
 }
+
+/* Varianten: formaat vooraan, naam eronder (afgekapt) */
+.variant-label .variant-size {
+  display: inline-block;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  background: var(--hover);
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-bottom: 3px;
+}
+.variant-label .variant-name {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
