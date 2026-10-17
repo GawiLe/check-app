@@ -18,8 +18,9 @@ export const SHORTCUT_GROUPS: { title: string; items: [string, string][] }[] = [
       ['PageUp / PageDown', `1 frame terug / vooruit (met ${K.shift.replace('+', '')}: 10)`],
       ['J / K', 'Naar vorig / volgend keyframe (van de selectie)'],
       [`I / ${K.shift}I`, 'Naar in- / uitpunt van de geselecteerde laag'],
-      ['[ / ]', 'In- / uitpunt van de laag op de playhead (inkorten)'],
-      [`${K.shift}[ / ${K.shift}]`, 'Laag verschuiven zodat hij op de playhead begint / eindigt'],
+      ['[ / ]', 'Laag (met keyframes) verschuiven: begint / eindigt op de playhead'],
+      [`${K.alt}[ / ${K.alt}]`, 'In- / uitpunt op de playhead (inkorten)'],
+      ['Klik / ⇧-klik / slepen', 'Keyframe selecteren / erbij / rechthoek over lege ruimte; samen verslepen'],
       ['F9', 'Easy Ease op geselecteerde keyframes'],
       [`${K.shift}F9 / ${K.cmd}${K.shift}F9`, 'Easy Ease In / Out']
     ]

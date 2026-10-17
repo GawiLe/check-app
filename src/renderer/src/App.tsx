@@ -209,8 +209,10 @@ export function App() {
       if (code === 'BracketLeft' || code === 'BracketRight') {
         const left = code === 'BracketLeft'
         if (mod) return run(() => arrangeSelection(e.shiftKey ? (left ? 'back' : 'front') : left ? 'backward' : 'forward'))
-        if (e.shiftKey) return run(() => moveLayerToPlayhead(left ? 'in' : 'out'))
-        return run(() => setInOut(left ? 'in' : 'out'))
+        // Zoals in After Effects: [ / ] verschuift de laag (met keyframes) zodat hij op de playhead begint / eindigt;
+        // ⌥[ / ⌥] kort de laag in op de playhead
+        if (e.altKey) return run(() => setInOut(left ? 'in' : 'out'))
+        return run(() => moveLayerToPlayhead(left ? 'in' : 'out'))
       }
       if (!mod && !e.altKey) {
         // Eigenschappen van de geselecteerde lagen tonen, zoals in After Effects:

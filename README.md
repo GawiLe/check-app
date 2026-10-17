@@ -95,6 +95,10 @@ Je animeert met **keyframes**, zoals in After Effects.
 - **Keyframes bewerken:** sleep ze in de tijdlijn, kies een easing per keyframe (rechtermuisknop, of F9 voor Easy Ease), en pas waarden direct aan in de uitgeklapte eigenschappen.
 - **Transform zoals in After Effects:** positie (X en Y) en schaal staan elk op één regel met één ◆. Schaal X/Y is standaard gekoppeld (🔗); ontkoppel om breedte en hoogte apart te schalen.
 - **Hele laag verschuiven:** sleep de balk van een laag in de tijdlijn; alle keyframes gaan mee.
+- **Meerdere keyframes:** ⇧-klik om keyframes erbij te selecteren, of sleep een rechthoek over lege ruimte in de eigenschap-sporen (ook over meerdere lagen). Sleep er één en ze gaan allemaal mee.
+- **Relatief aanpassen:** staat de playhead op een van de geselecteerde keyframes en wijzig je de waarde (bijv. Y), dan schuiven alle geselecteerde keyframes van die eigenschap evenveel mee. Zo zet je een hele slide-in in één keer hoger.
+- **Meerdere lagen tegelijk:** met meerdere lagen geselecteerd geldt een waarde die je in de tijdlijn intypt voor allemaal (zoals in After Effects).
+- **Duur:** klik of sleep op de duur in de tijdlijnkop (naast de tijd), of stel hem in bij Ontwerp → formaat.
 
 **Presets (paneel Animaties)** zijn een snelle start, en zetten gewone keyframes op de laag:
 
@@ -365,8 +369,8 @@ Het volledige overzicht staat in de app: **Help → Sneltoetsen** of druk **?**.
 | J / K | naar vorig / volgend keyframe |
 | ◀ ◆ ▶ in de tijdlijn | per eigenschap: precies naar het vorige / volgende keyframe, of keyframe zetten/weghalen |
 | I / ⇧I | naar in- / uitpunt van de geselecteerde laag |
-| [ / ] | in- / uitpunt op de playhead (inkorten) |
-| ⇧[ / ⇧] | laag verschuiven zodat hij op de playhead begint / eindigt |
+| [ / ] | laag met al zijn keyframes verschuiven: begint / eindigt (laatste keyframe) op de playhead |
+| ⌥[ / ⌥] | in- / uitpunt op de playhead (inkorten) |
 | P / S / R / O | alleen positie / schaal / rotatie / dekking van de selectie tonen in de tijdlijn (nog een keer = inklappen, ⇧ = erbij) |
 | U | alleen eigenschappen met keyframes tonen |
 | ⌥⇧P / S / R / O | keyframe positie / schaal / rotatie / dekking op de playhead (⌥⇧T werkt ook) |

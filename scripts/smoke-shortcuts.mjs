@@ -31,13 +31,13 @@ await page.locator('.welcome .list-item').first().click()
 await page.waitForSelector('.app')
 await page.locator('.viewer').click({ position: { x: 5, y: 5 } }) // focus op het canvas, niet in een veld
 
-// 1. [ en ] : in- en uitpunt op de playhead
+// 1. ⌥[ en ⌥] : in- en uitpunt op de playhead (inkorten)
 await select(['Subline'])
 await setTime(2)
-await key('BracketLeft')
+await key('Alt+BracketLeft')
 await setTime(5)
-await key('BracketRight')
-await check('[ en ] zetten in- en uitpunt (zonder Alt)', async () => {
+await key('Alt+BracketRight')
+await check('⌥[ en ⌥] zetten in- en uitpunt (inkorten)', async () => {
   const l = await layer('Subline')
   return Math.abs(l.start - 2) < 0.01 && Math.abs(l.end - 5) < 0.01
 })
@@ -49,12 +49,20 @@ await check('I: playhead naar in-punt', async () => Math.abs((await st()).time -
 await key('Shift+KeyI')
 await check('⇧I: playhead naar uitpunt', async () => Math.abs((await st()).time - 5) < 0.01)
 
-// 3. Shift+[ : laag verschuiven zodat hij op de playhead begint (duur blijft)
+// 3. [ : laag (met keyframes) verschuiven zodat hij op de playhead begint (duur blijft)
+const k0 = (await layer('Subline')).tracks.opacity[0].t
 await setTime(3)
-await key('Shift+BracketLeft')
-await check('⇧[: laag begint op de playhead, duur blijft gelijk', async () => {
+await key('BracketLeft')
+await check('[: laag begint op de playhead, duur blijft, keyframes gaan mee', async () => {
   const l = await layer('Subline')
-  return Math.abs(l.start - 3) < 0.01 && Math.abs(l.end - 6) < 0.01
+  return Math.abs(l.start - 3) < 0.01 && Math.abs(l.end - 6) < 0.01 && Math.abs(l.tracks.opacity[0].t - (k0 + 1)) < 0.01
+})
+// ] : uitpunt naar de playhead, keyframes mee
+await setTime(7)
+await key('BracketRight')
+await check(']: laag eindigt op de playhead, keyframes gaan mee', async () => {
+  const l = await layer('Subline')
+  return Math.abs(l.end - 7) < 0.01 && Math.abs(l.start - 4) < 0.01 && Math.abs(l.tracks.opacity[0].t - (k0 + 2)) < 0.01
 })
 
 // 3b. P / S / O / R / U: alleen die eigenschappen tonen in de tijdlijn (zoals After Effects)

@@ -65,8 +65,10 @@ export function layerLength(l: Layer): number {
 
 /** Verschuift een laag in de tijd, met al zijn animaties (bij een groep gaat de inhoud vanzelf mee). */
 export function shiftTiming(l: Layer, d: number, clamp = true) {
+  // Niet vóór 0: dan schuift alles (in-punt én keyframes) maar zo ver als kan, zodat ze samen blijven
+  if (clamp) d = Math.max(d, -(l.start ?? 0))
   if (!d) return
-  l.start = round(clamp ? Math.max(0, (l.start ?? 0) + d) : (l.start ?? 0) + d)
+  l.start = round((l.start ?? 0) + d)
   if (l.end != null) l.end = round(l.end + d)
   for (const p of ANIM_PROPS) if (l.tracks[p]) l.tracks[p] = l.tracks[p]!.map((k) => ({ ...k, t: round(k.t + d) }))
   if (l.intro) l.intro = { ...l.intro, start: round(l.intro.start + d) }

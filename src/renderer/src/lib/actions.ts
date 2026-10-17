@@ -3,7 +3,7 @@ import { createLayer, deriveComposition, newId } from '@shared/factory'
 import { applyLibraryItem, applyUserPreset, LIBRARY, presetFromLayer } from '@shared/library'
 import { mergeTracks, PRESETS } from '@shared/presets'
 import { copyFormat, resetCompOverrides, resetOverrides } from '@shared/sync'
-import { allLayers, cloneLayer, findDeep, groupLayers, layerLength, localTime, reorderLayer, sequenceLayers, shiftTiming, ungroup } from '@shared/tree'
+import { allLayers, cloneLayer, contentEnd, findDeep, groupLayers, layerLength, localTime, reorderLayer, sequenceLayers, shiftTiming, ungroup } from '@shared/tree'
 import { effectiveLayer } from '@shared/motion'
 import type { PropGroupId } from '@shared/propgroups'
 import { layerStateAt, restStateAt, upsertKeyframe } from '@shared/anim'
@@ -1004,7 +1004,8 @@ export function moveLayerToPlayhead(which: 'in' | 'out') {
       const l = f.layer
       const t = localTime(time, f.ancestors)
       const start = l.start ?? 0
-      const end = l.end ?? start + layerLength(l)
+      // Einde: het uit-punt, of zonder uit-punt het laatste keyframe (daar eindigt de animatie)
+      const end = l.end ?? Math.max(start, contentEnd(l))
       shiftTiming(l, which === 'in' ? t - start : t - end)
     }
   })

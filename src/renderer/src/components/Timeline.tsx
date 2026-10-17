@@ -31,7 +31,7 @@ import { ANIM_PROPS, EASES } from '@shared/types'
 import { applyLibrary, keyAssist, moveLayer, openComp, renameLayer, reorderTo, replaceImage } from '../lib/actions'
 import { ASSET_DRAG } from './LeftPanel'
 import { openEmptyMenu, openKeyMenu, openLayerMenu } from '../lib/menus'
-import { contextOf, currentComp, setLayerValue, toggleScaleLink, updateComp, updateLayer, useStore } from '../store'
+import { contextOf, currentComp, findLayer, setLayersValue, toggleScaleLink, updateComp, updateLayer, useStore, type SelectedKey } from '../store'
 import { EASE_LABEL } from './Inspector'
 import { DRAG_TYPE } from './Library'
 import { formatTime, InlineRename, Scrub } from './ui'
@@ -127,39 +127,55 @@ export function Timeline() {
   const onKeyDown = (e: React.PointerEvent, layerId: string, prop: AnimProp, t0: number, offset: number) => {
     e.stopPropagation()
     e.preventDefault()
-    s().selectKey({ layerId, prop, t: t0 }, e.shiftKey || e.metaKey)
+    const st0 = s()
+    const sameKey = (k: SelectedKey) => k.layerId === layerId && groupOf(k.prop) === groupOf(prop) && Math.abs(k.t - t0) < 1e-4
+    const additive = e.shiftKey || e.metaKey || e.ctrlKey
+    // Klik op een keyframe dat al bij een selectie van meerdere hoort: die blijft staan en gaat samen mee
+    const keepGroup = !additive && st0.selectedKeys.length > 1 && st0.selectedKeys.some(sameKey)
+    if (!keepGroup) s().selectKey({ layerId, prop, t: t0 }, additive)
     s().setTime(t0 + offset)
     s().setPlaying(false)
+    if (additive) return // Shift/Cmd-klik: alleen (de)selecteren
+    const keys = s().selectedKeys.map((k) => ({ ...k }))
+    const minT = Math.min(...keys.map((k) => k.t))
+    // Oorspronkelijke keyframes van de betrokken lagen: elke stap rekent vanaf hier (niets gaat onderweg verloren)
+    const compId = s().compId
+    const orig = new Map<string, Layer['tracks']>()
+    for (const k of keys) {
+      const l = findLayer(s().project!, compId, k.layerId)
+      if (l && !orig.has(k.layerId)) orig.set(k.layerId, structuredClone(l.tracks))
+    }
     const x0 = e.clientX
-    let cur = t0
     let moved = false
+    let applied = 0
     const move = (ev: PointerEvent) => {
       if (!moved && Math.abs(ev.clientX - x0) < 3) return
       moved = true
-      const nt = round(Math.max(0, snap(t0 + (ev.clientX - x0) / pps)))
-      if (Math.abs(nt - cur) < 1e-6) return
-      let ok = false
-      updateLayer(
-        layerId,
-        (l) => {
-          // Alle onderdelen van de groep (bijv. X en Y van Positie) samen verschuiven
-          const members = groupProps(l, groupOf(prop))
-          if (members.some((m) => l.tracks[m]?.some((x) => Math.abs(x.t - nt) < 1e-4))) return
-          for (const m of members) {
+      const dt = round(Math.max(-minT, snap((ev.clientX - x0) / pps)))
+      if (Math.abs(dt - applied) < 1e-6) return
+      s().update((p) => {
+        for (const [layerId, tracks] of orig) {
+          const l = findLayer(p, compId, layerId)
+          if (!l) continue
+          l.tracks = structuredClone(tracks)
+          // Per eigenschap (X en Y van Positie samen): welke tijden schuiven mee
+          const times = new Map<AnimProp, Set<number>>()
+          for (const sk of keys.filter((k) => k.layerId === layerId))
+            for (const m of groupProps(l, groupOf(sk.prop))) (times.get(m) ?? times.set(m, new Set()).get(m)!).add(round(sk.t))
+          for (const [m, set] of times) {
             const kfs = l.tracks[m]
-            const k = kfs?.find((x) => Math.abs(x.t - cur) < 1e-4)
-            if (!kfs || !k) continue
-            k.t = nt
-            l.tracks[m] = sortKeyframes(kfs)
-            ok = true
+            if (!kfs) continue
+            const moving = kfs.filter((x) => set.has(round(x.t))).map((x) => ({ ...x, t: round(x.t + dt) }))
+            const landed = new Set(moving.map((x) => x.t))
+            // Een niet-geselecteerd keyframe op de nieuwe plek wordt overschreven (zoals in AE)
+            const rest = kfs.filter((x) => !set.has(round(x.t)) && !landed.has(round(x.t)))
+            l.tracks[m] = sortKeyframes([...rest, ...moving])
           }
-        },
-        'kfdrag'
-      )
-      if (!ok) return // bezet door een ander keyframe: blijf staan
-      cur = nt
-      s().selectKey({ layerId, prop, t: nt })
-      s().setTime(nt + offset)
+        }
+      }, 'kfdrag')
+      applied = dt
+      useStore.setState({ selectedKeys: keys.map((k) => ({ ...k, t: round(k.t + dt) })), selectedKey: { layerId, prop, t: round(t0 + dt) } })
+      s().setTime(round(t0 + dt) + offset)
     }
     const w = viewOf(e.currentTarget as Node)
     const up = () => {
@@ -175,6 +191,49 @@ export function Timeline() {
     w.addEventListener('blur', up)
   }
 
+  // Selectierechthoek: sleep over lege ruimte in de eigenschap-sporen om keyframes te selecteren (Shift = erbij)
+  const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
+  const startMarquee = (e: React.PointerEvent) => {
+    if (e.button !== 0 || e.target !== e.currentTarget) return
+    e.preventDefault()
+    const root = (e.currentTarget as HTMLElement).closest('.timeline') as HTMLElement | null
+    if (!root) return
+    const additive = e.shiftKey || e.metaKey || e.ctrlKey
+    const base = additive ? s().selectedKeys : []
+    const x0 = e.clientX
+    const y0 = e.clientY
+    let moved = false
+    const move = (ev: PointerEvent) => {
+      if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 4) return
+      moved = true
+      const r = { x: Math.min(x0, ev.clientX), y: Math.min(y0, ev.clientY), w: Math.abs(ev.clientX - x0), h: Math.abs(ev.clientY - y0) }
+      setMarquee(r)
+      const hits: SelectedKey[] = []
+      for (const d of root.querySelectorAll<HTMLElement>('.diamond[data-layer]')) {
+        const b = d.getBoundingClientRect()
+        const cx = b.left + b.width / 2
+        const cy = b.top + b.height / 2
+        if (cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h) hits.push({ layerId: d.dataset.layer!, prop: d.dataset.prop as AnimProp, t: Number(d.dataset.t) })
+      }
+      const same = (a: SelectedKey, b: SelectedKey) => a.layerId === b.layerId && groupOf(a.prop) === groupOf(b.prop) && Math.abs(a.t - b.t) < 1e-4
+      const keys = [...base.filter((k) => !hits.some((h) => same(h, k))), ...hits]
+      const layers = [...new Set(keys.map((k) => k.layerId))]
+      useStore.setState({ selectedKeys: keys, selectedKey: keys[keys.length - 1] ?? null, ...(layers.length ? { selection: layers } : {}) })
+    }
+    const w = viewOf(e.currentTarget as Node)
+    const up = () => {
+      w.removeEventListener('pointermove', move)
+      w.removeEventListener('pointerup', up)
+      w.removeEventListener('pointercancel', up)
+      setMarquee(null)
+      // Gewoon klikken op lege ruimte: keyframe-selectie opheffen
+      if (!moved && !additive) useStore.setState({ selectedKeys: [], selectedKey: null })
+    }
+    w.addEventListener('pointermove', move)
+    w.addEventListener('pointerup', up)
+    w.addEventListener('pointercancel', up)
+  }
+
   /** Hele laag in de tijd verschuiven (balk slepen), of in/uit trimmen (randen slepen). */
   const barDrag = (e: React.PointerEvent, l: Layer, mode: 'move' | 'in' | 'out', shownEnd = 0) => {
     s().select([l.id])
@@ -183,11 +242,16 @@ export function Timeline() {
       updateLayer(
         l.id,
         (x) => {
-          if (mode === 'move') {
+          // Elke stap vanaf de oorspronkelijke laag (ook velden die er toen niet waren, zoals een in-punt, weer weg)
+          const restore = () => {
+            for (const k of Object.keys(x)) if (!(k in orig)) delete (x as unknown as Record<string, unknown>)[k]
             Object.assign(x, structuredClone(orig))
+          }
+          if (mode === 'move') {
+            restore()
             shiftTiming(x, Math.max(dt, -(orig.start ?? 0)))
           } else if (mode === 'in') {
-            Object.assign(x, structuredClone(orig))
+            restore()
             trimIn(x, (orig.start ?? 0) + dt)
           } else trimOut(x, shownEnd + dt)
         },
@@ -268,6 +332,9 @@ export function Timeline() {
           <div
             key={'k' + t}
             className={`diamond${sel ? ' sel' : ''}${k?.ei || k?.eo ? ' eased' : ''}`}
+            data-layer={l.id}
+            data-prop={prop}
+            data-t={t}
             style={{ left: xOf(offset + t) }}
             title={`${GROUP_LABEL[g]} ${vals} @ ${(offset + t).toFixed(2)}s${k ? ` · ${EASE_LABEL[k.e]}` : ''}`}
             onPointerDown={(e) => e.button === 0 && onKeyDown(e, l.id, prop, t, offset)}
@@ -457,7 +524,7 @@ export function Timeline() {
           <span className="grow">{GROUP_LABEL[g]}</span>
           <PropValues layer={l} group={g} st={st} animated={on} />
         </div>,
-        <div key={l.id + g + 't'} className="tl-track sub">
+        <div key={l.id + g + 't'} className="tl-track sub" onPointerDown={startMarquee}>
           {groupDiamonds(l, g, offset)}
         </div>
       )
@@ -485,6 +552,7 @@ export function Timeline() {
 
   return (
     <div className="timeline">
+      {marquee && <div className="tl-marquee" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} />}
       <div className="tl-tabs">
         <button className={activeTab ? '' : 'on'} onClick={() => s().setActiveTab(null)} title="Het formaat zelf">
           {comp.width}×{comp.height}
@@ -525,8 +593,9 @@ export function Timeline() {
           <SkipForward size={15} />
         </button>
         <span className="timecode">{formatTime(time)}</span>
-        <span className="faint" style={{ whiteSpace: 'nowrap' }}>
-          / {formatTime(comp.duration)}
+        <span className="faint tl-duration" style={{ whiteSpace: 'nowrap' }} title="Duur van de animatie (één loop): sleep of klik om te typen">
+          /
+          <Scrub value={comp.duration} step={0.1} min={0.5} max={30} decimals={1} suffix="s" onChange={(v, co) => updateComp((c) => void (c.duration = Math.round(v * 10) / 10), co ? 'tl-dur' : undefined)} />
           {comp.loops > 1 ? ` · ${comp.loops}×` : ''}
         </span>
         <div className="vsep" />
@@ -632,7 +701,12 @@ export function Timeline() {
  * Schaal: X 🔗 Y. Is de eigenschap geanimeerd, dan komt er een keyframe op de playhead.
  */
 function PropValues({ layer, group, st, animated }: { layer: Layer; group: PropGroupId; st: ReturnType<typeof layerStateAt>; animated: boolean }) {
-  const set = (p: AnimProp, f = 1) => (v: number, co: boolean) => setLayerValue(layer.id, p, v / f, co ? `tl-${p}` : undefined)
+  // Meerdere lagen geselecteerd (en deze erbij): dezelfde waarde op alle geselecteerde lagen
+  const set = (p: AnimProp, f = 1) => (v: number, co: boolean) => {
+    const sel = useStore.getState().selection
+    const ids = sel.length > 1 && sel.includes(layer.id) ? sel : [layer.id]
+    setLayersValue(ids, p, v / f, co ? `tl-${p}` : undefined, layer.id)
+  }
   const field = (p: AnimProp, value: number, opts: { f?: number; suffix?: string; min?: number; max?: number } = {}) => (
     <span className="tl-val">
       <Scrub value={Math.round(value * (opts.f ?? 1))} animated={animated} suffix={opts.suffix} min={opts.min} max={opts.max} decimals={0} onChange={set(p, opts.f)} />

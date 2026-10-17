@@ -275,27 +275,65 @@ export const isAnimProp = (k: string): k is AnimProp => (ANIM_PROPS as string[])
  * Zet een eigenschap zoals in After Effects: staat de stopwatch aan (er zijn
  * keyframes), dan komt er een keyframe op de huidige tijd; anders wijzigt de basiswaarde.
  */
+/** Waarde zetten op één laag binnen een project (keyframe als de eigenschap geanimeerd is). */
+function applyValue(l: Layer, prop: AnimProp, value: number, time: number, autoKey: boolean) {
+  // Gekoppelde schaal: X en Y tegelijk (scaleY volgt scale)
+  const members = groupProps(l, groupOf(prop))
+  const animated = members.some((m) => l.tracks[m]?.length)
+  if (animated || (autoKey && time > 0.01)) {
+    // Eén keyframe voor de hele groep (bijv. Positie = X én Y op hetzelfde moment)
+    const st = layerStateAt(l, time)
+    for (const m of members) {
+      const v = m === prop ? value : st[m]
+      const kfs = l.tracks[m]
+      if (kfs?.length) l.tracks[m] = upsertKeyframe(kfs, time, v)
+      else if (animated) l.tracks[m] = upsertKeyframe([], time, v)
+      else l.tracks[m] = upsertKeyframe(upsertKeyframe([], 0, baseValue(l, m)), time, v)
+    }
+  } else if (prop === 'scaleY') l.scaleY = value
+  else l[prop] = value
+}
+
+/**
+ * Zet een eigenschap zoals in After Effects: staat de stopwatch aan (er zijn
+ * keyframes), dan komt er een keyframe op de huidige tijd; anders wijzigt de basiswaarde.
+ * Staat de playhead op een geselecteerd keyframe van deze laag en zijn er meer keyframes van deze
+ * eigenschap geselecteerd, dan schuiven die allemaal evenveel mee (bijv. een hele slide-in hoger zetten).
+ */
 export function setLayerValue(layerId: string, prop: AnimProp, value: number, coalesce?: string) {
-  const { compId, autoKey, project } = useStore.getState()
-  const time = layerLocalTime(project!, compId, layerId, useStore.getState().time)
-  useStore.getState().update((p) => {
-    const l = findLayer(p, compId, layerId)
-    if (!l) return
-    // Gekoppelde schaal: X en Y tegelijk (scaleY volgt scale)
-    const members = groupProps(l, groupOf(prop))
-    const animated = members.some((m) => l.tracks[m]?.length)
-    if (animated || (autoKey && time > 0.01)) {
-      // Eén keyframe voor de hele groep (bijv. Positie = X én Y op hetzelfde moment)
-      const st = layerStateAt(l, time)
-      for (const m of members) {
-        const v = m === prop ? value : st[m]
-        const kfs = l.tracks[m]
-        if (kfs?.length) l.tracks[m] = upsertKeyframe(kfs, time, v)
-        else if (animated) l.tracks[m] = upsertKeyframe([], time, v)
-        else l.tracks[m] = upsertKeyframe(upsertKeyframe([], 0, baseValue(l, m)), time, v)
+  setLayersValue([layerId], prop, value, coalesce, layerId, true)
+}
+
+/**
+ * Dezelfde waarde op meerdere lagen tegelijk (zoals in After Effects met meerdere lagen geselecteerd).
+ * Met geselecteerde keyframes (en de playhead op een daarvan): alle geselecteerde keyframes van deze
+ * eigenschap verschuiven relatief mee. `ownKeysOnly`: alleen die van `primary` (bij slepen op het canvas).
+ */
+export function setLayersValue(ids: string[], prop: AnimProp, value: number, coalesce?: string, primary = ids[0], ownKeysOnly = false) {
+  const st = useStore.getState()
+  const { compId, autoKey, project, selectedKeys } = st
+  if (!project) return
+  const g = groupOf(prop)
+  const tPrimary = layerLocalTime(project, compId, primary, st.time)
+  const here = selectedKeys.some((k) => k.layerId === primary && groupOf(k.prop) === g && Math.abs(k.t - tPrimary) < 1 / 60)
+  const rel = here ? selectedKeys.filter((k) => groupOf(k.prop) === g && (!ownKeysOnly || k.layerId === primary)) : []
+  st.update((p) => {
+    if (rel.length > 1) {
+      const l = findLayer(p, compId, primary)
+      const k0 = l?.tracks[prop]?.find((k) => Math.abs(k.t - tPrimary) < 1 / 60)
+      if (k0) {
+        const delta = value - k0.v
+        for (const sk of rel) {
+          const k = findLayer(p, compId, sk.layerId)?.tracks[prop]?.find((x) => Math.abs(x.t - sk.t) < 1e-4)
+          if (k) k.v = k.v + delta
+        }
+        return
       }
-    } else if (prop === 'scaleY') l.scaleY = value
-    else l[prop] = value
+    }
+    for (const id of ids) {
+      const l = findLayer(p, compId, id)
+      if (l) applyValue(l, prop, value, layerLocalTime(project, compId, id, st.time), autoKey)
+    }
   }, coalesce)
 }
 

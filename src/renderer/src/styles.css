@@ -3050,3 +3050,35 @@ body.popout-window {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Selectierechthoek voor keyframes in de tijdlijn */
+.tl-marquee {
+  position: fixed;
+  z-index: 40;
+  border: 1px solid var(--accent);
+  background: rgba(124, 140, 255, 0.12);
+  pointer-events: none;
+}
+
+/* Duur in de tijdlijnkop, direct aan te passen */
+.tl-duration {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.tl-duration input {
+  width: 52px;
+  height: 22px;
+  padding: 0 5px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--muted);
+}
+.tl-duration input:hover,
+.tl-duration input:focus {
+  border-color: var(--line);
+  color: var(--text);
+}
