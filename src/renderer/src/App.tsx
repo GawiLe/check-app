@@ -233,6 +233,8 @@ export function App() {
       if (!mod && !e.altKey && !e.shiftKey) {
         if (code === 'KeyJ' || code === 'KeyK') return run(() => jumpKeyframe(code === 'KeyJ' ? -1 : 1))
       }
+      // < / > (ook , / . zonder Shift): naar vorig / volgend keyframe
+      if (!mod && !e.altKey && ['<', '>', ',', '.'].includes(e.key)) return run(() => jumpKeyframe(e.key === '<' || e.key === ',' ? -1 : 1))
       switch (e.key) {
         case ' ':
           e.preventDefault()

@@ -6,10 +6,12 @@ import { _electron as electron } from 'playwright-core'
 import { existsSync } from 'node:fs'
 import { mkdir, readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { pickFolder, zipText } from './lib/export.mjs'
 
 const [work, shots] = process.argv.slice(2)
-const dir = join(work, 'zomeractie')
-await mkdir(dir, { recursive: true })
+// Nieuw project krijgt zelf een map met de projectnaam in de gekozen locatie
+const dir = join(work, 'Zomeractie')
+await mkdir(work, { recursive: true })
 await mkdir(shots, { recursive: true })
 const app = await electron.launch({ args: ['--no-sandbox', '.'], env: { ...process.env, BS_USER_DATA: shots + '/userdata' } })
 const page = await app.firstWindow()
@@ -47,12 +49,15 @@ const waitFor = async (fn, tries = 40) => {
 
 // 1. Nieuw project: standaard leeg
 await page.waitForSelector('.welcome')
-await app.evaluate(({ dialog }, d) => void (dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [d] })), dir)
+await app.evaluate(({ dialog }, d) => void (dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [d] })), work)
 await page.getByRole('button', { name: /Nieuw project/ }).click()
 await page.locator('.modal input').first().fill('Zomeractie')
 await check('nieuw-venster: "Leeg" staat bovenaan en is gekozen', async () => (await page.locator('.modal .list-item.active').innerText()).includes('Leeg'))
-await page.getByRole('button', { name: /Kies map en maak aan/ }).click()
+await page.getByRole('button', { name: /Kies locatie en maak aan/ }).click()
 await page.waitForSelector('.app')
+await check('nieuw project in een eigen map (Zomeractie), zonder export-map', async () =>
+  existsSync(join(dir, 'project.bsproj')) && !existsSync(join(dir, 'export')) && (await S(() => window.__bsStore.getState().dir)) === dir
+)
 await check('nieuw project is leeg (alleen de basis 300×600)', async () => {
   const p = await project()
   return p.compositions.length === 1 && p.compositions[0].layers.length === 0 && p.compositions[0].width === 300
@@ -203,18 +208,23 @@ await page.getByRole('button', { name: 'Exporteren', exact: true }).click()
 await page.locator('.modal .target-row', { hasText: 'Azerion' }).click()
 await check('exportvenster legt het platform uit', async () => (await page.locator('.target-info').innerText()).includes('advertentieplatform'))
 await shot('f4-export')
+const out = join(work, 'export-hier')
+await pickFolder(app, out)
 await page.locator('.modal .actions .primary').click()
 await page.waitForSelector('.modal .result', { timeout: 120000 })
-await check('export in export/Zomeractie/CM360 (zip + backup per formaat)', async () => {
-  const files = await readdir(join(dir, 'export', 'Zomeractie', 'CM360'))
-  return files.filter((f) => f.endsWith('.zip')).length === 2 && files.some((f) => f === 'zomeractie_300x250.jpg')
+await check('exportmap staat in het venster', async () => (await page.locator('.export-dest').innerText()).includes('export-hier'))
+// Eén platform → geen submap met de platformnaam
+const cm = join(out, 'Zomeractie')
+await check('export in <gekozen map>/Zomeractie (zip + backup per formaat)', async () => {
+  const files = await readdir(cm)
+  return files.filter((f) => f.endsWith('.zip')).length === 2 && files.includes('Zomeractie_300x250px.zip') && files.includes('Zomeractie_300x250px.jpg') && files.every((f) => /\.(zip|jpg)$/.test(f))
 })
-await check('uitgezet formaat niet geëxporteerd', async () => !(await readdir(join(dir, 'export', 'Zomeractie', 'CM360'))).some((f) => f.includes('336x280')))
+await check('uitgezet formaat niet geëxporteerd', async () => !(await readdir(cm)).some((f) => f.includes('336x280')))
 await check('in 300×250: Headline verborgen in de export', async () => {
-  const html = await readFile(join(dir, 'export', 'Zomeractie', 'CM360', 'zomeractie_300x250', 'index.html'), 'utf8')
-  return !html.includes('Zomerdeals!') && (await readFile(join(dir, 'export', 'Zomeractie', 'CM360', 'zomeractie_300x600', 'index.html'), 'utf8')).includes('Zomerdeals!')
+  const html = await zipText(join(cm, 'Zomeractie_300x250px.zip'), 'index.html')
+  return !html.includes('Zomerdeals!') && (await zipText(join(cm, 'Zomeractie_300x600px.zip'), 'index.html')).includes('Zomerdeals!')
 })
-await check('rapport.json in de projectmap van de export', async () => existsSync(join(dir, 'export', 'Zomeractie', 'rapport.json')))
+await check('geen export-map in de projectmap', async () => !existsSync(join(dir, 'export')))
 await page.keyboard.press('Escape')
 
 // 10. Varianten: headline per variant, aanmaken en exporteren
@@ -233,12 +243,11 @@ await page.locator('.variant-col-head input').first().fill('Winter')
 await page.locator('.variant-table tbody tr').first().locator('textarea').first().fill('Winterdeals!')
 await page.getByRole('button', { name: /variant\(en\) aanmaken/ }).click()
 await page.waitForSelector('.variant-results .result', { timeout: 120000 })
-const variantDir = join(work, 'zomeractie-winter')
-await check('variant aangemaakt en geëxporteerd met eigen tekst', async () => {
-  const p = JSON.parse(await readFile(join(variantDir, 'project.bsproj'), 'utf8'))
-  const exp = join(variantDir, 'export', p.name, 'CM360')
-  const html = await readFile(join(exp, (await readdir(exp)).find((f) => f.endsWith('_300x600')), 'index.html'), 'utf8')
-  return html.includes('Winterdeals!')
+const variantDir = join(work, 'Zomeractie-winter')
+await check('variant in dezelfde bovenliggende map', async () => existsSync(join(variantDir, 'project.bsproj')))
+await check('variant geëxporteerd met eigen tekst (in de gekozen exportmap)', async () => {
+  const exp = join(out, 'Zomeractie-Winter')
+  return (await zipText(join(exp, 'Zomeractie-Winter_300x600px.zip'), 'index.html')).includes('Winterdeals!') && !(await readdir(exp)).some((f) => f.includes('336x280'))
 })
 await check('variant per formaat: 300×600 nieuwe tekst, 300×250 leeg = origineel, alle formaten aanwezig', async () => {
   const p = JSON.parse(await readFile(join(variantDir, 'project.bsproj'), 'utf8'))

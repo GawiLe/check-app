@@ -1,12 +1,12 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, shell } from 'electron'
 import { existsSync, watch, type FSWatcher } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
-import { extname, join, resolve } from 'node:path'
+import { dirname, extname, join, resolve } from 'node:path'
 import { inside } from './paths'
 import type { BannerStudioApi, Settings } from '@shared/api'
 import type { Project } from '@shared/types'
 import { aiAnimate } from './ai'
-import { estimateSize, exportBanners, MIME } from './exporter'
+import { estimateSize, exportBanners, MIME, projectFolder } from './exporter'
 import { addVersion, clearAutosave, listVersions, readNewerAutosave, readVersion, writeAutosave } from './history'
 import { normalizeProject } from '@shared/sync'
 import { createVariants, readVariantSheet } from './variants'
@@ -43,6 +43,8 @@ let win: BrowserWindow | null = null
 // Niet-opgeslagen wijzigingen: bij sluiten/afsluiten eerst vragen wat ermee moet
 let dirty = false
 let forceClose = false
+/** Exportmappen die de gebruiker zelf koos (dialoog of eerder onthouden): alleen daarheen wordt geëxporteerd. */
+const approvedExportDirs = new Set<string>()
 let quitting = false
 let mainClosing = false
 
@@ -100,12 +102,21 @@ type Handlers = { [K in keyof BannerStudioApi]?: (...a: Parameters<BannerStudioA
 
 const handlers: Handlers = {
   async newProject(boilerplateId, name) {
+    // Je kiest waar het project komt; de app maakt daarin zelf een map met de projectnaam
+    const s = await readSettings()
     const res = await dialog.showOpenDialog(win!, {
-      title: 'Kies een (lege) map voor het nieuwe project',
+      title: 'Waar moet het project komen? (er komt een map met de projectnaam in)',
+      buttonLabel: 'Project hier maken',
+      defaultPath: s.projectsDir && existsSync(s.projectsDir) ? s.projectsDir : app.getPath('documents'),
       properties: ['openDirectory', 'createDirectory']
     })
     if (res.canceled || !res.filePaths[0]) return null
-    const dir = res.filePaths[0]
+    const parent = res.filePaths[0]
+    s.projectsDir = parent
+    await writeSettings(s)
+    const folder = projectFolder(name || 'Nieuwe campagne')
+    let dir = join(parent, folder)
+    for (let i = 2; existsSync(dir); i++) dir = join(parent, `${folder} ${i}`)
     const { project, dir: src } = await boilerplateSource(boilerplateId)
     project.name = name || project.name
     await initProjectDir(dir, project, src)
@@ -200,7 +211,11 @@ const handlers: Handlers = {
     return { assets, fonts, skipped: paths.filter((p) => !img.includes(p) && !fnt.includes(p)) }
   },
   generateWriteOn: (dir, fontFile, text, size) => textToGlyphPaths(dir, fontFile, text, size),
-  exportBanners: (req) => exportBanners(req),
+  exportBanners: (req) => {
+    // Alleen naar een map die de gebruiker zelf heeft gekozen
+    if (typeof req?.outDir !== 'string' || !approvedExportDirs.has(resolve(req.outDir))) throw new Error('Kies eerst een exportmap.')
+    return exportBanners(req)
+  },
   async importVariantSheet(dir) {
     const res = await dialog.showOpenDialog(win!, {
       title: 'Varianten uit CSV of Excel',
@@ -223,7 +238,10 @@ const handlers: Handlers = {
     return res.filePath
   },
   estimateSize: (dir, project, compId, target) => estimateSize(dir, project, compId, target),
-  createVariants: (req) => createVariants(req),
+  createVariants: (req) => {
+    if (req?.exportOutDir != null && (typeof req.exportOutDir !== 'string' || !approvedExportDirs.has(resolve(req.exportOutDir)))) throw new Error('Kies eerst een exportmap.')
+    return createVariants(req)
+  },
   async setDirty(v) {
     dirty = !!v
     win?.setDocumentEdited(dirty)
@@ -257,6 +275,29 @@ const handlers: Handlers = {
     return { hasApiKey: !!(await loadApiKey()), model: s.model || DEFAULT_MODEL, recent: s.recent }
   },
   setApiKey: (key) => storeApiKey(key),
+
+  async getExportDir(dir) {
+    const out = (await readSettings()).exportDirs?.[resolve(dir)]
+    if (!out || !existsSync(out)) return null
+    approvedExportDirs.add(resolve(out))
+    return out
+  },
+  async chooseExportDir(dir) {
+    const s = await readSettings()
+    const cur = s.exportDirs?.[resolve(dir)]
+    const res = await dialog.showOpenDialog(win!, {
+      title: 'Waar moet de export komen? (er komt een map met de projectnaam in)',
+      buttonLabel: 'Hier exporteren',
+      defaultPath: cur && existsSync(cur) ? cur : dirname(dir),
+      properties: ['openDirectory', 'createDirectory']
+    })
+    if (res.canceled || !res.filePaths[0]) return null
+    const out = res.filePaths[0]
+    s.exportDirs = { ...(s.exportDirs ?? {}), [resolve(dir)]: out }
+    await writeSettings(s)
+    approvedExportDirs.add(resolve(out))
+    return out
+  },
   async setModel(model) {
     const s = await readSettings()
     s.model = model || DEFAULT_MODEL
@@ -289,6 +330,7 @@ const handlers: Handlers = {
 // (de map komt uit het venster en wordt dus niet blind vertrouwd).
 const DIR_ARG = new Set(['importImages', 'importFonts', 'listAssets', 'importPaths', 'generateWriteOn', 'saveBoilerplate', 'installWebFont', 'estimateSize', 'importVariantSheet', 'saveVariantSheet'])
 const DIR_REQ = new Set(['exportBanners', 'createVariants'])
+const DIR_ARG_EXPORT = new Set(['getExportDir', 'chooseExportDir'])
 // Mag voor elk geopend tabblad (ook op de achtergrond): opslaan, herstelkopie, versies
 const OPEN_DIR_ARG = new Set(['saveProject', 'autosave', 'clearAutosave', 'listVersions', 'readVersion'])
 function assertOpenProject(dir: unknown) {
@@ -299,7 +341,7 @@ for (const [name, fn] of Object.entries(handlers)) {
   ipcMain.handle(`bs:${name}`, async (e, ...args) => {
     // Alleen het hoofdvenster zelf, nooit een (preview-)frame of een ander venster
     if (!win || e.sender !== win.webContents || e.senderFrame !== win.webContents.mainFrame) throw new Error('Niet toegestaan.')
-    if (DIR_ARG.has(name)) assertOpenProject(args[0])
+    if (DIR_ARG.has(name) || DIR_ARG_EXPORT.has(name)) assertOpenProject(args[0])
     // Opslaan mag voor elk geopend tabblad (bijv. "alles opslaan" bij afsluiten)
     if (OPEN_DIR_ARG.has(name) && !(typeof args[0] === 'string' && openDirs.has(resolve(args[0])))) throw new Error('Dit project is niet geopend.')
     if (DIR_REQ.has(name)) assertOpenProject((args[0] as { dir?: unknown } | undefined)?.dir)

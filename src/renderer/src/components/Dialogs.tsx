@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Boilerplate, Settings, VersionInfo } from '@shared/api'
 import { IAB_SIZES, TARGET_IDS, TARGETS } from '@shared/specs'
 import type { ExportTarget, Project } from '@shared/types'
-import { addFormat, newProject, rememberedSvgMode, replaceImage, runExport, saveAsBoilerplate, setRememberedSvgMode, uploadAndReplace } from '../lib/actions'
+import { addFormat, exportFolder, newProject, rememberedSvgMode, replaceImage, runExport, saveAsBoilerplate, setRememberedSvgMode, uploadAndReplace } from '../lib/actions'
 import { FolderOpen, Image as ImageIcon, Shapes } from 'lucide-react'
 import { assetUrl, currentComp, useStore } from '../store'
 import { findDeep } from '@shared/tree'
@@ -85,11 +85,11 @@ function NewProjectDialog({ onClose }: { onClose: () => void }) {
       </Row>
       <div className="hint-text">Kies een boilerplate als startpunt. De basis is 300×600; andere formaten leid je daarvan af.</div>
       <BoilerplatePicker value={bp} onChange={setBp} />
-      <div className="hint-text">Je kiest hierna een (lege) map. Daarin komen project.bsproj, assets/, fonts/ en export/.</div>
+      <div className="hint-text">Je kiest hierna waar het project komt; daar maken we een eigen map met de projectnaam (met project.bsproj, assets/ en fonts/). Waar je exporteert kies je bij het exporteren.</div>
       <div className="actions">
         <button onClick={onClose}>Annuleren</button>
         <button className="primary" onClick={() => newProject(bp, name)}>
-          Kies map en maak aan…
+          Kies locatie en maak aan…
         </button>
       </div>
     </Modal>
@@ -150,6 +150,11 @@ function ExportDialog({ onClose }: { onClose: () => void }) {
   const [targets, setTargets] = useState<ExportTarget[]>(project.targets.length ? project.targets : ['cm360'])
   const [busy, setBusy] = useState(false)
   const [info, setInfo] = useState<ExportTarget>(targets[0] ?? 'cm360')
+  const dir = useStore((s) => s.dir)
+  const [outDir, setOutDir] = useState<string | null>(null)
+  useEffect(() => {
+    if (dir) void window.bs.getExportDir(dir).then(setOutDir)
+  }, [dir])
   const toggle = <T,>(list: T[], v: T, on: boolean) => (on ? [...list, v] : list.filter((x) => x !== v))
 
   return (
@@ -173,7 +178,7 @@ function ExportDialog({ onClose }: { onClose: () => void }) {
               <span className="meta">max. {kb(TARGETS[t].maxZipBytes)}</span>
             </div>
           ))}
-          <TargetInfo target={info} project={project} />
+          <TargetInfo target={info} project={project} multi={targets.length > 1} />
           <div className="hint-text">clickTag: {project.clickTag}</div>
           <div className="hint-text">Polite loading: {project.politeLoad ? 'aan' : 'uit'} · rand en backup volgens formaat-instellingen</div>
           <label className="check" style={{ marginTop: 8 }} title="JPG en PNG verkleinen tot de getoonde maat (2× voor retina) en opnieuw comprimeren. De originelen blijven staan.">
@@ -208,6 +213,19 @@ function ExportDialog({ onClose }: { onClose: () => void }) {
         </div>
       )}
 
+      <div className="export-dest">
+        <span className="faint">Exporteren naar</span>
+        <span className="export-path" title={outDir ?? ''}>{outDir ? `${outDir}/${project.name.trim().replace(/\s+/g, '-')}` : 'nog niet gekozen (je kiest bij exporteren)'}</span>
+        <button
+          className="ghost sm"
+          onClick={async () => {
+            const d = await exportFolder(true)
+            if (d) setOutDir(d)
+          }}
+        >
+          {outDir ? 'Wijzigen…' : 'Kiezen…'}
+        </button>
+      </div>
       <div className="actions">
         <button onClick={onClose}>Sluiten</button>
         <button
@@ -216,6 +234,7 @@ function ExportDialog({ onClose }: { onClose: () => void }) {
           onClick={async () => {
             setBusy(true)
             await runExport(comps, targets)
+            if (dir) setOutDir(await window.bs.getExportDir(dir))
             setBusy(false)
           }}
         >
@@ -227,9 +246,9 @@ function ExportDialog({ onClose }: { onClose: () => void }) {
 }
 
 /** Wat een platform is en welke eisen (presets) de export daarvoor gebruikt. */
-function TargetInfo({ target, project }: { target: ExportTarget; project: Project }) {
+function TargetInfo({ target, project, multi }: { target: ExportTarget; project: Project; multi: boolean }) {
   const t = TARGETS[target]
-  const folder = (project.name.replace(/[\\/:*?"<>|]+/g, '-').replace(/^[.\s-]+/, '').trim() || 'banner').slice(0, 80)
+  const folder = (project.name.replace(/[\\/:*?"<>|]+/g, '-').replace(/^[.\s-]+/, '').trim() || 'banner').slice(0, 80).replace(/\s+/g, '-')
   const rows: [string, string][] = [
     ['Max. ZIP', kb(t.maxZipBytes)],
     ['Initial load', `${kb(t.initialLoadBytes)} (richtlijn)`],
@@ -239,7 +258,7 @@ function TargetInfo({ target, project }: { target: ExportTarget; project: Projec
     ['Animatie', `max. ${t.maxAnimationSeconds} s, ${t.maxLoops} loops`],
     ['Backup-JPG', t.backupImage ? 'ja, van het eindframe (≤ 40 KB)' : 'ja (handig als statische variant)'],
     ['Klik', t.click],
-    ['Map', `export/${folder}/${t.folder}/`]
+    ['Bestanden', `${folder}/${multi ? `${t.folder}/` : ''}${folder}_300x600px.zip + .jpg`]
   ]
   return (
     <div className="target-info">

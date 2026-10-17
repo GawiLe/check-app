@@ -1,8 +1,9 @@
 // Rooktest: verloop, masker en overvloeimodus via het paneel Ontwerp, zichtbaar in de preview en in de export.
 // Gebruik: npm run build && xvfb-run node scripts/smoke-look.mjs <projectmap> <screenshotmap>
 import { _electron as electron } from 'playwright-core'
-import { mkdir, readFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { zipText } from './lib/export.mjs'
 
 const [dir, shots] = process.argv.slice(2)
 await mkdir(shots, { recursive: true })
@@ -101,8 +102,11 @@ await check('tekst: regelafstand 30 pt en tracking -40', async () => {
 
 // 4. Export bevat alles
 const comp = await page.evaluate(() => window.__bsStore.getState().project.compositions[0].id)
-const [res] = await page.evaluate(([d, c]) => window.bs.exportBanners({ dir: d, project: window.__bsStore.getState().project, compositionIds: [c], targets: ['cm360'] }), [dir, comp])
-const html = await readFile(join(res.folder, 'index.html'), 'utf8')
+await mkdir(`${shots}/out`, { recursive: true })
+await app.evaluate(({ dialog }, d) => void (dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [d] })), `${shots}/out`)
+const outDir = await page.evaluate((d) => window.bs.chooseExportDir(d), dir)
+const [res] = await page.evaluate(([d, c, o]) => window.bs.exportBanners({ dir: d, project: window.__bsStore.getState().project, compositionIds: [c], targets: ['cm360'], outDir: o }), [dir, comp, outDir])
+const html = await zipText(res.zip ?? join(res.folder, (await readdir(res.folder)).find((f) => f.endsWith('.zip'))), 'index.html')
 await check('export: verloop, overvloeien en masker in de HTML', async () => html.includes('linear-gradient(180deg') && html.includes('mix-blend-mode:multiply') && html.includes('clip-path:ellipse'))
 await check('export: geen fouten in de validatie', async () => !res.issues.some((i) => i.level === 'error'))
 

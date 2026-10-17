@@ -53,8 +53,11 @@ mijn-campagne/
   project.bsproj   ← het project (JSON: formaten, lagen, keyframes)
   assets/          ← afbeeldingen (png, jpg, svg, gif, webp)
   fonts/           ← woff, woff2, ttf, otf
-  export/          ← export/<projectnaam>/<platform>/ met de zips, backups en rapport.json
 ```
+
+- **Nieuw project:** je kiest alleen de locatie (bijv. *Documenten/Banners*); de app maakt daarin zelf een map met de projectnaam. Bestaat die al, dan wordt het `Naam 2`.
+- **Varianten** komen als eigen map naast het origineel, in dezelfde bovenliggende map (`Zomeractie-winter`).
+- Er wordt **geen exportmap** in het project aangemaakt: bij de eerste export kies je waar de export heen moet (te wijzigen in het exportvenster; per project onthouden).
 
 - Zet bestanden direct in `assets/` of `fonts/`. De app houdt de map in de gaten en ververst de preview als je een bestand vervangt (bijvoorbeeld een nieuwe packshot vanuit Photoshop).
 - Je kunt de map gewoon in Git, Dropbox of op de server zetten.
@@ -366,7 +369,7 @@ Het volledige overzicht staat in de app: **Help → Sneltoetsen** of druk **?**.
 | Spatie | afspelen / pauze |
 | Home / End | naar begin / eindframe |
 | PageUp / PageDown | 1 frame terug / vooruit (⇧: 10) |
-| J / K | naar vorig / volgend keyframe |
+| < / > of J / K | naar vorig / volgend keyframe |
 | ◀ ◆ ▶ in de tijdlijn | per eigenschap: precies naar het vorige / volgende keyframe, of keyframe zetten/weghalen |
 | I / ⇧I | naar in- / uitpunt van de geselecteerde laag |
 | [ / ] | laag met al zijn keyframes verschuiven: begint / eindigt (laatste keyframe) op de playhead |
@@ -429,9 +432,18 @@ De validator controleert per banner:
 - of er een rand is bij een lichte achtergrond;
 - de backup-afbeelding.
 
-De uitkomst staat in het exportvenster en in `export/<projectnaam>/rapport.json`.
+De uitkomst staat in het exportvenster.
 
-**Waar komt de export?** In `export/<projectnaam>/<platform>/`, bijvoorbeeld `export/Zomeractie/CM360/zomeractie_300x600.zip`. In het exportvenster klik je op een platform om te zien wat het is en welke eisen gelden. *Azerion* is een Europees advertentieplatform (o.a. Improve Digital) dat banners op websites en in games plaatst; kies het alleen als de campagne daar loopt.
+**Waar komt de export?** In de map die je kiest, met daarin een map met de projectnaam en per formaat een zip plus backup-afbeelding met dezelfde naam:
+
+```
+<gekozen map>/
+  Bannerv1/
+    Bannerv1_300x600px.zip
+    Bannerv1_300x600px.jpg
+```
+
+Kies je meer dan één platform, dan komt er per platform een submap tussen (`Bannerv1/CM360/…`, `Bannerv1/Adform/…`); bij één platform niet. In het exportvenster klik je op een platform om te zien wat het is en welke eisen gelden. *Azerion* is een Europees advertentieplatform (o.a. Improve Digital) dat banners op websites en in games plaatst; kies het alleen als de campagne daar loopt.
 
 ## Architectuur
 

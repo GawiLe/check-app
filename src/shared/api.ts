@@ -44,6 +44,8 @@ export interface ExportRequest {
   project: Project
   compositionIds: string[]
   targets: ExportTarget[]
+  /** Map waarin geëxporteerd wordt (door de gebruiker gekozen); daarin komt een map met de projectnaam. */
+  outDir: string
 }
 
 export interface VariantRequest {
@@ -51,6 +53,8 @@ export interface VariantRequest {
   project: Project
   /** Meteen exporteren naar deze platforms (leeg = alleen de projectmappen maken). */
   exportTargets: ExportTarget[] | null
+  /** Exportmap (gekozen door de gebruiker); elke variant krijgt daarin een map met zijn naam. */
+  exportOutDir?: string | null
 }
 
 export interface VariantResult {
@@ -79,6 +83,10 @@ export interface BannerStudioApi {
     size: number
   ): Promise<Pick<WriteOnProps, 'glyphs' | 'viewBox'> & { width: number; height: number }>
   exportBanners(req: ExportRequest): Promise<ExportResult[]>
+  /** Onthouden exportmap van dit project (of null). */
+  getExportDir(dir: string): Promise<string | null>
+  /** Exportmap kiezen (dialoog) en onthouden voor dit project. Null = geannuleerd. */
+  chooseExportDir(dir: string): Promise<string | null>
   /** Varianten uit een spreadsheet: kiest een CSV/Excel-bestand en geeft de tabel + gevonden afbeeldingen (null = geannuleerd). */
   importVariantSheet(dir: string): Promise<{ table: string[][]; images: Record<string, string>; file: string } | null>
   /** Varianten als CSV opslaan (sjabloon om in Excel in te vullen). Geeft het pad, of null bij annuleren. */

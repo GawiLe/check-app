@@ -1,6 +1,7 @@
 // Rooktest: start de gebouwde app, opent een testproject, doorloopt de hoofdflow en exporteert.
 // Gebruik: npm run build && xvfb-run node scripts/smoke.mjs <projectmap> <screenshotmap>
 import { _electron as electron } from 'playwright-core'
+import { pickFolder } from './lib/export.mjs'
 import { mkdir } from 'node:fs/promises'
 
 const [dir, shots] = process.argv.slice(2)
@@ -163,6 +164,7 @@ await check('kopiëren/plakken', async () => (await base()).layers.filter((l) =>
 await page.locator('.timeline .ruler').click({ position: { x: 10 + 3 * 120, y: 10 } })
 await shot('5-resultaat')
 
+await pickFolder(app, `${shots}/out`)
 await page.getByRole('button', { name: 'Exporteren' }).first().click()
 await page.getByRole('button', { name: /Exporteer \d+ banner/ }).click()
 await page.waitForFunction(() => document.querySelectorAll('.result').length >= 1, null, { timeout: 60000 })

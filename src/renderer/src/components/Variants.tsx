@@ -6,7 +6,7 @@ import { TARGETS } from '@shared/specs'
 import type { VariantSet } from '@shared/types'
 import { tableToVariants, toCsv, variantsToTable } from '@shared/sheet'
 import { variantFieldGroups, type FieldGroup, type VariantField } from '@shared/variants'
-import { openInBackground, openProject, refreshAssets, save } from '../lib/actions'
+import { exportFolder, openInBackground, openProject, refreshAssets, save } from '../lib/actions'
 import { assetUrl, useStore } from '../store'
 import { Modal } from './ui'
 
@@ -116,7 +116,10 @@ export function VariantsDialog({ onClose }: { onClose: () => void }) {
     setBusy(true)
     try {
       await save()
-      const res = await window.bs.createVariants({ dir, project: useStore.getState().project!, exportTargets: exportNow ? project.targets : null })
+      // Meteen exporteren: naar de exportmap van het template (eerste keer kiezen); elke variant krijgt daar zijn eigen map
+      const exportOutDir = exportNow ? await exportFolder() : null
+      if (exportNow && !exportOutDir) return
+      const res = await window.bs.createVariants({ dir, project: useStore.getState().project!, exportTargets: exportNow ? project.targets : null, exportOutDir })
       // Elke variant meteen als tabblad bovenin (op de achtergrond; je blijft in het template)
       await openInBackground(res.map((r) => r.dir))
       setResults(res)
@@ -332,8 +335,8 @@ export function VariantsDialog({ onClose }: { onClose: () => void }) {
             Meteen exporteren ({project.targets.map((t) => TARGETS[t].label).join(', ') || 'geen platform gekozen'})
           </label>
           <div className="hint-text">
-            Elke variant wordt een eigen projectmap naast deze ({dir.split(/[\\/]/).pop()}-&lt;naam&gt;), met eigen export. Opnieuw aanmaken werkt bestaande variantmappen bij. Deze instellingen worden
-            in dit project bewaard.
+            Elke variant wordt een eigen projectmap naast deze, in dezelfde map ({dir.split(/[\\/]/).slice(-2, -1)[0] ?? ''}). Met meteen exporteren komt elke variant als eigen map in je exportmap
+            (de eerste keer kies je die). Opnieuw aanmaken werkt bestaande variantmappen bij.
           </div>
           {sheetNote}
           <div className="actions">

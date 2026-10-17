@@ -1,5 +1,6 @@
 // Rooktest: lagen verslepen in de tijdlijn en een SVG-bestand importeren.
 import { _electron as electron } from 'playwright-core'
+import { pickFolder } from './lib/export.mjs'
 import { mkdir, writeFile } from 'node:fs/promises'
 
 const [dir, shots] = process.argv.slice(2)
@@ -77,6 +78,7 @@ await check('SVG geïmporteerd als laag', async () => (await project()).composit
 await page.waitForTimeout(600)
 await page.screenshot({ path: `${shots}/drag-svg.png` })
 
+await pickFolder(app, `${shots}/out`)
 await page.getByRole('button', { name: 'Exporteren' }).first().click()
 await page.getByRole('button', { name: /Exporteer \d+ banner/ }).click()
 await page.waitForFunction(() => document.querySelectorAll('.result').length >= 1, null, { timeout: 60000 })

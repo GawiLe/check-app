@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron'
 import { createHash } from 'node:crypto'
-import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { basename, extname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { zipSync } from 'fflate'
@@ -28,8 +29,11 @@ export const projectFolder = (name: string) =>
     .trim()
     .slice(0, 80) || 'banner'
 
-/** Exportmap: export/<projectnaam>/<platform>/ (bijv. export/Zomeractie/CM360). */
-export const exportDir = (dir: string, project: Project, target: ExportTarget) => join(dir, 'export', projectFolder(project.name), TARGETS[target].folder)
+/** Bestandsnaam van het project zonder spaties (bijv. "Bannerv1"), voor map en zips. */
+export const fileStem = (name: string) =>
+  projectFolder(name)
+    .replace(/\s*[–—]\s*/g, '-')
+    .replace(/\s+/g, '-')
 
 const MIME: Record<string, string> = {
   '.png': 'image/png',
@@ -149,18 +153,21 @@ async function pack(dir: string, project: Project, comp: Composition, target: Ex
 
 const kbs = (b: number) => `${(b / 1024).toFixed(1)} KB`
 
+/**
+ * Eén banner exporteren naar `targetDir`: <Project>_<B>x<H>px.zip en een backup <Project>_<B>x<H>px.jpg.
+ * De losse bestanden staan alleen tijdelijk op schijf (voor de backup-afbeelding).
+ */
 async function exportOne(
   dir: string,
+  targetDir: string,
   project: Project,
   comp: Composition,
   target: ExportTarget,
   fonts: Record<string, Buffer>
 ): Promise<ExportResult> {
-  const name = `${slug(project.name)}_${comp.width}x${comp.height}`
-  const targetDir = exportDir(dir, project, target)
-  const outDir = join(targetDir, name)
-  await rm(outDir, { recursive: true, force: true })
-  await mkdir(outDir, { recursive: true })
+  const name = `${fileStem(project.name)}_${comp.width}x${comp.height}px`
+  await mkdir(targetDir, { recursive: true })
+  const outDir = await mkdtemp(join(tmpdir(), 'bnnr-'))
 
   const { files, built, imageNotes } = await pack(dir, project, comp, target, fonts)
   for (const [n, data] of Object.entries(files)) await writeFile(join(outDir, n), data)
@@ -183,6 +190,7 @@ async function exportOne(
       backup = null
     }
   }
+  await rm(outDir, { recursive: true, force: true })
 
   const fileList = Object.entries(files).map(([n, d]) => ({ name: n, bytes: d.byteLength }))
   const issues = validateBanner({ target, comp, html: built.html, files: fileList, zipBytes: zip.byteLength, backupBytes, politeLoad: project.politeLoad })
@@ -210,7 +218,7 @@ async function exportOne(
   return {
     target,
     composition: comp.name,
-    folder: outDir,
+    folder: targetDir,
     zip: zipPath,
     zipBytes: zip.byteLength,
     initialLoadBytes: initialLoad(fileList, project.politeLoad),
@@ -244,20 +252,22 @@ export async function renderBackup(indexHtml: string, comp: Composition, outFile
   }
 }
 
+/**
+ * Exporteren naar de gekozen map: <map>/<Project>/<Project>_<B>x<H>px.zip + .jpg.
+ * Alleen bij meerdere platforms komt er per platform een submap (<Project>/CM360/…).
+ */
 export async function exportBanners(req: ExportRequest): Promise<ExportResult[]> {
   // Cache alleen binnen één export: een vervangen fontbestand moet de volgende keer opnieuw worden verkleind
   subsetCache.clear()
   const results: ExportResult[] = []
-  // Alleen bekende platforms: de naam wordt een mapnaam die vóór het schrijven wordt leeggemaakt
   const targets = req.targets.filter((t) => TARGET_IDS.includes(t))
+  const base = join(req.outDir, fileStem(req.project.name))
   for (const id of req.compositionIds) {
     const comp = req.project.compositions.find((c) => c.id === id)
     if (!comp) continue
     const fonts = await prepareFonts(req.dir, req.project, comp)
-    for (const target of targets) results.push(await exportOne(req.dir, req.project, comp, target, fonts))
+    for (const target of targets) results.push(await exportOne(req.dir, targets.length > 1 ? join(base, TARGETS[target].folder) : base, req.project, comp, target, fonts))
   }
-  await mkdir(join(req.dir, 'export', projectFolder(req.project.name)), { recursive: true })
-  await writeFile(join(req.dir, 'export', projectFolder(req.project.name), 'rapport.json'), JSON.stringify(results, null, 2))
   return results
 }
 

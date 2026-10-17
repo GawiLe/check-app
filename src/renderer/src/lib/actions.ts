@@ -591,13 +591,26 @@ export function deleteComposition(id: string) {
   S().setComp(project.baseCompositionId)
 }
 
+/** Exportmap van dit project: de onthouden map, of (eerste keer / `choose`) eerst kiezen. Null = geannuleerd. */
+export async function exportFolder(choose = false): Promise<string | null> {
+  const { dir } = S()
+  if (!dir) return null
+  if (!choose) {
+    const known = await window.bs.getExportDir(dir)
+    if (known) return known
+  }
+  return window.bs.chooseExportDir(dir)
+}
+
 export async function runExport(compositionIds: string[], targets: ExportTarget[]) {
   const { dir, project } = S()
   if (!dir || !project) return
   try {
+    const outDir = await exportFolder()
+    if (!outDir) return
     S().setStatus('Exporteren…')
     await save()
-    const results = await window.bs.exportBanners({ dir, project: S().project!, compositionIds, targets })
+    const results = await window.bs.exportBanners({ dir, project: S().project!, compositionIds, targets, outDir })
     S().setExportResults(results)
     const errors = results.reduce((n, r) => n + r.issues.filter((i) => i.level === 'error').length, 0)
     S().setStatus(
@@ -941,7 +954,7 @@ export function goToLayerEdge(which: 'in' | 'out') {
   S().setTime(Math.max(0, Math.min(findComp(project, compId).duration, t)))
 }
 
-/** J / K: naar het vorige / volgende keyframe (van de selectie, of van alle lagen). */
+/** < / > of J / K: naar het vorige / volgende keyframe (van de selectie, of van alle lagen). */
 export function jumpKeyframe(dir: -1 | 1) {
   const comp = currentComp(S())
   if (!comp) return

@@ -38,9 +38,8 @@ export async function createVariants(req: VariantRequest): Promise<VariantResult
     const project = { ...applyVariant(req.project, v, set.fields), variantOf: marker }
     await mkdir(dir, { recursive: true })
     for (const d of ['assets', 'fonts']) if (existsSync(join(src, d))) await cp(join(src, d), join(dir, d), { recursive: true, force: true })
-    await mkdir(join(dir, 'export'), { recursive: true })
     await writeProject(dir, project)
-    const exports = targets.length ? await exportBanners({ dir, project, targets, compositionIds: project.compositions.map((c) => c.id) }) : []
+    const exports = targets.length && req.exportOutDir ? await exportBanners({ dir, project, targets, compositionIds: project.compositions.filter((c) => !c.disabled).map((c) => c.id), outDir: req.exportOutDir }) : []
     out.push({ name: v.name, dir, exports })
   }
   return out

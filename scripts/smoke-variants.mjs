@@ -4,6 +4,7 @@ import { _electron as electron } from 'playwright-core'
 import { existsSync } from 'node:fs'
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
+import { pickFolder, zipText } from './lib/export.mjs'
 
 const [dir, shots] = process.argv.slice(2)
 await mkdir(shots, { recursive: true })
@@ -25,8 +26,10 @@ const shot = async (name) => {
 const check = async (label, fn) => console.log(label, (await fn()) ? 'OK' : 'MISLUKT')
 const readProject = async (d) => JSON.parse(await readFile(join(d, 'project.bsproj'), 'utf8'))
 const layersOf = (p) => p.compositions.flatMap((c) => c.layers)
-/** Exportmap: export/<projectnaam>/<platform> */
-const cmDir = async (d) => join(d, 'export', (await readProject(d)).name, 'CM360')
+/** Exportmap: <gekozen map>/<projectnaam> (één platform → geen submap) */
+const out = `${shots}/out`
+const stem = (n) => n.replace(/[\\/:*?"<>|]+/g, '-').trim().replace(/\s*[–—]\s*/g, '-').replace(/\s+/g, '-')
+const cmDir = async (d) => join(out, stem((await readProject(d)).name))
 
 await page.waitForSelector('.welcome')
 await page.evaluate((d) => window.bs.openProject(d), dir)
@@ -72,7 +75,8 @@ await check('waarden per variant in het project bewaard', async () => {
   return v.fields.length === 2 && v.variants.length === 2 && Object.keys(v.variants[0].values).length === 2 && Object.keys(v.variants[1].values).length === 1
 })
 
-// 4. Aanmaken en exporteren
+// 4. Aanmaken en exporteren (vraagt eenmalig de exportmap)
+await pickFolder(app, out)
 await page.getByRole('button', { name: /2 variant\(en\) aanmaken/ }).click()
 await page.waitForSelector('.variant-results .result', { timeout: 120000 })
 await page.waitForTimeout(300)
@@ -101,6 +105,7 @@ await check('Winter: zelfde headline, geüpload logo (ook in assets/)', async ()
     existsSync(join(winter, 'assets', 'winter.svg'))
   )
 })
+await check('geen export-map in de projectmappen', async () => !existsSync(join(zomer, 'export')) && !existsSync(join(dir, 'export')))
 await check('elke variant meteen geëxporteerd (zip + backup)', async () => {
   for (const d of [zomer, winter]) {
     const files = await readdir(await cmDir(d))
@@ -109,8 +114,8 @@ await check('elke variant meteen geëxporteerd (zip + backup)', async () => {
   return true
 })
 await check('export Zomer bevat de nieuwe tekst en het nieuwe logo', async () => {
-  const folder = (await readdir(await cmDir(zomer))).find((f) => !f.includes('.'))
-  const html = await readFile(join(await cmDir(zomer), folder, 'index.html'), 'utf8')
+  const zip = (await readdir(await cmDir(zomer))).find((f) => f.endsWith('.zip'))
+  const html = await zipText(join(await cmDir(zomer), zip), 'index.html')
   return html.includes('Zomeractie!') && html.includes('zomer.svg')
 })
 await check('origineel ongewijzigd (alleen de variantinstellingen erbij)', async () => {

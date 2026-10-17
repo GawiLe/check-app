@@ -23,6 +23,8 @@ const api: BannerStudioApi = {
   listAssets: call('listAssets'),
   generateWriteOn: call('generateWriteOn'),
   exportBanners: call('exportBanners'),
+  getExportDir: call('getExportDir'),
+  chooseExportDir: call('chooseExportDir'),
   importVariantSheet: call('importVariantSheet'),
   saveVariantSheet: call('saveVariantSheet'),
   estimateSize: call('estimateSize'),

@@ -6,7 +6,7 @@ import { createLayer, createStarterProject } from '../src/shared/factory'
 import { PROJECT_FILE } from '../src/shared/types'
 
 const [dir, fontFile] = process.argv.slice(2)
-for (const d of ['assets', 'fonts', 'export']) await mkdir(join(dir, d), { recursive: true })
+for (const d of ['assets', 'fonts']) await mkdir(join(dir, d), { recursive: true })
 await cp(fontFile, join(dir, 'fonts/brand-bold.ttf'))
 await writeFile(
   join(dir, 'assets/logo.svg'),

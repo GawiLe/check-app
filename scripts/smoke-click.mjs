@@ -1,6 +1,7 @@
 // Rooktest: klikgebieden, uitlijnen/verdelen, hele pixels, export naar CM360 + Adform met backup-afbeelding.
 // Gebruik: npm run build && xvfb-run node scripts/smoke-click.mjs <projectmap> <screenshotmap>
 import { _electron as electron } from 'playwright-core'
+import { pickFolder, zipNames, zipText } from './lib/export.mjs'
 import { mkdir, readdir, readFile } from 'node:fs/promises'
 
 const [dir, shots] = process.argv.slice(2)
@@ -100,35 +101,35 @@ await check('na slepen: hele pixels', async () => {
 await shot('c2-uitgelijnd')
 
 // 7. Export CM360 + Adform: backup met dezelfde naam als de zip, manifest.json voor Adform
+await pickFolder(app, `${shots}/out`)
 await page.getByRole('button', { name: 'Exporteren' }).first().click()
 await page.getByRole('button', { name: /Exporteer \d+ banner/ }).click()
 await page.waitForFunction(() => document.querySelectorAll('.result').length >= 2, null, { timeout: 90000 })
 console.log((await page.locator('.result .issues').allInnerTexts()).join('\n'))
 await shot('c3-export')
-// Exportmap: export/<projectnaam>/<platform>
-const pname = JSON.parse(await readFile(`${dir}/project.bsproj`, 'utf8')).name
-const cmDir = `${dir}/export/${pname}/CM360`
-const afDir = `${dir}/export/${pname}/Adform`
+// Exportmap: <gekozen map>/<projectnaam>/<platform> (twee platforms → submappen)
+const pname = JSON.parse(await readFile(`${dir}/project.bsproj`, 'utf8')).name.replace(/\s+/g, '-')
+const cmDir = `${shots}/out/${pname}/CM360`
+const afDir = `${shots}/out/${pname}/Adform`
 const cm = await readdir(cmDir)
 const zip = cm.find((f) => f.endsWith('.zip'))
-await check(`backup naast de zip met dezelfde naam (${cm.filter((f) => !f.includes('.') || /\.(zip|jpg)$/.test(f)).join(', ')})`, async () =>
-  cm.includes(zip.replace(/\.zip$/, '.jpg'))
+await check(`zip + backup met dezelfde naam, geen losse map (${cm.join(', ')})`, async () =>
+  /_\d+x\d+px\.zip$/.test(zip) && cm.includes(zip.replace(/\.zip$/, '.jpg')) && cm.every((f) => /\.(zip|jpg)$/.test(f))
 )
-const folder = zip.replace(/\.zip$/, '')
-const html = await readFile(`${cmDir}/${folder}/index.html`, 'utf8')
+const html = await zipText(`${cmDir}/${zip}`, 'index.html')
 await check('CM360: clickTag, clickTag1 en clickTag2', async () =>
   ['var clickTag = "https://www.makro.nl"', 'var clickTag1 = "https://www.makro.nl/actie"', 'window.open(window.clickTag2)'].every((s) => html.includes(s))
 )
-const af = await readdir(`${afDir}/${folder}`)
-const manifest = JSON.parse(await readFile(`${afDir}/${folder}/manifest.json`, 'utf8'))
+const af = await zipNames(`${afDir}/${zip}`)
+const manifest = JSON.parse(await zipText(`${afDir}/${zip}`, 'manifest.json'))
 await check('Adform: manifest.json met clickTAG, clickTAG1, clickTAG2', async () => af.includes('manifest.json') && Object.keys(manifest.clicktags).join() === 'clickTAG,clickTAG1,clickTAG2')
 await check('font als Base64 ingebed, geen los .woff2-bestand', async () =>
-  html.includes('url(data:font/woff2;base64,') && !(await readdir(`${cmDir}/${folder}`)).some((f) => f.endsWith('.woff2'))
+  html.includes('url(data:font/woff2;base64,') && !(await zipNames(`${cmDir}/${zip}`)).some((f) => f.endsWith('.woff2'))
 )
 await check('melding: font verkleind tot de gebruikte tekens', async () =>
   (await page.locator('.result .issues li').allInnerTexts()).some((t) => /tekens gebruikt, verkleind van [\d.]+ KB tot [\d.]+ KB en als Base64/.test(t))
 )
-await check('Adform: backup aanwezig', async () => (await readdir(afDir)).includes(`${folder}.jpg`))
+await check('Adform: backup aanwezig', async () => (await readdir(afDir)).includes(zip.replace(/\.zip$/, '.jpg')))
 // Testeinde: wijzigingen als opgeslagen markeren, anders vraagt de app terecht of je wilt opslaan
 await page.evaluate(() => window.__bsStore.getState().markSaved()).catch(() => {})
 await page.waitForTimeout(200)

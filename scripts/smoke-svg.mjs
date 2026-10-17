@@ -1,5 +1,6 @@
 // Rooktest: SVG importeren met keuzevenster (als afbeelding / als vormen).
 import { _electron as electron } from 'playwright-core'
+import { pickFolder } from './lib/export.mjs'
 import { mkdir, writeFile } from 'node:fs/promises'
 
 const [dir, shots] = process.argv.slice(2)
@@ -74,6 +75,7 @@ await page.locator('.list-item', { hasText: 'badge.svg' }).first().click()
 await page.waitForTimeout(300)
 await check('keuze onthouden (geen venster)', async () => (await page.locator('.choice-card').count()) === 0 && (await base()).layers.filter((l) => l.image?.src === 'assets/badge.svg').length === 2)
 
+await pickFolder(app, `${shots}/out`)
 await page.getByRole('button', { name: 'Exporteren' }).first().click()
 await page.getByRole('button', { name: /Exporteer \d+ banner/ }).click()
 await page.waitForFunction(() => document.querySelectorAll('.result').length >= 1, null, { timeout: 60000 })

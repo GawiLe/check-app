@@ -17,6 +17,10 @@ interface StoredSettings {
   apiKeyPlain?: string
   model: string
   recent: string[]
+  /** Map waarin nieuwe projecten komen (laatst gekozen). */
+  projectsDir?: string
+  /** Laatst gekozen exportmap per project. */
+  exportDirs?: Record<string, string>
 }
 
 const settingsPath = () => join(app.getPath('userData'), 'settings.json')
@@ -60,7 +64,7 @@ export async function addRecent(dir: string): Promise<void> {
 
 // ---------- Projectmappen ----------
 
-export const PROJECT_DIRS = ['assets', 'fonts', 'export'] as const
+export const PROJECT_DIRS = ['assets', 'fonts'] as const
 
 export async function readProject(dir: string): Promise<OpenedProject> {
   const project = JSON.parse(await readFile(join(dir, PROJECT_FILE), 'utf8')) as Project

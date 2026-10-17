@@ -124,6 +124,12 @@ const afterK = (await st()).time
 await key('KeyK')
 await key('KeyJ')
 await check('J: terug naar vorig keyframe', async () => Math.abs((await st()).time - afterK) < 0.01)
+await setTime(0)
+await page.keyboard.press('>')
+await check('>: naar volgend keyframe', async () => Math.abs((await st()).time - afterK) < 0.01)
+await page.keyboard.press('>')
+await page.keyboard.press('<')
+await check('<: terug naar vorig keyframe', async () => Math.abs((await st()).time - afterK) < 0.01)
 
 // 5b. Keyframe-navigator: ◀ ▶ bij een eigenschap zet de playhead precies op het keyframe
 await select(['Headline'])

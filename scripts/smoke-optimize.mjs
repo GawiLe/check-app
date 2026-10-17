@@ -3,6 +3,7 @@
 import { _electron as electron } from 'playwright-core'
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { pickFolder, readZip } from './lib/export.mjs'
 
 const [dir, shots] = process.argv.slice(2)
 await mkdir(shots, { recursive: true })
@@ -86,11 +87,16 @@ await page.screenshot({ path: `${shots}/o2-na.png` })
 
 // 3. Exporteren: foto als JPG op 600×600 (2× van 300), vorm blijft PNG (transparant) op 200×200
 const comp = await page.evaluate(() => window.__bsStore.getState().project.compositions[0].id)
+await pickFolder(app, `${shots}/out`)
+const outDir = await page.evaluate((d) => window.bs.chooseExportDir(d), dir)
 const results = await page.evaluate(
-  ([d, c]) => window.bs.exportBanners({ dir: d, project: window.__bsStore.getState().project, compositionIds: [c], targets: ['cm360'] }),
-  [dir, comp]
+  ([d, c, o]) => window.bs.exportBanners({ dir: d, project: window.__bsStore.getState().project, compositionIds: [c], targets: ['cm360'], outDir: o }),
+  [dir, comp, outDir]
 )
-const folder = results[0].folder
+// Zip uitpakken om de bestanden te controleren
+const folder = `${shots}/unzipped`
+await mkdir(folder, { recursive: true })
+for (const [n, data] of Object.entries(await readZip(results[0].zip))) await writeFile(join(folder, n), data)
 const files = await readdir(folder)
 await check('foto.png → foto.jpg in de export', async () => files.includes('foto.jpg') && !files.includes('foto.png'))
 await check('transparante PNG blijft PNG', async () => files.includes('vorm.png'))

@@ -3082,3 +3082,23 @@ body.popout-window {
   border-color: var(--line);
   color: var(--text);
 }
+
+/* Exportvenster: waar komt de export */
+.export-dest {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.export-dest .export-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}

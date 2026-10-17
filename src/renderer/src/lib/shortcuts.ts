@@ -16,7 +16,7 @@ export const SHORTCUT_GROUPS: { title: string; items: [string, string][] }[] = [
       ['Spatie', 'Afspelen / pauze'],
       ['Home / End', 'Naar begin / eindframe'],
       ['PageUp / PageDown', `1 frame terug / vooruit (met ${K.shift.replace('+', '')}: 10)`],
-      ['J / K', 'Naar vorig / volgend keyframe (van de selectie)'],
+      ['< / >  of  J / K', 'Naar vorig / volgend keyframe (van de selectie)'],
       [`I / ${K.shift}I`, 'Naar in- / uitpunt van de geselecteerde laag'],
       ['[ / ]', 'Laag (met keyframes) verschuiven: begint / eindigt op de playhead'],
       [`${K.alt}[ / ${K.alt}]`, 'In- / uitpunt op de playhead (inkorten)'],
