@@ -31,11 +31,15 @@ interface StoredSettings {
 
 const settingsPath = () => join(app.getPath('userData'), 'settings.json')
 export const DEFAULT_MODEL = 'claude-opus-5-5'
-export const DEFAULT_FAL_MODEL = 'anthropic/claude-3.7-sonnet'
+export const DEFAULT_FAL_MODEL = 'anthropic/claude-sonnet-4.5'
+/** Oude standaardmodellen die fal niet meer aanbiedt: behandelen als "niet ingesteld". */
+const RETIRED_FAL_MODELS = ['anthropic/claude-3.7-sonnet']
 
 export async function readSettings(): Promise<StoredSettings> {
   try {
-    return { model: DEFAULT_MODEL, recent: [], ...JSON.parse(await readFile(settingsPath(), 'utf8')) }
+    const s: StoredSettings = { model: DEFAULT_MODEL, recent: [], ...JSON.parse(await readFile(settingsPath(), 'utf8')) }
+    if (s.falModel && RETIRED_FAL_MODELS.includes(s.falModel)) delete s.falModel
+    return s
   } catch {
     return { model: DEFAULT_MODEL, recent: [] }
   }

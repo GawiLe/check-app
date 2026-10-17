@@ -472,7 +472,7 @@ Een code-element gedraagt zich als een gewone laag: verplaatsen, schalen (de inh
 
 **Instellingen → AI via:**
 - **Anthropic (Claude):** vul je Anthropic API-sleutel in (console.anthropic.com). Standaardmodel: `claude-opus-5-5`.
-- **fal.ai:** gebruikt je fal-tegoed (ook tegoed via Vercel). Maak een sleutel in het fal-dashboard (Vercel → Integrations → fal → *Open in fal* → Keys) en vul die in. Het fal-model is in te stellen (standaard `anthropic/claude-3.7-sonnet` via fal's `any-llm`).
+- **fal.ai:** gebruikt je fal-tegoed (ook tegoed via Vercel). Maak een sleutel in het fal-dashboard (Vercel → Integrations → fal → *Open in fal* → Keys) en vul die in. Het fal-model is in te stellen (standaard `anthropic/claude-sonnet-4.5` via fal's `any-llm`; bestaat een model niet meer, dan probeert de app zelf een ander en onthoudt dat).
 
 Sleutels worden versleuteld opgeslagen via de sleutelhanger van het OS.
 

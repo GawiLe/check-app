@@ -3,6 +3,7 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { z } from 'zod'
 import type { AiAnimationResult, AiCodeRequest, AiCodeResult } from '@shared/api'
 import { ANIM_PROPS, EASES } from '@shared/types'
+import { readSettings, writeSettings } from './storage'
 import type { AnimProp, Project, Tracks } from '@shared/types'
 
 // Claude maakt keyframes binnen het vaste animatiemodel van de app. Het schrijft
@@ -165,8 +166,36 @@ async function askJson<T>(provider: AiProvider, apiKey: string, model: string, s
   return response.parsed_output as T
 }
 
-/** Via fal.ai (tegoed op fal, bijv. via Vercel): het LLM-endpoint fal-ai/any-llm, antwoord als JSON in tekst. */
+/** Modellen om te proberen als het gekozen fal-model niet (meer) bestaat. */
+const FAL_FALLBACKS = ['anthropic/claude-sonnet-4.5', 'anthropic/claude-sonnet-4', 'anthropic/claude-3.5-sonnet', 'google/gemini-2.5-flash', 'openai/gpt-4o']
+
+class FalModelMissing extends Error {}
+
+/**
+ * Via fal.ai (tegoed op fal, bijv. via Vercel): het LLM-endpoint fal-ai/any-llm, antwoord als JSON in tekst.
+ * Bestaat het gekozen model niet (meer), dan proberen we de volgende uit FAL_FALLBACKS en onthouden het
+ * model dat werkt.
+ */
 async function viaFal<T>(apiKey: string, model: string, system: string, user: string, schema: z.ZodType<T>): Promise<T> {
+  const tried: string[] = []
+  for (const m of [model, ...FAL_FALLBACKS.filter((x) => x !== model)]) {
+    tried.push(m)
+    try {
+      const out = await falOnce(apiKey, m, system, user, schema)
+      if (m !== model) {
+        const s = await readSettings()
+        s.falModel = m
+        await writeSettings(s)
+      }
+      return out
+    } catch (e) {
+      if (!(e instanceof FalModelMissing)) throw e
+    }
+  }
+  throw new Error(`fal.ai kent geen van deze modellen: ${tried.join(', ')}. Vul in Instellingen een ander fal-model in (zie fal.ai/models/fal-ai/any-llm).`)
+}
+
+async function falOnce<T>(apiKey: string, model: string, system: string, user: string, schema: z.ZodType<T>): Promise<T> {
   const res = await fetch('https://fal.run/fal-ai/any-llm', {
     method: 'POST',
     headers: { Authorization: `Key ${apiKey}`, 'Content-Type': 'application/json' },
@@ -176,16 +205,18 @@ async function viaFal<T>(apiKey: string, model: string, system: string, user: st
       prompt: user
     })
   })
-  const body = (await res.json().catch(() => null)) as { output?: string; error?: string; detail?: unknown } | null
-  if (!res.ok) {
-    const detail = body?.detail ? (typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail)) : res.statusText
-    throw new Error(res.status === 401 || res.status === 403 ? 'fal.ai weigert de sleutel. Controleer de fal-sleutel in Instellingen.' : `fal.ai: ${detail}`)
+  const body = (await res.json().catch(() => null)) as { output?: string; error?: unknown; detail?: unknown } | null
+  const text = (v: unknown) => (v == null ? '' : typeof v === 'string' ? v : JSON.stringify(v))
+  const problem = !res.ok ? text(body?.detail) || text(body?.error) || res.statusText : text(body?.error)
+  if (problem) {
+    if (res.status === 401 || res.status === 403) throw new Error('fal.ai weigert de sleutel. Controleer de fal-sleutel in Instellingen.')
+    if (/no endpoints found|not a valid model|model.*(not found|does not exist|not supported)|unknown model|input should be/i.test(problem)) throw new FalModelMissing(problem)
+    throw new Error(`fal.ai: ${problem.slice(0, 300)}`)
   }
-  if (body?.error) throw new Error(`fal.ai: ${body.error}`)
-  const text = body?.output ?? ''
+  const out = body?.output ?? ''
   let data: unknown = null
   try {
-    data = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1))
+    data = JSON.parse(out.slice(out.indexOf('{'), out.lastIndexOf('}') + 1))
   } catch {
     /* hieronder afgehandeld */
   }
