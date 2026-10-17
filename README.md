@@ -460,9 +460,21 @@ src/renderer/src/dock/  werkruimte: indeling als boom van splitsingen en tabgroe
 - **Wat je ziet is wat je exporteert.** De preview in de editor is dezelfde HTML als de export, met dezelfde runtime, in een iframe. Een test controleert dat runtime en editor op elk tijdstip identieke waarden geven.
 - De runtime (`src/shared/runtime.ts`) gebruikt geen libraries. Hij speelt af na `load` en `document.fonts.ready` (geen FOUT) en stopt op het eindframe.
 
-## AI-instelling
+## AI: animatiecode laten schrijven
 
-Vul onder **Instellingen** een Anthropic API-sleutel in. Die wordt versleuteld opgeslagen via de sleutelhanger van het OS. Standaardmodel: `claude-opus-5-5`.
+De AI is bedoeld voor animaties die je zelf lastig kunt maken. Paneel **AI**:
+
+- **Nieuw element:** beschrijf een bewegend element, bijv. *"een laadsymbool met drie stippen die op en neer stuiteren"* of *"een glans die schuin over de knop schuift"*. De AI schrijft kleine HTML/SVG + CSS-animatie; die komt als **code-element** (laag) in het midden van het formaat.
+- **Element aanpassen:** selecteer een code-element en vraag om een wijziging (*"twee keer zo snel"*, *"in de kleuren van de banner"*). Positie en schaal blijven behouden.
+- **Lagen animeren:** de AI zet keyframes op je bestaande lagen (zoals voorheen).
+
+Een code-element gedraagt zich als een gewone laag: verplaatsen, schalen (de inhoud schaalt mee), in-/uitpunt, keyframes, maskers. De CSS-animatie loopt **synchroon met de tijdlijn** vanaf het in-punt: scrubben laat precies dat moment zien, en de backup-afbeelding toont het eindbeeld. De code kun je zelf bekijken en aanpassen in het paneel **Ontwerp**. Bij het bouwen wordt hij altijd opgeschoond (geen scripts, geen externe bestanden) en per laag afgeschermd, zodat hij niets anders in de banner raakt.
+
+**Instellingen → AI via:**
+- **Anthropic (Claude):** vul je Anthropic API-sleutel in (console.anthropic.com). Standaardmodel: `claude-opus-5-5`.
+- **fal.ai:** gebruikt je fal-tegoed (ook tegoed via Vercel). Maak een sleutel in het fal-dashboard (Vercel → Integrations → fal → *Open in fal* → Keys) en vul die in. Het fal-model is in te stellen (standaard `anthropic/claude-3.7-sonnet` via fal's `any-llm`).
+
+Sleutels worden versleuteld opgeslagen via de sleutelhanger van het OS.
 
 ## Roadmap-ideeën
 

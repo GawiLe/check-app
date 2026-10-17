@@ -1379,3 +1379,52 @@ describe('Photoshop-waarden', () => {
     expect(dl.text!.leading! / dl.text!.size).toBeCloseTo(42 / 48, 2)
   })
 })
+
+describe('code-elementen', () => {
+  const withCode = (html: string, css: string) => {
+    const p = createStarterProject('Code')
+    const l = createLayer('code', p.compositions[0])
+    l.code = { html, css, w: 80, h: 40 }
+    Object.assign(l, { width: 160, height: 80, start: 1 })
+    p.compositions[0].layers.unshift(l)
+    return build(p).html
+  }
+
+  it('schermt de CSS per laag af en maakt keyframe-namen uniek', () => {
+    const html = withCode('<div class="dot"></div>', '.root .dot{animation:kf-bounce 1s infinite}@keyframes kf-bounce{50%{transform:translateY(-10px)}} .dot{color:red} body{background:red}')
+    const style = html.slice(html.indexOf('<style>'), html.indexOf('</style>'))
+    expect(style).toMatch(/#a\d+>\.K \.dot\{animation:a\d+-bounce 1s infinite\}/)
+    expect(style).toMatch(/@keyframes a\d+-bounce\{/)
+    expect(style).not.toMatch(/\}body\{/)
+    expect(style).toMatch(/#a\d+>\.K body\{/)
+    expect(style).toMatch(/transform:scale\(2,2\)/)
+  })
+
+  it('haalt scripts, event-handlers en externe bestanden weg', () => {
+    const html = withCode(
+      '<svg onload="alert(1)"><circle r="4"/></svg><script>alert(2)</script><img src="https://evil.example/x.png"><a href="javascript:x">x</a>',
+      '@import url(https://evil.example/a.css);.root{background:url(https://evil.example/b.png)}</style><script>alert(3)</script>'
+    )
+    expect(html).not.toContain('alert(1)')
+    expect(html).not.toContain('alert(2)')
+    expect(html).not.toContain('alert(3)')
+    expect(html).not.toContain('evil.example')
+    expect(html.slice(html.indexOf('<div class="K">'))).not.toMatch(/javascript:x/)
+    expect(html).toContain('<circle r="4"/>')
+  })
+
+  it('geeft het in-punt door aan de runtime en zet de CSS-animatie op de tijdlijntijd', async () => {
+    const html = withCode('<div class="dot"></div>', '.root .dot{animation:kf-spin 2s linear infinite}@keyframes kf-spin{to{transform:rotate(360deg)}}')
+    expect(html).toMatch(/"C":\[\["a\d+",1\]\]/)
+    const dom = new JSDOM(html, { runScripts: 'dangerously', pretendToBeVisual: true })
+    const anims: { currentTime: number; paused: boolean }[] = [{ currentTime: 0, paused: false }]
+    const el = dom.window.document.querySelector('.K')!.parentElement as unknown as { getAnimations: () => unknown[] }
+    el.getAnimations = () => anims.map((a) => ({ pause: () => void (a.paused = true), set currentTime(v: number) { a.currentTime = v } }))
+    ;(dom.window as unknown as { BS: { seek: (t: number) => void } }).BS?.seek(2.5)
+    // BS bestaat pas na laden; in jsdom zonder afbeeldingen meteen
+    await new Promise((r) => setTimeout(r, 50))
+    ;(dom.window as unknown as { BS: { seek: (t: number) => void } }).BS.seek(2.5)
+    expect(anims[0].paused).toBe(true)
+    expect(anims[0].currentTime).toBe(1500)
+  })
+})

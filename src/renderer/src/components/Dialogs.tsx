@@ -282,14 +282,38 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [key, setKey] = useState('')
   const [model, setModel] = useState('')
+  const [provider, setProvider] = useState<'anthropic' | 'fal'>('anthropic')
+  const [falKey, setFalKey] = useState('')
+  const [falModel, setFalModel] = useState('')
   useEffect(() => {
     window.bs.getSettings().then((s) => {
       setSettings(s)
       setModel(s.model)
+      setProvider(s.aiProvider)
+      setFalModel(s.falModel)
     })
   }, [])
   return (
     <Modal title="Instellingen" onClose={onClose}>
+      <Row label="AI via">
+        <select value={provider} onChange={(e) => setProvider(e.target.value as 'anthropic' | 'fal')}>
+          <option value="anthropic">Anthropic (Claude)</option>
+          <option value="fal">fal.ai (tegoed, bijv. via Vercel)</option>
+        </select>
+      </Row>
+      {provider === 'fal' && (
+        <>
+          <Row label="fal.ai-sleutel">
+            <input type="password" placeholder={settings?.hasFalKey ? '•••••• (ingesteld)' : 'fal-sleutel (Keys in het fal-dashboard)'} value={falKey} onChange={(e) => setFalKey(e.target.value)} />
+          </Row>
+          <Row label="fal-model">
+            <input value={falModel} onChange={(e) => setFalModel(e.target.value)} />
+          </Row>
+          <div className="hint-text">
+            Gebruikt het fal-endpoint any-llm. Je fal-sleutel maak je in het fal-dashboard (bij Vercel: Integrations → fal → Open in fal → Keys). Elke vraag kost een klein beetje tegoed.
+          </div>
+        </>
+      )}
       <Row label="Anthropic API-sleutel">
         <input
           type="password"
@@ -298,7 +322,7 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
           onChange={(e) => setKey(e.target.value)}
         />
       </Row>
-      <div className="hint-text">Nodig voor AI-animatie. Wordt versleuteld opgeslagen op deze computer (OS-sleutelhanger).</div>
+      <div className="hint-text">Nodig als je AI via Anthropic gebruikt. Sleutels worden versleuteld opgeslagen op deze computer (OS-sleutelhanger).</div>
       <Row label="Model">
         <input value={model} onChange={(e) => setModel(e.target.value)} />
       </Row>
@@ -310,15 +334,15 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
         </select>
       </Row>
       <div className="actions">
-        {settings?.hasApiKey && (
+        {(provider === 'fal' ? settings?.hasFalKey : settings?.hasApiKey) && (
           <button
             className="danger"
             onClick={async () => {
-              await window.bs.setApiKey('')
+              await window.bs.setApiKey('', provider)
               onClose()
             }}
           >
-            Sleutel verwijderen
+            {provider === 'fal' ? 'fal-sleutel verwijderen' : 'Sleutel verwijderen'}
           </button>
         )}
         <button onClick={onClose}>Annuleren</button>
@@ -326,7 +350,9 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
           className="primary"
           onClick={async () => {
             if (key) await window.bs.setApiKey(key.trim())
+            if (falKey) await window.bs.setApiKey(falKey.trim(), 'fal')
             await window.bs.setModel(model.trim())
+            await window.bs.setAiProvider(provider, falModel.trim())
             useStore.getState().setStatus('Instellingen opgeslagen')
             onClose()
           }}

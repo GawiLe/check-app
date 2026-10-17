@@ -15,6 +15,12 @@ import { PROJECT_FILE, PROJECT_VERSION } from '@shared/types'
 interface StoredSettings {
   apiKeyEnc?: string
   apiKeyPlain?: string
+  /** Sleutel voor fal.ai (bijv. tegoed via Vercel). */
+  falKeyEnc?: string
+  falKeyPlain?: string
+  /** Welke dienst de AI levert: Anthropic (Claude) of fal.ai. */
+  aiProvider?: 'anthropic' | 'fal'
+  falModel?: string
   model: string
   recent: string[]
   /** Map waarin nieuwe projecten komen (laatst gekozen). */
@@ -25,6 +31,7 @@ interface StoredSettings {
 
 const settingsPath = () => join(app.getPath('userData'), 'settings.json')
 export const DEFAULT_MODEL = 'claude-opus-5-5'
+export const DEFAULT_FAL_MODEL = 'anthropic/claude-3.7-sonnet'
 
 export async function readSettings(): Promise<StoredSettings> {
   try {
@@ -39,21 +46,25 @@ export async function writeSettings(s: StoredSettings): Promise<void> {
   await writeFile(settingsPath(), JSON.stringify(s, null, 2))
 }
 
-export async function storeApiKey(key: string): Promise<void> {
+const SLOTS = { anthropic: ['apiKeyEnc', 'apiKeyPlain', 'ANTHROPIC_API_KEY'], fal: ['falKeyEnc', 'falKeyPlain', 'FAL_KEY'] } as const
+
+export async function storeApiKey(key: string, which: 'anthropic' | 'fal' = 'anthropic'): Promise<void> {
   const s = await readSettings()
-  delete s.apiKeyEnc
-  delete s.apiKeyPlain
+  const [enc, plain] = SLOTS[which]
+  delete s[enc]
+  delete s[plain]
   if (key) {
-    if (safeStorage.isEncryptionAvailable()) s.apiKeyEnc = safeStorage.encryptString(key).toString('base64')
-    else s.apiKeyPlain = key
+    if (safeStorage.isEncryptionAvailable()) s[enc] = safeStorage.encryptString(key).toString('base64')
+    else s[plain] = key
   }
   await writeSettings(s)
 }
 
-export async function loadApiKey(): Promise<string | null> {
+export async function loadApiKey(which: 'anthropic' | 'fal' = 'anthropic'): Promise<string | null> {
   const s = await readSettings()
-  if (s.apiKeyEnc) return safeStorage.decryptString(Buffer.from(s.apiKeyEnc, 'base64'))
-  return s.apiKeyPlain ?? process.env.ANTHROPIC_API_KEY ?? null
+  const [enc, plain, env] = SLOTS[which]
+  if (s[enc]) return safeStorage.decryptString(Buffer.from(s[enc]!, 'base64'))
+  return s[plain] ?? process.env[env] ?? null
 }
 
 export async function addRecent(dir: string): Promise<void> {

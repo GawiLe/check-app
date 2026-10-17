@@ -45,6 +45,8 @@ const api: BannerStudioApi = {
   setApiKey: call('setApiKey'),
   setModel: call('setModel'),
   aiAnimate: call('aiAnimate'),
+  aiCode: call('aiCode'),
+  setAiProvider: call('setAiProvider'),
   fontCatalog: call('fontCatalog'),
   installWebFont: call('installWebFont'),
   listPresets: call('listPresets'),

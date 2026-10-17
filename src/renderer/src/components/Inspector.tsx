@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { AlignCenter, AlignLeft, AlignRight, BookmarkPlus, Folder, Plus, Image as ImageIcon, Link2, Link2Off, ListOrdered, PenLine, RotateCcw, Sparkles, Square, Timer, Trash2, Type, Wand2, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { AlignCenter, AlignLeft, AlignRight, BookmarkPlus, Folder, Plus, Image as ImageIcon, Link2, Link2Off, ListOrdered, PenLine, RotateCcw, Sparkles, Square, Timer, Trash2, Type, Wand2, X, Code2 } from 'lucide-react'
 import { layerStateAt } from '@shared/anim'
 import { endFrameTime } from '@shared/motion'
 import { LIBRARY } from '@shared/library'
@@ -13,6 +13,7 @@ import type { AnimProp, BlendMode, EaseName, Layer, RevealMode, Shadow, ShapePro
 import { BLEND_MODES } from '@shared/types'
 import {
   aiAnimate,
+  aiCodeElement,
   applyPreset,
   deleteComposition,
   regenerateWriteOn,
@@ -44,7 +45,7 @@ export const EASE_LABEL: Record<EaseName, string> = {
   hold: 'Hold'
 }
 
-const TYPE_ICON = { text: Type, image: ImageIcon, shape: Square, writeon: PenLine, group: Folder }
+const TYPE_ICON = { text: Type, image: ImageIcon, shape: Square, writeon: PenLine, group: Folder, code: Code2 }
 
 function useSelectedLayer() {
   const comp = useStore(currentComp)!
@@ -343,7 +344,7 @@ function LayerDesign({ layer }: { layer: Layer }) {
     <>
       {derived && <Overrides keys={layer.overrides} onReset={(keys) => resetLayerOverrides(layer.id, keys)} />}
       {own && <div className="notice">Eigen laag: bestaat alleen in dit formaat.</div>}
-      <Section id="soort" title={<Icon size={14} />} actions={<span className="faint">{{ text: 'Tekst', image: 'Afbeelding', shape: 'Vorm', writeon: 'Write-on', group: 'Compositie' }[layer.type]}</span>}>
+      <Section id="soort" title={<Icon size={14} />} actions={<span className="faint">{{ text: 'Tekst', image: 'Afbeelding', shape: 'Vorm', writeon: 'Write-on', group: 'Compositie', code: 'Code-element' }[layer.type]}</span>}>
         <TextInput value={layer.name} onCommit={(v) => up((l) => void (l.name = v))} />
       </Section>
 
@@ -458,6 +459,24 @@ function LayerDesign({ layer }: { layer: Layer }) {
               <span className="faint grow">Nog geen paden.</span>
               <button className="ghost sm" onClick={() => regenerateWriteOn(layer.id)}>
                 Genereer
+              </button>
+            </div>
+          )}
+        </Section>
+      )}
+
+      {layer.code && (
+        <Section title="Code-element">
+          <div className="hint-text">
+            HTML/SVG met CSS-animatie ({layer.code.w}×{layer.code.h}px ontwerpmaat, schaalt mee met de laag). De animatie loopt mee met de tijdlijn vanaf het in-punt. Aanpassen kan hieronder of via het paneel AI.
+          </div>
+          <CodeField label="HTML / SVG" value={layer.code.html} onCommit={(v) => up((l) => void (l.code!.html = v))} />
+          <CodeField label="CSS (.root = het element, @keyframes kf-…)" value={layer.code.css} onCommit={(v) => up((l) => void (l.code!.css = v))} />
+          {(layer.width !== layer.code.w || layer.height !== layer.code.h) && (
+            <div className="row">
+              <span className="faint grow">Geschaald naar {layer.width}×{layer.height}</span>
+              <button className="ghost sm" onClick={() => up((l) => Object.assign(l, { width: l.code!.w, height: l.code!.h }))}>
+                Ware grootte
               </button>
             </div>
           )}
@@ -1100,36 +1119,73 @@ function SavePreset({ layer }: { layer: Layer }) {
   )
 }
 
+function CodeField(props: { label: string; value: string; onCommit: (v: string) => void }) {
+  const [v, setV] = useState(props.value)
+  useEffect(() => setV(props.value), [props.value])
+  return (
+    <label className="code-field">
+      <span className="faint">{props.label}</span>
+      <textarea className="code-area" rows={6} spellCheck={false} value={v} onChange={(e) => setV(e.target.value)} onBlur={() => v !== props.value && props.onCommit(v)} />
+    </label>
+  )
+}
+
 function AiPanel() {
   const selection = useStore((s) => s.selection)
+  const selectedCode = useStore((s) => {
+    const c = currentComp(s)
+    return s.selection.length === 1 && !!c && findDeep(c.layers, s.selection[0])?.layer.type === 'code'
+  })
+  const [mode, setMode] = useState<'element' | 'animate'>('element')
   const [prompt, setPrompt] = useState('')
   const [busy, setBusy] = useState(false)
   const [explain, setExplain] = useState<string | null>(null)
   const run = async () => {
     setBusy(true)
     setExplain(null)
-    setExplain(await aiAnimate(prompt))
+    setExplain(await (mode === 'element' ? aiCodeElement(prompt) : aiAnimate(prompt)))
     setBusy(false)
   }
-  const examples = [
-    'Laat de headline letter voor letter inschrijven',
-    'Rustige premium intro, alles binnen 3 seconden in beeld',
-    'CTA na 4 seconden twee keer laten pulseren',
-    'Packshot met een kleine zoom-in en lichte rotatie'
-  ]
+  const examples =
+    mode === 'element'
+      ? selectedCode
+        ? ['Maak hem twee keer zo snel', 'Gebruik de kleuren van de banner', 'Laat hem na 3 seconden stoppen']
+        : [
+            'Een laadsymbool met drie stippen die op en neer stuiteren',
+            'Een cirkelvormige loader die draait',
+            'Een glans die schuin over de knop schuift',
+            'Een pijltje naar rechts dat zachtjes heen en weer beweegt',
+            'Confetti die naar beneden dwarrelt'
+          ]
+      : [
+          'Laat de headline letter voor letter inschrijven',
+          'Rustige premium intro, alles binnen 3 seconden in beeld',
+          'CTA na 4 seconden twee keer laten pulseren',
+          'Packshot met een kleine zoom-in en lichte rotatie'
+        ]
   return (
-    <Section title={<><Sparkles size={13} /> Animeren met AI</>}>
+    <Section title={<><Sparkles size={13} /> AI</>}>
+      <div className="seg ai-mode" style={{ marginBottom: 8 }}>
+        <button className={mode === 'element' ? 'on' : ''} onClick={() => setMode('element')} title="De AI schrijft animatiecode (HTML/SVG + CSS) als nieuw element">
+          {selectedCode ? 'Element aanpassen' : 'Nieuw element'}
+        </button>
+        <button className={mode === 'animate' ? 'on' : ''} onClick={() => setMode('animate')} title="De AI zet keyframes op je bestaande lagen">
+          Lagen animeren
+        </button>
+      </div>
       <textarea
         rows={4}
-        placeholder="Beschrijf de animatie…"
+        placeholder={mode === 'element' ? (selectedCode ? 'Wat moet er anders aan dit element?' : 'Beschrijf het bewegende element, bijv. een laadsymbool…') : 'Beschrijf de animatie…'}
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
         onKeyDown={(e) => (e.metaKey || e.ctrlKey) && e.key === 'Enter' && prompt.trim() && !busy && run()}
       />
       <div className="row" style={{ marginTop: 8 }}>
-        <span className="faint grow">{selection.length ? `${selection.length} laag/lagen geselecteerd` : 'Hele formaat'}</span>
+        <span className="faint grow">
+          {mode === 'element' ? (selectedCode ? 'Past het geselecteerde code-element aan' : 'Komt als nieuwe laag in het midden') : selection.length ? `${selection.length} laag/lagen geselecteerd` : 'Hele formaat'}
+        </span>
         <button className="primary" disabled={busy || !prompt.trim()} onClick={run}>
-          {busy ? 'Bezig…' : 'Genereer'}
+          {busy ? 'Bezig…' : mode === 'element' ? (selectedCode ? 'Aanpassen' : 'Maak element') : 'Genereer'}
         </button>
       </div>
       {explain && <div className="hint-text">{explain}</div>}

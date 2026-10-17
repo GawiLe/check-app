@@ -23,6 +23,9 @@ export interface Boilerplate {
 
 export interface Settings {
   hasApiKey: boolean
+  hasFalKey: boolean
+  aiProvider: 'anthropic' | 'fal'
+  falModel: string
   model: string
   recent: string[]
 }
@@ -31,6 +34,23 @@ export interface AiLayerResult {
   layerId: string
   revealMode: RevealMode | null
   tracks: Tracks
+}
+
+/** Een door de AI geschreven code-element (HTML/SVG + CSS-animatie). */
+export interface AiCodeResult {
+  name: string
+  width: number
+  height: number
+  html: string
+  css: string
+  explanation: string
+}
+
+export interface AiCodeRequest {
+  prompt: string
+  banner: { width: number; height: number; background: string; colors: string[] }
+  /** Bestaande code om aan te passen (leeg = nieuw element). */
+  existing?: { html: string; css: string; w: number; h: number } | null
 }
 
 export interface AiAnimationResult {
@@ -114,8 +134,10 @@ export interface BannerStudioApi {
   saveBoilerplate(dir: string, project: Project, name: string): Promise<Boilerplate>
   deleteBoilerplate(id: string): Promise<void>
   getSettings(): Promise<Settings>
-  setApiKey(key: string): Promise<void>
+  setApiKey(key: string, which?: 'anthropic' | 'fal'): Promise<void>
   setModel(model: string): Promise<void>
+  setAiProvider(provider: 'anthropic' | 'fal', falModel: string): Promise<void>
+  aiCode(req: AiCodeRequest): Promise<AiCodeResult>
   aiAnimate(project: Project, compositionId: string, layerIds: string[], prompt: string): Promise<AiAnimationResult>
   fontCatalog(): Promise<{ fonts: WebFont[]; online: boolean }>
   installWebFont(dir: string, font: WebFont, weight: number, style: 'normal' | 'italic'): Promise<FontAsset>

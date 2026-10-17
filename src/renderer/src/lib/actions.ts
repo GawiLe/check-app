@@ -538,6 +538,58 @@ export async function aiAnimate(prompt: string): Promise<string | null> {
   }
 }
 
+/**
+ * AI-code-element: nieuw element (bijv. "een laadsymbool dat draait") of, als er een code-element
+ * geselecteerd is, dat element aanpassen. Geeft de uitleg van de AI terug.
+ */
+export async function aiCodeElement(prompt: string): Promise<string | null> {
+  const { project, compId, selection } = S()
+  const comp = currentComp(S())
+  if (!project || !comp) return null
+  const selected = selection.length === 1 ? findLayer(project, compId, selection[0]) : undefined
+  const existing = selected?.type === 'code' ? selected : undefined
+  const colors = [
+    ...new Set(
+      allLayers(comp.layers).flatMap((l) => [l.text?.color, l.shape?.fillEnabled === false ? undefined : l.shape?.fill, l.writeon?.color].filter((c): c is string => !!c))
+    )
+  ].slice(0, 8)
+  try {
+    const res = await window.bs.aiCode({
+      prompt,
+      banner: { width: comp.width, height: comp.height, background: comp.background, colors },
+      existing: existing?.code ? { html: existing.code.html, css: existing.code.css, w: existing.code.w, h: existing.code.h } : null
+    })
+    const code = { html: res.html, css: res.css, w: res.width, h: res.height, prompt }
+    if (existing) {
+      updateLayer(existing.id, (l) => {
+        // Zelfde schaal als hiervoor houden, ook als de ontwerpmaat verandert
+        const sx = l.width / (l.code?.w || l.width)
+        const sy = l.height / (l.code?.h || l.height)
+        l.code = code
+        l.width = Math.round(res.width * sx)
+        l.height = Math.round(res.height * sy)
+      })
+      S().setStatus('Code-element aangepast (Ctrl/Cmd+Z om ongedaan te maken)')
+    } else {
+      const { activeTab } = S()
+      const box = contextOf(project, compId, activeTab).group ?? comp
+      addLayer('code', (l) => {
+        l.name = res.name || 'Code-element'
+        l.code = code
+        l.width = res.width
+        l.height = res.height
+        l.x = Math.round((box.width - res.width) / 2)
+        l.y = Math.round((box.height - res.height) / 2)
+      })
+      S().setStatus('Code-element toegevoegd (Ctrl/Cmd+Z om ongedaan te maken)')
+    }
+    return res.explanation
+  } catch (e) {
+    fail(e)
+    return null
+  }
+}
+
 /** Genereert de paden voor een write-on laag uit het gekozen font. */
 export async function regenerateWriteOn(layerId: string) {
   const { dir, project, compId } = S()

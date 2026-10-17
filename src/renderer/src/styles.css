@@ -3102,3 +3102,24 @@ body.popout-window {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+
+/* Code-element */
+.code-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+.code-area {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre;
+  tab-size: 2;
+}
+.ai-mode {
+  display: flex;
+}
+.ai-mode button {
+  flex: 1;
+}

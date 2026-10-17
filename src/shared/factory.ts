@@ -14,7 +14,7 @@ export function createLayer(type: LayerType, comp: { width: number; height: numb
   const base: Layer = {
     id,
     linkId: id,
-    name: { text: 'Tekst', image: 'Afbeelding', shape: 'Vorm', writeon: 'Write-on', group: 'Groep' }[type],
+    name: { text: 'Tekst', image: 'Afbeelding', shape: 'Vorm', writeon: 'Write-on', group: 'Groep', code: 'Code-element' }[type],
     type,
     visible: true,
     locked: false,
@@ -63,6 +63,11 @@ export function createLayer(type: LayerType, comp: { width: number; height: numb
         fillAfter: 0.4
       }
       base.height = 80
+      break
+    case 'code':
+      base.code = { html: '', css: '', w: 100, h: 100 }
+      base.width = 100
+      base.height = 100
       break
   }
   return base

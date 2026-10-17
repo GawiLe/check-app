@@ -5,7 +5,7 @@ import { dirname, extname, join, resolve } from 'node:path'
 import { inside } from './paths'
 import type { BannerStudioApi, Settings } from '@shared/api'
 import type { Project } from '@shared/types'
-import { aiAnimate } from './ai'
+import { aiAnimate, aiCode } from './ai'
 import { estimateSize, exportBanners, MIME, projectFolder } from './exporter'
 import { addVersion, clearAutosave, listVersions, readNewerAutosave, readVersion, writeAutosave } from './history'
 import { normalizeProject } from '@shared/sync'
@@ -17,6 +17,7 @@ import {
   boilerplateSource,
   copyIntoProject,
   deleteBoilerplate,
+  DEFAULT_FAL_MODEL,
   DEFAULT_MODEL,
   initProjectDir,
   listAssets,
@@ -272,9 +273,22 @@ const handlers: Handlers = {
 
   async getSettings(): Promise<Settings> {
     const s = await readSettings()
-    return { hasApiKey: !!(await loadApiKey()), model: s.model || DEFAULT_MODEL, recent: s.recent }
+    return {
+      hasApiKey: !!(await loadApiKey()),
+      hasFalKey: !!(await loadApiKey('fal')),
+      aiProvider: s.aiProvider ?? 'anthropic',
+      falModel: s.falModel || DEFAULT_FAL_MODEL,
+      model: s.model || DEFAULT_MODEL,
+      recent: s.recent
+    }
   },
-  setApiKey: (key) => storeApiKey(key),
+  setApiKey: (key, which) => storeApiKey(key, which === 'fal' ? 'fal' : 'anthropic'),
+  async setAiProvider(provider, falModel) {
+    const s = await readSettings()
+    s.aiProvider = provider === 'fal' ? 'fal' : 'anthropic'
+    s.falModel = String(falModel ?? '').trim() || DEFAULT_FAL_MODEL
+    await writeSettings(s)
+  },
 
   async getExportDir(dir) {
     const out = (await readSettings()).exportDirs?.[resolve(dir)]
@@ -319,10 +333,18 @@ const handlers: Handlers = {
   savePresets: (list) => writePresets(list),
 
   async aiAnimate(project: Project, compositionId, layerIds, prompt) {
-    const key = await loadApiKey()
-    if (!key) throw new Error('Geen Anthropic API-sleutel ingesteld. Ga naar Instellingen.')
     const s = await readSettings()
-    return aiAnimate(key, s.model || DEFAULT_MODEL, project, compositionId, layerIds, prompt)
+    const provider = s.aiProvider ?? 'anthropic'
+    const key = await loadApiKey(provider)
+    if (!key) throw new Error(provider === 'fal' ? 'Geen fal.ai-sleutel ingesteld. Ga naar Instellingen.' : 'Geen Anthropic API-sleutel ingesteld. Ga naar Instellingen.')
+    return aiAnimate(provider, key, provider === 'fal' ? s.falModel || DEFAULT_FAL_MODEL : s.model || DEFAULT_MODEL, project, compositionId, layerIds, prompt)
+  },
+  async aiCode(req) {
+    const s = await readSettings()
+    const provider = s.aiProvider ?? 'anthropic'
+    const key = process.env.BS_AI_MOCK ? 'mock' : await loadApiKey(provider)
+    if (!key) throw new Error(provider === 'fal' ? 'Geen fal.ai-sleutel ingesteld. Ga naar Instellingen.' : 'Geen Anthropic API-sleutel ingesteld. Ga naar Instellingen.')
+    return aiCode(provider, key, provider === 'fal' ? s.falModel || DEFAULT_FAL_MODEL : s.model || DEFAULT_MODEL, req)
   }
 }
 

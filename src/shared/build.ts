@@ -3,6 +3,7 @@ import { effectiveLayer, endFrameTime } from './motion'
 import { minifiedRuntime, WIPE_INDEX } from './runtime'
 import { allLayers, walk } from './tree'
 import { anchorOf } from './geometry'
+import { cleanCodeHtml, scopeCodeCss } from './code'
 import { BLEND_MODES, type AnimProp, type Composition, type ExportTarget, type FontAsset, type Gradient, type Layer, type LayerMask, type Project, type Shadow } from './types'
 
 // Bouwt de banner-HTML uit een compositie. Wordt zowel door de editor (preview)
@@ -35,6 +36,7 @@ export const escapeHtml = (s: string): string =>
 /** Houd CSS-waarden veilig: geen tekens waarmee je uit een declaratie kunt breken. */
 export const cssValue = (s: string): string => s.replace(/[<>{};"\\]/g, '')
 
+const n4 = (v: number): string => String(Number.isFinite(v) ? Math.round(v * 10000) / 10000 : 1)
 const n = (v: number): string => {
   const r = round(Number(v), 2)
   return String(Number.isFinite(r) ? r : 0)
@@ -190,6 +192,20 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
           inner = `<svg viewBox="${vb}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" fill="${cssValue(w.color)}" stroke="${cssValue(w.color)}" stroke-width="${n(w.strokeWidth)}" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="1 1" style="overflow:visible">${paths}</svg>`
           break
         }
+        case 'code': {
+          // Code-element: eigen HTML/SVG + CSS-animatie, afgeschermd per laag en meeschalend met de laag.
+          // De runtime zet de CSS-animaties op de tijd van de tijdlijn (vanaf het in-punt).
+          const c = l.code!
+          const cw = Math.max(1, Number(c.w) || l.width)
+          const ch = Math.max(1, Number(c.h) || l.height)
+          css.push(
+            `#${id}>.K{position:absolute;left:0;top:0;width:${n(cw)}px;height:${n(ch)}px;transform:scale(${n4(l.width / cw)},${n4(l.height / ch)});transform-origin:0 0}`,
+            scopeCodeCss(c.css ?? '', `#${id}>.K`, id)
+          )
+          inner = `<div class="K">${cleanCodeHtml(c.html ?? '')}</div>`
+          codeEntries.push([id, round(offset + (l.start ?? 0))])
+          break
+        }
         case 'group':
           // Inhoud van de groep: posities relatief aan de groep, tijd vanaf het in-punt.
           inner = emit(l.children ?? [], offset + (l.start ?? 0))
@@ -239,6 +255,7 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
     return out.join('')
   }
   const animatedEntries: unknown[] = []
+  const codeEntries: [string, number][] = []
   body.push(emit(comp.layers, 0))
   if (usesMask) css.push('.M{position:absolute;left:0;top:0;width:100%;height:100%;overflow:hidden}')
 
@@ -256,7 +273,8 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
     l: Math.max(1, Math.round(comp.loops)),
     e: endFrameTime(comp),
     a: opts.mode === 'export' ? 1 : 0,
-    L: animatedEntries
+    L: animatedEntries,
+    ...(codeEntries.length ? { C: codeEntries } : {})
   }
 
   const html =

@@ -5,6 +5,7 @@ import {
   ChevronsDownUp,
   ChevronsUpDown,
   ChevronUp,
+  Code2,
   Eye,
   EyeOff,
   Folder,
@@ -51,7 +52,7 @@ const PROP_LABEL: Record<AnimProp, string> = {
   opacity: 'Dekking',
   reveal: 'Reveal'
 }
-const TYPE_ICON = { text: Type, image: ImageIcon, shape: Square, writeon: PenLine, group: Folder }
+const TYPE_ICON = { text: Type, image: ImageIcon, shape: Square, writeon: PenLine, group: Folder, code: Code2 }
 
 /** Sleepgedrag via pointer capture; geeft de verschuiving in seconden door. */
 function useTimeDrag(pps: number) {

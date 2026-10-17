@@ -43,7 +43,22 @@ export interface Keyframe {
 
 export type Tracks = Partial<Record<AnimProp, Keyframe[]>>
 
-export type LayerType = 'text' | 'image' | 'shape' | 'writeon' | 'group'
+export type LayerType = 'text' | 'image' | 'shape' | 'writeon' | 'group' | 'code'
+
+/**
+ * Code-element: eigen HTML/SVG met CSS-animatie (bijv. door AI gemaakt, zoals een laadsymbool).
+ * De CSS gebruikt `.root` voor de container en keyframe-namen die met `kf-` beginnen; bij het bouwen
+ * wordt dat per laag uniek gemaakt. De animatie loopt synchroon met de tijdlijn (vanaf het in-punt).
+ */
+export interface CodeProps {
+  html: string
+  css: string
+  /** Ontwerpmaat van de code; de inhoud schaalt mee met de laag. */
+  w: number
+  h: number
+  /** Laatste opdracht aan de AI (ter info). */
+  prompt?: string
+}
 
 export interface TextProps {
   content: string
@@ -238,6 +253,7 @@ export interface Layer {
   image?: ImageProps
   shape?: ShapeProps
   writeon?: WriteOnProps
+  code?: CodeProps
   /**
    * Groep (pre-comp): lagen binnen deze laag. Posities zijn relatief aan de groep,
    * tijden relatief aan `start` van de groep. De groep zelf kun je als geheel

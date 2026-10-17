@@ -28,7 +28,7 @@ export function normalizeProject(p: Project): Project {
 
 /** Per formaat, nooit gesynchroniseerd. */
 const LOCAL = new Set(['id', 'linkId', 'overrides', 'locked'])
-const GROUPS = ['text', 'image', 'shape', 'writeon'] as const
+const GROUPS = ['text', 'image', 'shape', 'writeon', 'code'] as const
 
 /** Alle eigenschap-sleutels van een laag, zoals "x", "text.content", "tracks.opacity", "intro". */
 export function layerKeys(...layers: Layer[]): string[] {
@@ -108,6 +108,8 @@ export const OVERRIDE_LABEL: Record<string, string> = {
   'writeon.content': 'write-on tekst',
   'writeon.size': 'write-on grootte',
   'writeon.color': 'write-on kleur',
+  'code.html': 'code (HTML)',
+  'code.css': 'code (CSS)',
   duration: 'duur',
   loops: 'loops',
   background: 'achtergrond',
