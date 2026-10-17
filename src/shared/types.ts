@@ -75,6 +75,8 @@ export interface TextProps {
   tracking?: number
   /** Automatisch passend maken: de lettergrootte wordt (in de browser, met het echte font) verkleind tot de tekst in het kader past. */
   fit?: boolean
+  /** Lijn rond de letters (buitenkant, de vulling blijft heel). */
+  stroke?: { color: string; width: number } | null
 }
 
 export interface ImageProps {
@@ -135,6 +137,12 @@ export interface ShapeProps {
   strokeColor: string
   /** 0 = geen lijn. */
   strokeWidth: number
+  /** Positie van de lijn (rechthoek/ellips): binnen (standaard), op de rand of buiten. Pen-vormen: altijd op de rand. */
+  strokeAlign?: 'inside' | 'center' | 'outside'
+  /** Stippellijn: lengte van streep en tussenruimte in px (streep 0 met ronde uiteinden = stippen). Ontbreekt = doorgetrokken. */
+  strokeDash?: [number, number] | null
+  /** Uiteinden en hoeken: rond (standaard) of recht. */
+  strokeCap?: 'round' | 'butt'
   /** Kleurverloop in plaats van een effen vulling (begint met `fill`). */
   gradient?: Gradient | null
   /** Pen tool: SVG-pad in een eigen coördinatenstelsel van w×h (schaalt mee met de laag). */
@@ -159,7 +167,8 @@ export interface WriteOnProps {
 }
 
 /** Wipe-reveal voor niet-write-on lagen, gestuurd door `reveal`. */
-export type RevealMode = 'none' | 'wipeLeft' | 'wipeRight' | 'wipeUp' | 'wipeDown'
+/** Wipe (bijsnijden vanaf een kant) of `draw`: de lijn van een vorm tekent zich (zoals Trim Paths in After Effects). */
+export type RevealMode = 'none' | 'wipeLeft' | 'wipeRight' | 'wipeUp' | 'wipeDown' | 'draw'
 
 /**
  * Binnenkomst of uitgang van een laag, zoals een GSAP from()/to(): beweegt van/naar

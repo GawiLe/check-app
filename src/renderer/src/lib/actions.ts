@@ -142,7 +142,7 @@ export function addShapeRect(kind: 'rect' | 'ellipse', x: number, y: number, w: 
 }
 
 /** Vorm van de pen tool. */
-export function addPenShape(points: PenPoint[], closed: boolean) {
+export function addPenShape(points: PenPoint[], closed: boolean, keepTool = false) {
   const pts = points.map((pt) => {
     const a = toContext(pt.x, pt.y)
     const h = pt.hx != null ? toContext(pt.hx, pt.hy!) : null
@@ -160,7 +160,24 @@ export function addPenShape(points: PenPoint[], closed: boolean) {
       l.shape!.strokeColor = '#111111'
     }
   })
-  S().setTool('select')
+  if (!keepTool) S().setTool('select')
+}
+
+/** Lijn laten tekenen (zoals Trim Paths): Reveal van 0 naar 1 in 1 s vanaf de playhead. */
+export function animateStrokeDraw(layerId: string) {
+  const { project, compId, time } = S()
+  if (!project) return
+  const t = round(Math.max(0, layerLocalTime(project, compId, layerId, time)), 3)
+  updateLayer(layerId, (l) => {
+    l.revealMode = 'draw'
+    l.reveal = 1
+    l.tracks.reveal = [
+      ...(l.tracks.reveal ?? []).filter((k) => k.t < t - 1e-3 || k.t > t + 1 + 1e-3),
+      { t, v: 0, e: 'easeInOut' as const },
+      { t: round(t + 1, 3), v: 1, e: 'linear' as const }
+    ].sort((a, b) => a.t - b.t)
+  })
+  S().setStatus('Lijn tekent zich vanaf de playhead (keyframes op Reveal)')
 }
 
 /** Tekstgereedschap: nieuwe tekst op de klikplek, meteen bewerken. */

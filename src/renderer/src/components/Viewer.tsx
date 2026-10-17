@@ -310,26 +310,32 @@ function SingleViewer() {
     drag.current = { kind: 'move', x: p.x, y: p.y, start, bbox, targets }
   }
 
-  const finishPen = (closed: boolean) => {
-    if (pen.current.length >= 2) addPenShape(pen.current, closed)
+  /** Pen afronden. Dubbele punten op dezelfde plek (van een dubbelklik) tellen niet mee. */
+  const finishPen = (closed: boolean, keepTool = false) => {
+    const pts = pen.current.filter((p, i, a) => i === 0 || Math.hypot(p.x - a[i - 1].x, p.y - a[i - 1].y) > 2 / zoom || p.hx != null)
     pen.current = []
     setPenCursor(null)
+    if (pts.length >= 2) addPenShape(pts, closed, keepTool)
+    else if (!keepTool) useStore.getState().setTool('select')
     force((n) => n + 1)
   }
 
-  // Pen tool: Enter = open vorm afronden, Escape = annuleren
+  // Pen tool: Enter, Esc of dubbelklik = open lijn afronden (met minder dan twee punten: stoppen).
+  // Ander gereedschap kiezen rondt de lijn ook af, zodat hij nooit zomaar verdwijnt.
   useEffect(() => {
     if (tool !== 'pen') return
     const k = (e: KeyboardEvent) => {
-      if (e.key === 'Enter') finishPen(false)
-      if (e.key === 'Escape') {
-        pen.current = []
-        setPenCursor(null)
-        useStore.getState().setTool('select')
+      if (e.key === 'Enter' || e.key === 'Escape') {
+        e.preventDefault()
+        finishPen(false)
       }
     }
     window.addEventListener('keydown', k)
-    return () => window.removeEventListener('keydown', k)
+    return () => {
+      window.removeEventListener('keydown', k)
+      if (pen.current.length >= 2) finishPen(false, true)
+      pen.current = []
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tool])
 
@@ -496,6 +502,7 @@ function SingleViewer() {
 
   /** Dubbelklik: compositie openen in een eigen tab, of tekst op het canvas bewerken. */
   const onDouble = (e: React.MouseEvent) => {
+    if (tool === 'pen') return finishPen(false)
     if (tool !== 'select') return
     const p = toComp(e)
     const hit = hitTest(p.x, p.y)
@@ -685,7 +692,8 @@ function SingleViewer() {
               </div>
             ))}
             {hovered && box(hovered, 'hover', false)}
-            {selected.map((b) => box(b, '', !!single && b === single))}
+            {/* Grepen alleen met het selectiegereedschap: tijdens tekenen (pen, vormen, tekst) vangen ze geen klikken af */}
+            {selected.map((b) => box(b, '', tool === 'select' && !!single && b === single))}
             {single && tool === 'select' && !editBox && (
               <div
                 className="anchor"
@@ -729,7 +737,7 @@ function SingleViewer() {
         </div>
       </div>
       {tool === 'pen' && (
-        <div className="tool-hint">Klik voor punten, sleep voor een bocht. Klik op het eerste punt om te sluiten, Enter of rechtermuisknop voor een open lijn, Esc om te stoppen.</div>
+        <div className="tool-hint">Klik voor punten, sleep voor een bocht. Klik op het eerste punt om de vorm te sluiten. Open lijn: dubbelklik, Enter of Esc. Lijndikte en kleur stel je daarna in bij Ontwerp → Lijn.</div>
       )}
       {ctxGroup && <div className="tool-hint top">Compositie "{ctxGroup.name}" geopend: je bewerkt de lagen hierin. Klik op het formaat-tabblad onder om terug te gaan.</div>}
       <SizeMeter />

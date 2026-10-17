@@ -3123,3 +3123,12 @@ body.popout-window {
 .ai-mode button {
   flex: 1;
 }
+
+.stroke-align,
+.stroke-cap {
+  display: flex;
+}
+.stroke-align button,
+.stroke-cap button {
+  flex: 1;
+}

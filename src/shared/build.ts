@@ -4,7 +4,7 @@ import { minifiedRuntime, WIPE_INDEX } from './runtime'
 import { allLayers, walk } from './tree'
 import { anchorOf } from './geometry'
 import { cleanCodeHtml, scopeCodeCss } from './code'
-import { BLEND_MODES, type AnimProp, type Composition, type ExportTarget, type FontAsset, type Gradient, type Layer, type LayerMask, type Project, type Shadow } from './types'
+import { BLEND_MODES, type AnimProp, type Composition, type ExportTarget, type FontAsset, type Gradient, type Layer, type LayerMask, type Project, type Shadow, type ShapeProps } from './types'
 
 // Bouwt de banner-HTML uit een compositie. Wordt zowel door de editor (preview)
 // als door de exporter gebruikt, zodat wat je ziet ook echt is wat je exporteert.
@@ -157,6 +157,8 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
             t.tracking != null && Number.isFinite(Number(t.tracking)) ? `letter-spacing:${n(Number(t.tracking) / 1000)}em` : `letter-spacing:${n(t.letterSpacing)}px`,
             'white-space:pre-wrap'
           )
+          // Lijn rond de letters: dubbel zo dik met de vulling erboven, zodat de lijn alleen buiten de letter valt
+          if (t.stroke && Number(t.stroke.width) > 0) rules.push(`-webkit-text-stroke:${n(Number(t.stroke.width) * 2)}px ${cssValue(t.stroke.color)}`, 'paint-order:stroke fill')
           inner = escapeHtml(t.content)
           break
         }
@@ -171,9 +173,11 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
         case 'shape': {
           const sh = l.shape!
           const fill = sh.fillEnabled === false ? 'none' : cssValue(sh.fill)
+          const sw = Number(sh.strokeWidth) > 0 ? Number(sh.strokeWidth) : 0
+          const svgStroke = (nonScaling: boolean) => strokeAttrs(sh, sw, l.revealMode === 'draw', nonScaling)
           if (sh.kind === 'path' && sh.path) {
             // Vrije vorm: SVG die meeschaalt met de laag; lijndikte blijft gelijk.
-            const stroke = sh.strokeWidth > 0 ? ` stroke="${cssValue(sh.strokeColor)}" stroke-width="${n(sh.strokeWidth)}" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"` : ''
+            const stroke = sw > 0 ? svgStroke(true) : ''
             const grad = sh.gradient && fill !== 'none' && sh.path.closed ? svgGradient(`${id}g`, sh.fill, sh.gradient) : ''
             const pathFill = sh.path.closed ? (grad ? `url(#${id}g)` : fill) : 'none'
             inner = `<svg viewBox="0 0 ${n(sh.path.w)} ${n(sh.path.h)}" width="100%" height="100%" preserveAspectRatio="none" style="overflow:visible;display:block">${grad}<path d="${escapeHtml(sh.path.d)}" fill="${pathFill}"${sh.fillRule === 'evenodd' ? ' fill-rule="evenodd"' : ''}${stroke}/></svg>`
@@ -181,7 +185,19 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
             // Rechthoek / ellips: gewone CSS (lichtst).
             if (fill !== 'none') rules.push(`background:${sh.gradient ? gradientCss(sh.fill, sh.gradient, sh.kind === 'ellipse') : fill}`)
             rules.push(`border-radius:${sh.kind === 'ellipse' ? '50%' : `${n(sh.radius)}px`}`)
-            if (sh.strokeWidth > 0) rules.push(`border:${n(sh.strokeWidth)}px solid ${cssValue(sh.strokeColor)}`)
+            const plain = (sh.strokeAlign ?? 'inside') === 'inside' && !sh.strokeDash && l.revealMode !== 'draw'
+            if (sw > 0 && plain) rules.push(`border:${n(sw)}px solid ${cssValue(sh.strokeColor)}`)
+            else if (sw > 0) {
+              // Lijn op de rand of buiten, stippellijn of tekenen: als SVG over de vorm
+              const o = sh.strokeAlign === 'center' ? 0 : sh.strokeAlign === 'outside' ? -sw / 2 : sw / 2
+              const W = l.width
+              const H = l.height
+              const shape =
+                sh.kind === 'ellipse'
+                  ? `<ellipse cx="${n(W / 2)}" cy="${n(H / 2)}" rx="${n(Math.max(0, W / 2 - o))}" ry="${n(Math.max(0, H / 2 - o))}"`
+                  : `<rect x="${n(o)}" y="${n(o)}" width="${n(Math.max(0, W - 2 * o))}" height="${n(Math.max(0, H - 2 * o))}" rx="${n(Math.max(0, Math.min(Number(sh.radius) || 0, W / 2, H / 2) - o))}"`
+              inner = `<svg width="100%" height="100%" style="position:absolute;left:0;top:0;overflow:visible">${shape} fill="none"${svgStroke(false)}/></svg>`
+            }
           }
           break
         }
@@ -293,6 +309,15 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
     '</body></html>'
 
   return { html, assets: [...new Set(assets)], fontIds, extraFiles: click.files }
+}
+
+/** SVG-lijnattributen van een vorm: kleur, dikte, uiteinden, stippellijn of tekenen (`draw`, via pathLength). */
+function strokeAttrs(sh: ShapeProps, sw: number, draw: boolean, nonScaling: boolean): string {
+  const cap = sh.strokeCap === 'butt' ? 'butt' : 'round'
+  let a = ` stroke="${cssValue(sh.strokeColor)}" stroke-width="${n(sw)}"${nonScaling ? ' vector-effect="non-scaling-stroke"' : ''} stroke-linejoin="${cap === 'round' ? 'round' : 'miter'}" stroke-linecap="${cap}"`
+  if (draw) a += ' pathLength="1" stroke-dasharray="1 1" stroke-dashoffset="1" data-d'
+  else if (Array.isArray(sh.strokeDash) && sh.strokeDash.length === 2) a += ` stroke-dasharray="${n(Math.max(0, Number(sh.strokeDash[0]) || 0))} ${n(Math.max(0.5, Number(sh.strokeDash[1]) || 0))}"`
+  return a
 }
 
 /** Klikgebieden in exportvolgorde: van boven naar onder in de lagenlijst (clickTag1, clickTag2 …). */

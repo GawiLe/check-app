@@ -14,6 +14,7 @@ import { BLEND_MODES } from '@shared/types'
 import {
   aiAnimate,
   aiCodeElement,
+  animateStrokeDraw,
   applyPreset,
   deleteComposition,
   regenerateWriteOn,
@@ -414,6 +415,21 @@ function LayerDesign({ layer }: { layer: Layer }) {
               }
             />
           </div>
+          <div className="row">
+            <span className="label">Lijn</span>
+            <Switch
+              checked={!!layer.text.stroke && layer.text.stroke.width > 0}
+              onChange={(v) => up((l) => void (l.text!.stroke = v ? { color: l.text!.stroke?.color ?? '#000000', width: l.text!.stroke?.width || 1 } : null))}
+            />
+            {layer.text.stroke && layer.text.stroke.width > 0 && (
+              <>
+                <input type="color" value={layer.text.stroke.color} onChange={(e) => up((l) => void (l.text!.stroke!.color = e.target.value), 'tsc')} />
+                <div className="grow">
+                  <Num label="px" value={layer.text.stroke.width} min={0.5} max={20} step={0.5} decimals={1} onChange={(v, co) => up((l) => void (l.text!.stroke!.width = v), co ? 'tsw' : undefined)} />
+                </div>
+              </>
+            )}
+          </div>
           <Row label="Passend">
             <Switch checked={!!layer.text.fit} onChange={(v) => up((l) => void (l.text!.fit = v))} />
             <span className="faint">{layer.text.fit ? 'verkleint tot het in het kader past' : 'vaste grootte'}</span>
@@ -529,18 +545,21 @@ function LayerDesign({ layer }: { layer: Layer }) {
               Pen-vorm ({layer.shape.path?.closed ? 'gesloten' : 'open lijn'}). Schaalt mee met breedte en hoogte.
             </div>
           )}
-          <div className="row">
-            <span className="label">Vulling</span>
-            <Switch checked={layer.shape.fillEnabled !== false} onChange={(v) => up((l) => void (l.shape!.fillEnabled = v))} />
-            {layer.shape.fillEnabled !== false && (
-              <>
-                <input type="color" value={layer.shape.fill} onChange={(e) => up((l) => void (l.shape!.fill = e.target.value), 'sf')} />
-                <div className="grow">
-                  <TextInput value={layer.shape.fill} onCommit={(v) => up((l) => void (l.shape!.fill = v))} />
-                </div>
-              </>
-            )}
-          </div>
+          {/* Een open lijn heeft geen vulling */}
+          {!(layer.shape.kind === 'path' && !layer.shape.path?.closed) && (
+            <div className="row">
+              <span className="label">Vulling</span>
+              <Switch checked={layer.shape.fillEnabled !== false} onChange={(v) => up((l) => void (l.shape!.fillEnabled = v))} />
+              {layer.shape.fillEnabled !== false && (
+                <>
+                  <input type="color" value={layer.shape.fill} onChange={(e) => up((l) => void (l.shape!.fill = e.target.value), 'sf')} />
+                  <div className="grow">
+                    <TextInput value={layer.shape.fill} onCommit={(v) => up((l) => void (l.shape!.fill = v))} />
+                  </div>
+                </>
+              )}
+            </div>
+          )}
           {layer.shape.fillEnabled !== false && (layer.shape.kind !== 'path' || layer.shape.path?.closed) && <GradientRows layer={layer} />}
           <div className="row">
             <span className="label">Lijn</span>
@@ -557,6 +576,7 @@ function LayerDesign({ layer }: { layer: Layer }) {
               </>
             )}
           </div>
+          {layer.shape.strokeWidth > 0 && <StrokeRows layer={layer} />}
           {(layer.shape.kind ?? 'rect') === 'rect' && (
             <div className="row">
               <span className="label">Hoekradius</span>
@@ -1070,6 +1090,7 @@ function LayerMotion({ layer }: { layer: Layer }) {
               <option value="wipeRight">Van rechts</option>
               <option value="wipeUp">Van onder</option>
               <option value="wipeDown">Van boven</option>
+              {layer.shape && layer.shape.strokeWidth > 0 && <option value="draw">Lijn tekenen</option>}
             </select>
           </Row>
         )}
@@ -1116,6 +1137,74 @@ function SavePreset({ layer }: { layer: Layer }) {
         </button>
       </div>
     </div>
+  )
+}
+
+/** Extra lijn-opties van een vorm: positie, stippellijn, uiteinden en de lijn laten tekenen. */
+function StrokeRows({ layer }: { layer: Layer }) {
+  const sh = layer.shape!
+  const up = (fn: (l: Layer) => void, co?: string) => updateLayer(layer.id, fn, co)
+  const isPath = sh.kind === 'path'
+  const dash = sh.strokeDash ?? null
+  const open = isPath && !sh.path?.closed
+  return (
+    <>
+      {!isPath && (
+        <div className="row">
+          <span className="label">Positie</span>
+          <div className="seg grow stroke-align">
+            {(
+              [
+                ['inside', 'Binnen'],
+                ['center', 'Midden'],
+                ['outside', 'Buiten']
+              ] as const
+            ).map(([v, label]) => (
+              <button key={v} className={(sh.strokeAlign ?? 'inside') === v ? 'on' : ''} onClick={() => up((l) => void (l.shape!.strokeAlign = v))}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="row">
+        <span className="label">Stippel</span>
+        <Switch
+          checked={!!dash}
+          onChange={(v) => up((l) => void (l.shape!.strokeDash = v ? [Math.max(2, Math.round(l.shape!.strokeWidth * 3)), Math.max(2, Math.round(l.shape!.strokeWidth * 2))] : null))}
+        />
+        {dash && (
+          <>
+            <div className="grow">
+              <Num label="Streep" title="Lengte van een streep (0 met ronde uiteinden = stippen)" value={dash[0]} min={0} max={200} step={1} decimals={1} onChange={(v, co) => up((l) => void (l.shape!.strokeDash = [v, l.shape!.strokeDash?.[1] ?? v]), co ? 'sd0' : undefined)} />
+            </div>
+            <div className="grow">
+              <Num label="Gat" title="Ruimte tussen de strepen" value={dash[1]} min={0.5} max={200} step={1} decimals={1} onChange={(v, co) => up((l) => void (l.shape!.strokeDash = [l.shape!.strokeDash?.[0] ?? v, v]), co ? 'sd1' : undefined)} />
+            </div>
+          </>
+        )}
+      </div>
+      {(open || dash || isPath || (sh.strokeAlign && sh.strokeAlign !== 'inside')) && (
+        <div className="row">
+          <span className="label">Uiteinden</span>
+          <div className="seg grow stroke-cap">
+            <button className={sh.strokeCap !== 'butt' ? 'on' : ''} onClick={() => up((l) => void (l.shape!.strokeCap = 'round'))}>
+              Rond
+            </button>
+            <button className={sh.strokeCap === 'butt' ? 'on' : ''} onClick={() => up((l) => void (l.shape!.strokeCap = 'butt'))}>
+              Recht
+            </button>
+          </div>
+        </div>
+      )}
+      <div className="row">
+        <span className="label">Animatie</span>
+        <button className="ghost sm grow" title="De lijn tekent zich vanaf de playhead in 1 seconde (keyframes op Reveal, aan te passen in de tijdlijn)" onClick={() => animateStrokeDraw(layer.id)}>
+          <PenLine size={13} /> Lijn laten tekenen
+        </button>
+      </div>
+      {layer.revealMode === 'draw' && dash && <div className="hint-text">Tijdens het tekenen wordt de lijn doorgetrokken getoond; stippels gaan niet samen met tekenen.</div>}
+    </>
   )
 }
 

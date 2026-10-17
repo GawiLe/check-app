@@ -1428,3 +1428,65 @@ describe('code-elementen', () => {
     expect(anims[0].currentTime).toBe(1500)
   })
 })
+
+describe('lijnen', () => {
+  const withShape = (fn: (l: ReturnType<typeof createLayer>) => void) => {
+    const p = createStarterProject('Lijn')
+    const l = createLayer('shape', p.compositions[0])
+    Object.assign(l, { width: 100, height: 40 })
+    l.shape!.strokeWidth = 4
+    l.shape!.strokeColor = '#ff0000'
+    fn(l)
+    p.compositions[0].layers.unshift(l)
+    return build(p).html
+  }
+
+  it('lijn binnen blijft een CSS-rand (licht)', () => {
+    const html = withShape(() => {})
+    expect(html).toMatch(/border:4px solid #ff0000/)
+    expect(html).not.toContain('<rect')
+  })
+
+  it('lijn buiten of op de rand, met stippellijn: SVG om de vorm', () => {
+    const out = withShape((l) => {
+      l.shape!.strokeAlign = 'outside'
+      l.shape!.strokeDash = [6, 3]
+      l.shape!.radius = 10
+    })
+    expect(out).toContain('<rect x="-2" y="-2" width="104" height="44" rx="12" fill="none" stroke="#ff0000" stroke-width="4"')
+    expect(out).toContain('stroke-dasharray="6 3"')
+    const mid = withShape((l) => {
+      l.shape!.kind = 'ellipse'
+      l.shape!.strokeAlign = 'center'
+    })
+    expect(mid).toContain('<ellipse cx="50" cy="20" rx="50" ry="20" fill="none"')
+  })
+
+  it('lijn laten tekenen: pathLength en runtime-modus 5', () => {
+    const html = withShape((l) => {
+      l.shape!.kind = 'path'
+      l.shape!.path = { d: 'M0 0L100 40', w: 100, h: 40, closed: false }
+      l.revealMode = 'draw'
+      l.tracks.reveal = [
+        { t: 0, v: 0, e: 'linear' },
+        { t: 1, v: 1, e: 'linear' }
+      ]
+    })
+    expect(html).toContain('pathLength="1" stroke-dasharray="1 1" stroke-dashoffset="1" data-d')
+    expect(html).toMatch(/"w":5/)
+    const dom = new JSDOM(html, { runScripts: 'dangerously', pretendToBeVisual: true })
+    const BS = (dom.window as unknown as { BS: { seek: (t: number) => void } }).BS
+    BS.seek(0.25)
+    const path = dom.window.document.querySelector('[data-d]') as HTMLElement
+    expect(Number(path.style.strokeDashoffset)).toBeCloseTo(0.75)
+    BS.seek(0)
+    expect(path.style.visibility).toBe('hidden')
+  })
+
+  it('lijn om tekst: buitenlijn via text-stroke', () => {
+    const p = createStarterProject('Tekst')
+    p.compositions[0].layers.find((l) => l.type === 'text')!.text!.stroke = { color: '#000000', width: 2 }
+    const html = build(p).html
+    expect(html).toContain('-webkit-text-stroke:4px #000000;paint-order:stroke fill')
+  })
+})

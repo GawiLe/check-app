@@ -175,7 +175,7 @@ Lagen: selecteer en druk **Enter**, dubbelklik op de naam in de tijdlijn, of rec
   - **V** selecteren
   - **T** tekst: klik op het canvas, of **sleep een tekstvak** in de maat die je wilt
   - **Q** rechthoek en **E** ellips: sleep, met Shift voor een vierkant of cirkel
-  - **G** pen tool: klik voor punten en sleep voor een bocht. Klik op het eerste punt om de vorm te sluiten. Enter of de rechtermuisknop geeft een open lijn, Esc stopt.
+  - **G** pen tool: klik voor punten en sleep voor een bocht. Klik op het eerste punt om de vorm te sluiten. Een **open lijn** rond je af met dubbelklik, Enter, Esc, de rechtermuisknop of door ander gereedschap te kiezen. Een open lijn krijgt meteen een zwarte lijn van 3 px.
 - **Lagen verbergen:** het oogje links in de tijdlijn. In een ander formaat dan de basis geldt dat alleen voor dat formaat.
 - **Waarden in de tijdlijn:** klap een laag uit (pijltje, of P/S/R/O/U) en pas positie, schaal (X 🔗 Y), rotatie en dekking direct aan: slepen of klikken en typen. Is de eigenschap geanimeerd, dan komt er een keyframe op de playhead.
 - **Uitlijnen:** de uitlijnknoppen staan bovenin de werkbalk (selectie of banner).
@@ -188,6 +188,8 @@ Lagen: selecteer en druk **Enter**, dubbelklik op de naam in de tijdlijn, of rec
   - Sleep het naar een andere plek; het klikt vast op hoeken, randen en midden. De laag verspringt niet, net als met Pan Behind in AE.
   - Je kunt het ook instellen via het 3×3-raster in de inspector.
 - **Vormen:** kies rechthoek of ellips, zet vulling en lijn los aan of uit (met kleur en dikte), en stel bij een rechthoek de hoekradius in. *Rond* maakt er een pil-vorm van. Pen-vormen schalen mee als je de laag groter maakt.
+- **Lijn (stroke):** bij een vorm stel je onder *Lijn* in: kleur, dikte, **positie** (binnen, midden of buiten de rand), **stippellijn** (lengte van streep en gat; streep 0 met ronde uiteinden geeft stippen) en **uiteinden** (rond of recht). Tekst kan ook een lijn krijgen (rond de letters, de vulling blijft heel).
+- **Lijn laten tekenen:** de knop *Lijn laten tekenen* (of Wipe → *Lijn tekenen*) laat de lijn zich vanaf de playhead in 1 seconde tekenen, zoals Trim Paths in After Effects. Het zijn gewone keyframes op *Reveal* die je in de tijdlijn kunt verschuiven of aanpassen. Werkt voor pen-lijnen, rechthoeken en ellipsen.
 - **Rechtermuisknop** op een laag (canvas of tijdlijn) geeft onder meer:
   - *Voeg toe aan nieuwe compositie*
   - knippen, kopiëren, plakken, dupliceren
