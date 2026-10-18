@@ -309,6 +309,13 @@ export interface FontAsset {
 
 export type ExportTarget = 'cm360' | 'google-ads' | 'gam' | 'adform' | 'azerion' | 'generic'
 
+/** Banner ook als video/GIF (altijd in een eigen map MP4/ of GIF/ in de projectmap van de export). */
+export interface MediaOptions {
+  mp4?: { fps: number; scale: 1 | 2 } | null
+  /** maxKb: GIF zo nodig kleiner maken (minder kleuren, lagere fps, kleiner formaat) tot hij hieronder blijft. */
+  gif?: { fps: number; maxKb?: number | null } | null
+}
+
 export interface Project {
   version: number
   name: string
@@ -327,6 +334,8 @@ export interface Project {
   embedFonts?: boolean
   /** Afbeeldingen bij export verkleinen tot de getoonde maat (2×) en opnieuw comprimeren. */
   optimizeImages?: boolean
+  /** Laatst gekozen video/GIF-export (ontbreekt = alleen HTML5). */
+  media?: MediaOptions
   /** Varianten van dit project (template): welke velden variabel zijn en de waarden per variant. */
   variants?: VariantSet
   /** Gezet in een variantmap: van welk template (mapnaam) en welke variant dit project komt. */

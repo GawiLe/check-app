@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Boilerplate, Settings, VersionInfo } from '@shared/api'
 import { IAB_SIZES, TARGET_IDS, TARGETS } from '@shared/specs'
-import type { ExportTarget, Project } from '@shared/types'
+import type { ExportTarget, MediaOptions, Project } from '@shared/types'
 import { addFormat, exportFolder, newProject, rememberedSvgMode, replaceImage, runExport, saveAsBoilerplate, setRememberedSvgMode, uploadAndReplace } from '../lib/actions'
 import { FolderOpen, Image as ImageIcon, Shapes } from 'lucide-react'
 import { assetUrl, currentComp, useStore } from '../store'
@@ -146,6 +146,14 @@ function AddFormatDialog({ onClose }: { onClose: () => void }) {
 function ExportDialog({ onClose }: { onClose: () => void }) {
   const project = useStore((s) => s.project)!
   const results = useStore((s) => s.exportResults)
+  const mediaResults = useStore((s) => s.mediaResults)
+  const media = project.media ?? {}
+  const setMedia = (fn: (m: MediaOptions) => void) =>
+    useStore.getState().update((p) => {
+      p.media ??= {}
+      fn(p.media)
+    })
+  const wantsMedia = !!(media.mp4 || media.gif)
   const [comps, setComps] = useState<string[]>(project.compositions.filter((c) => !c.disabled).map((c) => c.id))
   const [targets, setTargets] = useState<ExportTarget[]>(project.targets.length ? project.targets : ['cm360'])
   const [busy, setBusy] = useState(false)
@@ -185,6 +193,54 @@ function ExportDialog({ onClose }: { onClose: () => void }) {
             <input type="checkbox" checked={!!project.optimizeImages} onChange={(e) => useStore.getState().update((p) => void (p.optimizeImages = e.target.checked))} />
             Afbeeldingen optimaliseren
           </label>
+          <div className="sub" style={{ marginTop: 14 }}>
+            Ook als video of GIF
+          </div>
+          <div className="media-row">
+            <label className="check">
+              <input type="checkbox" checked={!!media.mp4} onChange={(e) => setMedia((m) => void (m.mp4 = e.target.checked ? { fps: 30, scale: 2 } : null))} />
+              MP4
+            </label>
+            {media.mp4 && (
+              <>
+                <select value={media.mp4.fps} onChange={(e) => setMedia((m) => void (m.mp4!.fps = Number(e.target.value)))}>
+                  <option value={25}>25 fps</option>
+                  <option value={30}>30 fps</option>
+                  <option value={60}>60 fps</option>
+                </select>
+                <select value={media.mp4.scale} onChange={(e) => setMedia((m) => void (m.mp4!.scale = Number(e.target.value) as 1 | 2))}>
+                  <option value={2}>2× (scherp)</option>
+                  <option value={1}>1× (ware grootte)</option>
+                </select>
+              </>
+            )}
+          </div>
+          <div className="media-row">
+            <label className="check">
+              <input type="checkbox" checked={!!media.gif} onChange={(e) => setMedia((m) => void (m.gif = e.target.checked ? { fps: 15, maxKb: null } : null))} />
+              GIF
+            </label>
+            {media.gif && (
+              <>
+                <select value={media.gif.fps} onChange={(e) => setMedia((m) => void (m.gif!.fps = Number(e.target.value)))}>
+                  <option value={8}>8 fps</option>
+                  <option value={10}>10 fps</option>
+                  <option value={15}>15 fps</option>
+                  <option value={20}>20 fps</option>
+                </select>
+                <input
+                  type="number"
+                  className="media-max"
+                  min={0}
+                  placeholder="max. KB"
+                  title="Maximale grootte: de GIF wordt zo nodig lichter gemaakt (minder kleuren, lagere fps). Leeg = geen maximum."
+                  value={media.gif.maxKb ?? ''}
+                  onChange={(e) => setMedia((m) => void (m.gif!.maxKb = e.target.value ? Math.max(0, Number(e.target.value)) : null))}
+                />
+              </>
+            )}
+          </div>
+          {wantsMedia && <div className="hint-text">Altijd in een eigen map: {folderOf(project)}/MP4/ en {folderOf(project)}/GIF/, met alle loops tot het eindbeeld.</div>}
         </div>
       </div>
 
@@ -213,6 +269,29 @@ function ExportDialog({ onClose }: { onClose: () => void }) {
         </div>
       )}
 
+      {mediaResults && (
+        <div style={{ marginTop: 14 }}>
+          {mediaResults.map((r) => (
+            <div className="result" key={r.file}>
+              <header>
+                <b>
+                  {r.kind.toUpperCase()} · {r.composition}
+                </b>
+                <span className="muted">
+                  {kb(r.bytes)} · {r.note}
+                </span>
+                <button onClick={() => window.bs.revealInFolder(r.file)}>Toon {r.kind.toUpperCase()}</button>
+              </header>
+              {r.warning && (
+                <ul className="issues">
+                  <li className="warning">{r.warning}</li>
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="export-dest">
         <span className="faint">Exporteren naar</span>
         <span className="export-path" title={outDir ?? ''}>{outDir ? `${outDir}/${project.name.trim().replace(/\s+/g, '-')}` : 'nog niet gekozen (je kiest bij exporteren)'}</span>
@@ -230,25 +309,31 @@ function ExportDialog({ onClose }: { onClose: () => void }) {
         <button onClick={onClose}>Sluiten</button>
         <button
           className="primary"
-          disabled={busy || !comps.length || !targets.length}
+          disabled={busy || !comps.length || (!targets.length && !wantsMedia)}
           onClick={async () => {
             setBusy(true)
-            await runExport(comps, targets)
+            await runExport(comps, targets, media)
             if (dir) setOutDir(await window.bs.getExportDir(dir))
             setBusy(false)
           }}
         >
-          {busy ? 'Bezig…' : `Exporteer ${comps.length * targets.length} banner(s)`}
+          {busy
+            ? 'Bezig…'
+            : [targets.length ? `Exporteer ${comps.length * targets.length} banner(s)` : 'Exporteer', media.mp4 && 'MP4', media.gif && 'GIF'].filter(Boolean).join(' + ')}
         </button>
       </div>
     </Modal>
   )
 }
 
+/** Mapnaam van de export (zoals fileStem in het hoofdproces). */
+const folderOf = (project: Project) =>
+  (project.name.replace(/[\\/:*?"<>|]+/g, '-').replace(/^[.\s-]+/, '').trim() || 'banner').slice(0, 80).replace(/\s*[–—]\s*/g, '-').replace(/\s+/g, '-')
+
 /** Wat een platform is en welke eisen (presets) de export daarvoor gebruikt. */
 function TargetInfo({ target, project, multi }: { target: ExportTarget; project: Project; multi: boolean }) {
   const t = TARGETS[target]
-  const folder = (project.name.replace(/[\\/:*?"<>|]+/g, '-').replace(/^[.\s-]+/, '').trim() || 'banner').slice(0, 80).replace(/\s+/g, '-')
+  const folder = folderOf(project)
   const rows: [string, string][] = [
     ['Max. ZIP', kb(t.maxZipBytes)],
     ['Initial load', `${kb(t.initialLoadBytes)} (richtlijn)`],

@@ -46,6 +46,7 @@ const api: BannerStudioApi = {
   setModel: call('setModel'),
   aiAnimate: call('aiAnimate'),
   aiCode: call('aiCode'),
+  exportMedia: call('exportMedia'),
   setAiProvider: call('setAiProvider'),
   fontCatalog: call('fontCatalog'),
   installWebFont: call('installWebFont'),
@@ -55,7 +56,8 @@ const api: BannerStudioApi = {
   pathForFile: (file: File) => webUtils.getPathForFile(file),
   savePresets: call('savePresets'),
   onFilesChanged: subscribe('bs:filesChanged') as BannerStudioApi['onFilesChanged'],
-  onMenu: subscribe('bs:menu') as BannerStudioApi['onMenu']
+  onMenu: subscribe('bs:menu') as BannerStudioApi['onMenu'],
+  onExportProgress: subscribe('bs:exportProgress') as BannerStudioApi['onExportProgress']
 } as BannerStudioApi
 
 contextBridge.exposeInMainWorld('bs', api)

@@ -49,7 +49,7 @@ const MIME: Record<string, string> = {
  * Per formaat, want elke banner bevat zijn eigen kopie (zeker bij Base64). Gelijke sets worden hergebruikt.
  */
 const subsetCache = new Map<string, Promise<Buffer>>()
-async function prepareFonts(dir: string, project: Project, comp: Composition, cache = subsetCache): Promise<Record<string, Buffer>> {
+export async function prepareFonts(dir: string, project: Project, comp: Composition, cache = subsetCache): Promise<Record<string, Buffer>> {
   const chars = charsPerFont(project, comp)
   const out: Record<string, Buffer> = {}
   for (const f of project.fonts) {
@@ -72,7 +72,7 @@ async function prepareFonts(dir: string, project: Project, comp: Composition, ca
 }
 
 /** Alle bestanden van één banner (in het geheugen): HTML, afbeeldingen, fonts en extra bestanden. */
-async function pack(dir: string, project: Project, comp: Composition, target: ExportTarget, fonts: Record<string, Buffer>) {
+export async function pack(dir: string, project: Project, comp: Composition, target: ExportTarget, fonts: Record<string, Buffer>) {
   const files: Record<string, Uint8Array> = {}
 
   // Dezelfde afbeelding (byte voor byte) op meerdere lagen of onder meerdere namen: één bestand in de export.

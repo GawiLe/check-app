@@ -7,6 +7,7 @@ import type { BannerStudioApi, Settings } from '@shared/api'
 import type { Project } from '@shared/types'
 import { aiAnimate, aiCode } from './ai'
 import { estimateSize, exportBanners, MIME, projectFolder } from './exporter'
+import { exportMedia } from './media'
 import { addVersion, clearAutosave, listVersions, readNewerAutosave, readVersion, writeAutosave } from './history'
 import { normalizeProject } from '@shared/sync'
 import { createVariants, readVariantSheet } from './variants'
@@ -217,6 +218,10 @@ const handlers: Handlers = {
     if (typeof req?.outDir !== 'string' || !approvedExportDirs.has(resolve(req.outDir))) throw new Error('Kies eerst een exportmap.')
     return exportBanners(req)
   },
+  exportMedia: (req) => {
+    if (typeof req?.outDir !== 'string' || !approvedExportDirs.has(resolve(req.outDir))) throw new Error('Kies eerst een exportmap.')
+    return exportMedia(req, (msg) => win?.webContents.send('bs:exportProgress', msg))
+  },
   async importVariantSheet(dir) {
     const res = await dialog.showOpenDialog(win!, {
       title: 'Varianten uit CSV of Excel',
@@ -351,7 +356,7 @@ const handlers: Handlers = {
 // Functies die in een projectmap schrijven of lezen: alleen in het project dat nu open is
 // (de map komt uit het venster en wordt dus niet blind vertrouwd).
 const DIR_ARG = new Set(['importImages', 'importFonts', 'listAssets', 'importPaths', 'generateWriteOn', 'saveBoilerplate', 'installWebFont', 'estimateSize', 'importVariantSheet', 'saveVariantSheet'])
-const DIR_REQ = new Set(['exportBanners', 'createVariants'])
+const DIR_REQ = new Set(['exportBanners', 'exportMedia', 'createVariants'])
 const DIR_ARG_EXPORT = new Set(['getExportDir', 'chooseExportDir'])
 // Mag voor elk geopend tabblad (ook op de achtergrond): opslaan, herstelkopie, versies
 const OPEN_DIR_ARG = new Set(['saveProject', 'autosave', 'clearAutosave', 'listVersions', 'readVersion'])

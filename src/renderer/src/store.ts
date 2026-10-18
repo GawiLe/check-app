@@ -3,6 +3,7 @@ import { create } from 'zustand'
 import { baseValue, layerStateAt, upsertKeyframe } from '@shared/anim'
 import { groupOf, groupProps, type PropFilter } from '@shared/propgroups'
 import type { UserPreset } from '@shared/library'
+import type { MediaResult } from '@shared/api'
 import { useDock } from './dock/store'
 import { normalizeProject, syncFormats } from '@shared/sync'
 import { findDeep, localTime } from '@shared/tree'
@@ -56,6 +57,7 @@ export interface State {
   dialog: Dialog
   status: { text: string; kind: 'info' | 'error' } | null
   exportResults: ExportResult[] | null
+  mediaResults: MediaResult[] | null
   /** Alle formaten naast elkaar tonen. */
   overview: boolean
   /** Auto-keyframe (zoals de opname-knop in AE): elke wijziging zet een keyframe. */
@@ -96,6 +98,7 @@ export interface State {
   setAssets(a: string[]): void
   bumpAssets(): void
   setExportResults(r: ExportResult[] | null): void
+  setMediaResults(r: MediaResult[] | null): void
   setOverview(o: boolean): void
   setAutoKey(a: boolean): void
   setTab(t: InspectorTab): void
@@ -145,6 +148,7 @@ export const useStore = create<State>((set, get) => ({
   dialog: null,
   status: null,
   exportResults: null,
+  mediaResults: null,
   overview: false,
   autoKey: false,
   tab: 'design',
@@ -168,7 +172,8 @@ export const useStore = create<State>((set, get) => ({
       dirty: false,
       past: [],
       future: [],
-      exportResults: null
+      exportResults: null,
+      mediaResults: null
     }),
 
   update: (fn, coalesce, skipSync) => {
@@ -236,6 +241,7 @@ export const useStore = create<State>((set, get) => ({
   setAssets: (a) => set({ assets: a }),
   bumpAssets: () => set({ assetsRev: get().assetsRev + 1 }),
   setExportResults: (r) => set({ exportResults: r }),
+  setMediaResults: (r) => set({ mediaResults: r }),
   setOverview: (o) => set({ overview: o }),
   setAutoKey: (a) => set({ autoKey: a }),
   setTab: (t) => {

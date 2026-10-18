@@ -13,7 +13,8 @@ import { applyKeyAssist, type KeyAssist } from '@shared/keys'
 import { groupOf, groupProps } from '@shared/propgroups'
 import { penToPath, type PenPoint } from '@shared/path'
 import { ANIM_PROPS } from '@shared/types'
-import type { ExportTarget, Layer, LayerType } from '@shared/types'
+import type { ExportTarget, Layer, LayerType, MediaOptions } from '@shared/types'
+import type { MediaResult } from '@shared/api'
 import { parseSvg, shapesToLayers } from './svgimport'
 import { round } from '@shared/anim'
 import { assetUrl, contextOf, currentComp, findComp, findLayer, layerLocalTime, setLayerValue, updateLayer, useStore, type SelectedKey, type SvgMode } from '../store'
@@ -671,7 +672,8 @@ export async function exportFolder(choose = false): Promise<string | null> {
   return window.bs.chooseExportDir(dir)
 }
 
-export async function runExport(compositionIds: string[], targets: ExportTarget[]) {
+/** Exporteren: HTML5 per platform en, als gekozen, MP4/GIF (in een eigen map MP4/ en GIF/). */
+export async function runExport(compositionIds: string[], targets: ExportTarget[], media?: MediaOptions | null) {
   const { dir, project } = S()
   if (!dir || !project) return
   try {
@@ -679,13 +681,21 @@ export async function runExport(compositionIds: string[], targets: ExportTarget[
     if (!outDir) return
     S().setStatus('Exporteren…')
     await save()
-    const results = await window.bs.exportBanners({ dir, project: S().project!, compositionIds, targets, outDir })
-    S().setExportResults(results)
+    const results = targets.length ? await window.bs.exportBanners({ dir, project: S().project!, compositionIds, targets, outDir }) : []
+    S().setExportResults(results.length ? results : null)
+    let media_: MediaResult[] = []
+    if (media && (media.mp4 || media.gif)) {
+      const off = window.bs.onExportProgress((msg) => S().setStatus(`Exporteren: ${msg}`))
+      try {
+        media_ = await window.bs.exportMedia({ dir, project: S().project!, compositionIds, outDir, media })
+      } finally {
+        off()
+      }
+    }
+    S().setMediaResults(media_.length ? media_ : null)
     const errors = results.reduce((n, r) => n + r.issues.filter((i) => i.level === 'error').length, 0)
-    S().setStatus(
-      errors ? `Export klaar met ${errors} fout(en). Zie het exportvenster.` : `${results.length} banner(s) geëxporteerd en gevalideerd.`,
-      errors ? 'error' : 'info'
-    )
+    const parts = [results.length && `${results.length} banner(s)`, media_.length && `${media_.length} video/GIF`].filter(Boolean).join(' en ')
+    S().setStatus(errors ? `Export klaar met ${errors} fout(en). Zie het exportvenster.` : `${parts} geëxporteerd.`, errors ? 'error' : 'info')
   } catch (e) {
     fail(e)
   }

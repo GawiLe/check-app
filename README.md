@@ -445,7 +445,22 @@ De uitkomst staat in het exportvenster.
     Bannerv1_300x600px.jpg
 ```
 
-Kies je meer dan één platform, dan komt er per platform een submap tussen (`Bannerv1/CM360/…`, `Bannerv1/Adform/…`); bij één platform niet. In het exportvenster klik je op een platform om te zien wat het is en welke eisen gelden. *Azerion* is een Europees advertentieplatform (o.a. Improve Digital) dat banners op websites en in games plaatst; kies het alleen als de campagne daar loopt.
+Kies je meer dan één platform, dan komt er per platform een submap tussen (`Bannerv1/CM360/…`, `Bannerv1/Adform/…`); bij één platform niet.
+
+**Ook als MP4 of GIF:** vink in het exportvenster onder *Ook als video of GIF* MP4 en/of GIF aan (dat kan ook zonder HTML5-platform). Ze komen altijd in een eigen map, ook bij één platform:
+
+```
+<gekozen map>/
+  Bannerv1/
+    Bannerv1_300x600px.zip
+    Bannerv1_300x600px.jpg
+    MP4/Bannerv1_300x600px.mp4
+    GIF/Bannerv1_300x600px.gif
+```
+
+- **MP4:** H.264 (speelt overal af, ook in PowerPoint, Keynote en op social), 25/30/60 fps, standaard 2× zo scherp (bijv. 600×1200 voor een 300×600).
+- **GIF:** ware grootte, 8–20 fps. Vul bij *max. KB* een maximum in, dan maakt Bnnr de GIF zo nodig lichter (minder kleuren, lagere fps) en waarschuwt als dat niet genoeg is.
+- Beide bevatten alle loops achter elkaar en eindigen op het eindbeeld, precies zoals de banner afspeelt (ook code-elementen en tekenende lijnen). In het exportvenster klik je op een platform om te zien wat het is en welke eisen gelden. *Azerion* is een Europees advertentieplatform (o.a. Improve Digital) dat banners op websites en in games plaatst; kies het alleen als de campagne daar loopt.
 
 ## Architectuur
 
@@ -483,7 +498,6 @@ Sleutels worden versleuteld opgeslagen via de sleutelhanger van het OS.
 - Slimmere formaat-afleiding met ankers per laag (links/rechts/midden, schaal-regels).
 - Extra platforms: Flashtalking, Xandr.
 - Video-laag en sprite-sheets.
-- Export naar MP4/GIF (social, previews).
 - Mockups in de app en *Publiceren naar klantportaal*.
 - Installeerbare app (.dmg) met automatische updates.
 - AI-effecten als herbruikbare presets opslaan.

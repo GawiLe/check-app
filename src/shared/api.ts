@@ -1,6 +1,7 @@
 import type { UserPreset } from './library'
 import type { WebFont } from './webfonts'
-import type { ExportResult, ExportTarget, FontAsset, Project, Tracks, RevealMode, WriteOnProps } from './types'
+import type { ExportResult, ExportTarget, FontAsset, MediaOptions, Project, Tracks, RevealMode, WriteOnProps } from './types'
+export type { MediaOptions } from './types'
 
 export interface OpenedProject {
   dir: string
@@ -66,6 +67,24 @@ export interface ExportRequest {
   targets: ExportTarget[]
   /** Map waarin geëxporteerd wordt (door de gebruiker gekozen); daarin komt een map met de projectnaam. */
   outDir: string
+}
+
+export interface MediaRequest {
+  dir: string
+  project: Project
+  compositionIds: string[]
+  outDir: string
+  media: MediaOptions
+}
+
+export interface MediaResult {
+  kind: 'mp4' | 'gif'
+  composition: string
+  file: string
+  bytes: number
+  /** Bijv. "15 fps, 128 kleuren" of een waarschuwing. */
+  note: string
+  warning?: string
 }
 
 export interface VariantRequest {
@@ -134,6 +153,8 @@ export interface BannerStudioApi {
   saveBoilerplate(dir: string, project: Project, name: string): Promise<Boilerplate>
   deleteBoilerplate(id: string): Promise<void>
   getSettings(): Promise<Settings>
+  /** Banners als MP4 en/of GIF exporteren (in <outDir>/<project>/MP4 en /GIF). */
+  exportMedia(req: MediaRequest): Promise<MediaResult[]>
   setApiKey(key: string, which?: 'anthropic' | 'fal'): Promise<void>
   setModel(model: string): Promise<void>
   setAiProvider(provider: 'anthropic' | 'fal', falModel: string): Promise<void>
@@ -150,6 +171,8 @@ export interface BannerStudioApi {
   savePresets(list: UserPreset[]): Promise<void>
   onFilesChanged(cb: () => void): () => void
   onMenu(cb: (action: string) => void): () => void
+  /** Voortgang van een MP4/GIF-export ("MP4 300×600…"). */
+  onExportProgress(cb: (msg: string) => void): () => void
 }
 
 declare global {

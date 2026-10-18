@@ -3132,3 +3132,20 @@ body.popout-window {
 .stroke-cap button {
   flex: 1;
 }
+
+/* Export: MP4 / GIF */
+.media-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+}
+.media-row .check {
+  min-width: 64px;
+}
+.media-row select {
+  width: auto;
+}
+.media-max {
+  width: 80px;
+}

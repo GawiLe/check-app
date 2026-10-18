@@ -15,11 +15,14 @@ const strictCsp = (): Plugin => ({
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    // gifenc/mp4-muxer worden meegebundeld (klein, en zo altijd beschikbaar in de gebouwde app)
+    plugins: [externalizeDepsPlugin({ exclude: ['gifenc', 'mp4-muxer'] })],
     resolve: { alias: { '@shared': resolve('src/shared') } }
   },
   preload: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin({ exclude: ['gifenc', 'mp4-muxer'] })],
+    // Twee preloads: het hoofdvenster en het onzichtbare venster dat MP4's codeert (WebCodecs)
+    build: { rollupOptions: { input: { index: resolve('src/preload/index.ts'), media: resolve('src/preload/media.ts') } } },
     resolve: { alias: { '@shared': resolve('src/shared') } }
   },
   renderer: {
