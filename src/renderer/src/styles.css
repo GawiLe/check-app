@@ -3149,3 +3149,37 @@ body.popout-window {
 .media-max {
   width: 80px;
 }
+
+/* Kleur: vlakje + hexcode */
+.color-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.color-field .hex {
+  width: 72px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  text-transform: lowercase;
+}
+.text-case {
+  display: flex;
+}
+.text-case button {
+  flex: 1;
+}
+
+/* Assets: sorteren, gebruik, verwijderen */
+.asset-sort {
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.asset-item .asset-uses {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.asset-item.unused .asset-uses {
+  opacity: 0.55;
+  font-style: italic;
+}

@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, shell } from 'electron'
 import { existsSync, watch, type FSWatcher } from 'node:fs'
-import { readFile, writeFile } from 'node:fs/promises'
-import { dirname, extname, join, resolve } from 'node:path'
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { basename, dirname, extname, join, resolve } from 'node:path'
 import { inside } from './paths'
 import type { BannerStudioApi, Settings } from '@shared/api'
 import type { Project } from '@shared/types'
@@ -203,6 +203,20 @@ const handlers: Handlers = {
   },
 
   listAssets: (dir) => listAssets(dir),
+  async deleteAsset(dir, rel) {
+    // Alleen bestanden in assets/; naar de prullenbak (terug te halen), anders naar .bnnr/prullenbak in het project
+    if (typeof rel !== 'string' || !/^assets\/[^/]+$/.test(rel)) throw new Error('Alleen bestanden in assets/ kunnen weg.')
+    const file = inside(dir, rel)
+    try {
+      await shell.trashItem(file)
+      return 'trash'
+    } catch {
+      const bin = join(dir, '.bnnr', 'prullenbak')
+      await mkdir(bin, { recursive: true })
+      await rename(file, join(bin, `${Date.now()}-${basename(file)}`))
+      return 'project'
+    }
+  },
 
   async importPaths(dir, paths) {
     const img = paths.filter((p) => /\.(png|jpe?g|gif|svg|webp)$/i.test(p))
@@ -355,7 +369,7 @@ const handlers: Handlers = {
 
 // Functies die in een projectmap schrijven of lezen: alleen in het project dat nu open is
 // (de map komt uit het venster en wordt dus niet blind vertrouwd).
-const DIR_ARG = new Set(['importImages', 'importFonts', 'listAssets', 'importPaths', 'generateWriteOn', 'saveBoilerplate', 'installWebFont', 'estimateSize', 'importVariantSheet', 'saveVariantSheet'])
+const DIR_ARG = new Set(['importImages', 'importFonts', 'listAssets', 'deleteAsset', 'importPaths', 'generateWriteOn', 'saveBoilerplate', 'installWebFont', 'estimateSize', 'importVariantSheet', 'saveVariantSheet'])
 const DIR_REQ = new Set(['exportBanners', 'exportMedia', 'createVariants'])
 const DIR_ARG_EXPORT = new Set(['getExportDir', 'chooseExportDir'])
 // Mag voor elk geopend tabblad (ook op de achtergrond): opslaan, herstelkopie, versies

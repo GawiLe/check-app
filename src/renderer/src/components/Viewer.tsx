@@ -4,7 +4,7 @@ import { Maximize, Minus, Plus, Star } from 'lucide-react'
 import { layerStateAt, restStateAt } from '@shared/anim'
 import { resizeFromHandle } from '@shared/geometry'
 import { measuresFor, snapMove, union, type Guide, type Measure, type Rect } from '@shared/snap'
-import { buildBanner } from '@shared/build'
+import { buildBanner, TEXT_CASE } from '@shared/build'
 import type { Composition, Layer, Project } from '@shared/types'
 import { anchorOf } from '@shared/geometry'
 import type { PenPoint } from '@shared/path'
@@ -818,6 +818,7 @@ function TextEditor({ box, zoom, project }: { box: Box; zoom: number; project: P
         lineHeight: t.leading != null ? `${t.leading * zoom}px` : t.lineHeight,
         letterSpacing: t.tracking != null ? `${t.tracking / 1000}em` : t.letterSpacing * zoom,
         textAlign: t.align,
+        textTransform: t.case ? TEXT_CASE[t.case] : undefined,
         color: t.color
       }}
     />

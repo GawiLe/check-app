@@ -287,3 +287,43 @@ export function InlineRename(props: { value: string; onDone: (v: string | null) 
     />
   )
 }
+
+/** Hexcode netjes maken: "abc", "#ABC" of "aabbcc" → "#aabbcc". Ongeldig = null. */
+export function normalizeHex(v: string): string | null {
+  const m = v.trim().replace(/^#/, '').toLowerCase()
+  if (/^[0-9a-f]{3}$/.test(m)) return '#' + [...m].map((c) => c + c).join('')
+  if (/^[0-9a-f]{6}$/.test(m)) return '#' + m
+  return null
+}
+
+/**
+ * Kleur: vlakje met de kleurkiezer van het systeem plus een veld voor de hexcode
+ * (typen of plakken, Enter of wegklikken = toepassen). `coalesce` voegt het slepen in de kiezer
+ * samen tot één stap voor Ongedaan maken.
+ */
+export function ColorInput(props: { value: string; onChange: (v: string, coalesce?: string) => void; coalesce?: string; title?: string }) {
+  const [text, setText] = useState(props.value)
+  useEffect(() => setText(props.value), [props.value])
+  const commit = () => {
+    const hex = normalizeHex(text)
+    if (hex && hex !== props.value) props.onChange(hex)
+    else setText(props.value)
+  }
+  return (
+    <span className="color-field" title={props.title}>
+      <input type="color" value={normalizeHex(props.value) ?? '#000000'} onChange={(e) => props.onChange(e.target.value, props.coalesce)} />
+      <input
+        className="hex"
+        value={text}
+        spellCheck={false}
+        maxLength={9}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+          if (e.key === 'Escape') setText(props.value)
+        }}
+      />
+    </span>
+  )
+}

@@ -61,6 +61,8 @@ export function usedFontIds(comp: Composition): string[] {
   return [...ids]
 }
 
+export const TEXT_CASE = { upper: 'uppercase', lower: 'lowercase', title: 'capitalize' } as const
+
 /** Alle tekens per font (voor subsetting). */
 export function charsPerFont(project: Project, only?: Composition): Record<string, string> {
   const out: Record<string, Set<string>> = {}
@@ -68,7 +70,9 @@ export function charsPerFont(project: Project, only?: Composition): Record<strin
     for (const l of allLayers(c.layers))
       if (l.type === 'text' && l.text?.fontId) {
         const set = (out[l.text.fontId] ??= new Set())
-        for (const ch of l.text.content) set.add(ch)
+        // Met hoofdletters/kleine letters toont de browser andere tekens dan getypt: die moeten ook in het font
+        const text = l.text.case ? l.text.content + l.text.content.toUpperCase() + l.text.content.toLowerCase() : l.text.content
+        for (const ch of text) set.add(ch)
       }
   return Object.fromEntries(Object.entries(out).map(([k, v]) => [k, [...v].join('')]))
 }
@@ -157,6 +161,7 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
             t.tracking != null && Number.isFinite(Number(t.tracking)) ? `letter-spacing:${n(Number(t.tracking) / 1000)}em` : `letter-spacing:${n(t.letterSpacing)}px`,
             'white-space:pre-wrap'
           )
+          if (t.case === 'upper' || t.case === 'lower' || t.case === 'title') rules.push(`text-transform:${TEXT_CASE[t.case]}`)
           // Lijn rond de letters: dubbel zo dik met de vulling erboven, zodat de lijn alleen buiten de letter valt
           if (t.stroke && Number(t.stroke.width) > 0) rules.push(`-webkit-text-stroke:${n(Number(t.stroke.width) * 2)}px ${cssValue(t.stroke.color)}`, 'paint-order:stroke fill')
           inner = escapeHtml(t.content)

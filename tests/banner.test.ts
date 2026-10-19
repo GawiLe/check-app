@@ -1490,3 +1490,19 @@ describe('lijnen', () => {
     expect(html).toContain('-webkit-text-stroke:4px #000000;paint-order:stroke fill')
   })
 })
+
+describe('hoofdletters', () => {
+  it('text-transform in de HTML en hoofd- én kleine letters in het verkleinde font', async () => {
+    const { charsPerFont } = await import('../src/shared/build')
+    const p = createStarterProject('Case')
+    const t = p.compositions[0].layers.find((l) => l.type === 'text')!
+    t.text!.fontId = 'f1'
+    t.text!.content = 'abc'
+    expect(charsPerFont(p, p.compositions[0]).f1).toBe('abc')
+    t.text!.case = 'upper'
+    expect([...charsPerFont(p, p.compositions[0]).f1].sort().join('')).toBe('ABCabc')
+    expect(build(p).html).toContain('text-transform:uppercase')
+    t.text!.case = 'title'
+    expect(build(p).html).toContain('text-transform:capitalize')
+  })
+})

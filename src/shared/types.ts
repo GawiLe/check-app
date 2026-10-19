@@ -75,6 +75,8 @@ export interface TextProps {
   tracking?: number
   /** Automatisch passend maken: de lettergrootte wordt (in de browser, met het echte font) verkleind tot de tekst in het kader past. */
   fit?: boolean
+  /** Hoofdletters: zoals getypt (ontbreekt), ALLES HOOFDLETTERS, alles kleine letters of Elk Woord Met Een Hoofdletter. De tekst zelf blijft zoals getypt. */
+  case?: 'upper' | 'lower' | 'title' | null
   /** Lijn rond de letters (buitenkant, de vulling blijft heel). */
   stroke?: { color: string; width: number } | null
 }

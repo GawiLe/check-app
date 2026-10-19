@@ -33,7 +33,7 @@ import {
 } from '../lib/actions'
 import { currentComp, layerLocalTime, setLayerValue, toggleStopwatch, updateComp, updateLayer, useStore } from '../store'
 import { FontPicker } from './FontPicker'
-import { Num, Row, Scrub, Section, SectionStack, Switch, TextInput } from './ui'
+import { ColorInput, Num, Row, Scrub, Section, SectionStack, Switch, TextInput } from './ui'
 
 export const EASE_LABEL: Record<EaseName, string> = {
   linear: 'Lineair',
@@ -251,8 +251,7 @@ function CompDesign() {
           </span>
         </Row>
         <Row label="Achtergrond">
-          <input type="color" value={comp.background} onChange={(e) => updateComp((c) => void (c.background = e.target.value), 'bg')} />
-          <TextInput value={comp.background} onCommit={(v) => updateComp((c) => void (c.background = v))} />
+          <ColorInput value={comp.background} coalesce="bg" onChange={(v, co) => updateComp((c) => void (c.background = v), co)} />
         </Row>
         <Row label="Rand">
           <Switch
@@ -261,7 +260,7 @@ function CompDesign() {
           />
           {comp.border && (
             <>
-              <input type="color" value={comp.border.color} onChange={(e) => updateComp((c) => void (c.border!.color = e.target.value), 'bc')} />
+              <ColorInput value={comp.border.color} coalesce="bc" onChange={(v, co) => updateComp((c) => void (c.border!.color = v), co)} />
               <Num label="px" value={comp.border.width} min={1} max={10} onChange={(v, co) => updateComp((c) => void (c.border!.width = v), co ? 'bw' : undefined)} />
             </>
           )}
@@ -363,7 +362,7 @@ function LayerDesign({ layer }: { layer: Layer }) {
             }
           />
           <div className="row">
-            <input type="color" value={layer.text.color} onChange={(e) => up((l) => void (l.text!.color = e.target.value), 'tc')} />
+            <ColorInput value={layer.text.color} coalesce="tc" onChange={(v, co) => up((l) => void (l.text!.color = v), co)} />
             <div className="grow">
               <Num label="pt" value={layer.text.size} min={4} max={300} onChange={(v, co) => up((l) => void (l.text!.size = v), co ? 'ts' : undefined)} />
             </div>
@@ -423,12 +422,29 @@ function LayerDesign({ layer }: { layer: Layer }) {
             />
             {layer.text.stroke && layer.text.stroke.width > 0 && (
               <>
-                <input type="color" value={layer.text.stroke.color} onChange={(e) => up((l) => void (l.text!.stroke!.color = e.target.value), 'tsc')} />
+                <ColorInput value={layer.text.stroke.color} coalesce="tsc" onChange={(v, co) => up((l) => void (l.text!.stroke!.color = v), co)} />
                 <div className="grow">
                   <Num label="px" value={layer.text.stroke.width} min={0.5} max={20} step={0.5} decimals={1} onChange={(v, co) => up((l) => void (l.text!.stroke!.width = v), co ? 'tsw' : undefined)} />
                 </div>
               </>
             )}
+          </div>
+          <div className="row">
+            <span className="label">Hoofdletters</span>
+            <div className="seg grow text-case">
+              {(
+                [
+                  [null, 'Aa', 'Zoals getypt'],
+                  ['upper', 'AA', 'ALLES HOOFDLETTERS'],
+                  ['lower', 'aa', 'alles kleine letters'],
+                  ['title', 'Aa Bb', 'Elk Woord Met Een Hoofdletter']
+                ] as const
+              ).map(([v, label, title]) => (
+                <button key={label} title={title} className={(layer.text!.case ?? null) === v ? 'on' : ''} onClick={() => up((l) => void (v ? (l.text!.case = v) : delete l.text!.case))}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
           <Row label="Passend">
             <Switch checked={!!layer.text.fit} onChange={(v) => up((l) => void (l.text!.fit = v))} />
@@ -462,7 +478,7 @@ function LayerDesign({ layer }: { layer: Layer }) {
             }}
           />
           <div className="row">
-            <input type="color" value={layer.writeon.color} onChange={(e) => up((l) => void (l.writeon!.color = e.target.value), 'wc')} />
+            <ColorInput value={layer.writeon.color} coalesce="wc" onChange={(v, co) => up((l) => void (l.writeon!.color = v), co)} />
             <div className="grow">
               <Num label="Lijn" value={layer.writeon.strokeWidth} step={0.1} min={0} max={20} decimals={1} onChange={(v, co) => up((l) => void (l.writeon!.strokeWidth = v), co ? 'wsw' : undefined)} />
             </div>
@@ -552,10 +568,7 @@ function LayerDesign({ layer }: { layer: Layer }) {
               <Switch checked={layer.shape.fillEnabled !== false} onChange={(v) => up((l) => void (l.shape!.fillEnabled = v))} />
               {layer.shape.fillEnabled !== false && (
                 <>
-                  <input type="color" value={layer.shape.fill} onChange={(e) => up((l) => void (l.shape!.fill = e.target.value), 'sf')} />
-                  <div className="grow">
-                    <TextInput value={layer.shape.fill} onCommit={(v) => up((l) => void (l.shape!.fill = v))} />
-                  </div>
+                  <ColorInput value={layer.shape.fill} coalesce="sf" onChange={(v, co) => up((l) => void (l.shape!.fill = v), co)} />
                 </>
               )}
             </div>
@@ -569,7 +582,7 @@ function LayerDesign({ layer }: { layer: Layer }) {
             />
             {layer.shape.strokeWidth > 0 && (
               <>
-                <input type="color" value={layer.shape.strokeColor} onChange={(e) => up((l) => void (l.shape!.strokeColor = e.target.value), 'sc')} />
+                <ColorInput value={layer.shape.strokeColor} coalesce="sc" onChange={(v, co) => up((l) => void (l.shape!.strokeColor = v), co)} />
                 <div className="grow">
                   <Num label="px" value={layer.shape.strokeWidth} min={0.5} max={50} step={0.5} decimals={1} onChange={(v, co) => up((l) => void (l.shape!.strokeWidth = v), co ? 'ss' : undefined)} />
                 </div>
@@ -698,10 +711,7 @@ function GradientRows({ layer }: { layer: Layer }) {
       {g && (
         <>
           <Row label="Naar">
-            <input type="color" value={g.to} onChange={(e) => up((gr) => void (gr.to = e.target.value), 'gto')} />
-            <div className="grow">
-              <TextInput value={g.to} onCommit={(v) => up((gr) => void (gr.to = v))} />
-            </div>
+            <ColorInput value={g.to} coalesce="gto" onChange={(v, co) => up((gr) => void (gr.to = v), co)} />
             {g.type === 'linear' && (
               <div style={{ width: 74 }}>
                 <Num label="°" value={g.angle} min={-360} max={360} onChange={(v, co) => up((gr) => void (gr.angle = v), co ? 'gan' : undefined)} />
@@ -852,7 +862,7 @@ function ShadowSection({ layer }: { layer: Layer }) {
         return (
           <div key={i} className="shadow-row ps-shadow">
             <div className="ps-head">
-              <input type="color" value={sh.color} title="Kleur" onChange={(e) => set(i, { color: e.target.value }, `shc${i}`)} />
+              <ColorInput value={sh.color} title="Kleur" coalesce={`shc${i}`} onChange={(v, co) => set(i, { color: v }, co)} />
               <span className="faint">Slagschaduw {list.length > 1 ? i + 1 : ''}</span>
               <span className="grow" />
               <button className="icon sm" title="Schaduw verwijderen" onClick={() => up((l) => void (l.shadows = l.shadows!.filter((_, j) => j !== i)))}>

@@ -26,6 +26,40 @@ function fail(err: unknown) {
   S().setStatus(msg, 'error')
 }
 
+/** Hoe vaak elke asset gebruikt wordt: afbeeldingslagen in alle formaten (ook in composities). */
+export function assetUsage(project: { compositions: { layers: Layer[] }[] }): Map<string, number> {
+  const out = new Map<string, number>()
+  for (const c of project.compositions)
+    for (const l of allLayers(c.layers)) if (l.image?.src) out.set(l.image.src, (out.get(l.image.src) ?? 0) + 1)
+  return out
+}
+
+/**
+ * Asset verwijderen (naar de prullenbak). Is hij in gebruik, dan eerst bevestigen; die
+ * afbeeldingslagen worden leeg (en blijven staan, zodat je er een andere afbeelding in kunt zetten).
+ */
+export async function deleteAsset(path: string) {
+  const { dir, project } = S()
+  if (!dir || !project) return
+  const name = path.replace(/^assets\//, '')
+  const used = assetUsage(project).get(path) ?? 0
+  const msg = used
+    ? `"${name}" wordt in ${used} laag/lagen gebruikt. Die lagen worden leeg (je kunt er daarna een andere afbeelding in zetten).\n\nToch verwijderen? Het bestand gaat naar de prullenbak.`
+    : `"${name}" verwijderen? Het bestand gaat naar de prullenbak.`
+  if (!window.confirm(msg)) return
+  try {
+    const where = await window.bs.deleteAsset(dir, path)
+    if (used)
+      S().update((p) => {
+        for (const c of p.compositions) for (const l of allLayers(c.layers)) if (l.image?.src === path) l.image.src = ''
+      })
+    await refreshAssets()
+    S().setStatus(`"${name}" verwijderd${where === 'trash' ? ' (in de prullenbak)' : ' (in .bnnr/prullenbak in het project)'}`)
+  } catch (e) {
+    fail(e)
+  }
+}
+
 export async function refreshAssets() {
   const { dir } = S()
   if (dir) S().setAssets(await window.bs.listAssets(dir))

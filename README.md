@@ -188,6 +188,8 @@ Lagen: selecteer en druk **Enter**, dubbelklik op de naam in de tijdlijn, of rec
   - Sleep het naar een andere plek; het klikt vast op hoeken, randen en midden. De laag verspringt niet, net als met Pan Behind in AE.
   - Je kunt het ook instellen via het 3×3-raster in de inspector.
 - **Vormen:** kies rechthoek of ellips, zet vulling en lijn los aan of uit (met kleur en dikte), en stel bij een rechthoek de hoekradius in. *Rond* maakt er een pil-vorm van. Pen-vormen schalen mee als je de laag groter maakt.
+- **Kleuren:** naast elk kleurvlakje staat de hexcode. Typ of plak een code (`#e30613`, `e30613` of kort `f00`) en druk op Enter.
+- **Hoofdletters:** bij *Tekst → Hoofdletters* kies je *Aa* (zoals getypt), *AA* (alles hoofdletters), *aa* (alles kleine letters) of *Aa Bb* (elk woord een hoofdletter). De tekst zelf blijft zoals je hem typte; bij export komen de juiste letters in het verkleinde font.
 - **Lijn (stroke):** bij een vorm stel je onder *Lijn* in: kleur, dikte, **positie** (binnen, midden of buiten de rand), **stippellijn** (lengte van streep en gat; streep 0 met ronde uiteinden geeft stippen) en **uiteinden** (rond of recht). Tekst kan ook een lijn krijgen (rond de letters, de vulling blijft heel).
 - **Lijn laten tekenen:** de knop *Lijn laten tekenen* (of Wipe → *Lijn tekenen*) laat de lijn zich vanaf de playhead in 1 seconde tekenen, zoals Trim Paths in After Effects. Het zijn gewone keyframes op *Reveal* die je in de tijdlijn kunt verschuiven of aanpassen. Werkt voor pen-lijnen, rechthoeken en ellipsen.
 - **Rechtermuisknop** op een laag (canvas of tijdlijn) geeft onder meer:
@@ -209,6 +211,7 @@ Lagen: selecteer en druk **Enter**, dubbelklik op de naam in de tijdlijn, of rec
 
 - **Volgorde:** sleep een laag in de tijdlijn naar boven of onder. Een blauwe lijn laat zien waar hij komt; bij de rand scrolt de tijdlijn mee.
   - Je kunt een laag ook in of uit een opengeklapte compositie slepen. Positie en timing worden dan omgerekend, zodat hij op dezelfde plek en hetzelfde moment blijft.
+- **Assets-paneel:** achter elke asset staat hoe vaak hij gebruikt wordt (in alle formaten), of *niet gebruikt*. Sorteer op *Naam* of *Gebruik*. Verwijderen kan met het prullenbakje (bij aanwijzen) of de rechtermuisknop: het bestand gaat naar de prullenbak. Is de asset in gebruik, dan vraagt Bnnr eerst bevestiging en worden die afbeeldingslagen leeg.
 - **SVG, PNG, JPG, GIF en WebP:** sleep ze vanuit de Finder op het canvas. Ze komen in `assets/` en worden meteen een laag op de plek waar je loslaat.
   - Sleep je ze op het linkerpaneel, dan komen ze alleen bij de assets.
   - Via *Assets & fonts → importeren* kan het ook.

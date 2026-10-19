@@ -1,5 +1,6 @@
-import { ImagePlus, Type, X } from 'lucide-react'
-import { addAsset, importDroppedFiles, importFonts, importImages, replaceImage } from '../lib/actions'
+import { useState } from 'react'
+import { ImagePlus, Trash2, Type, X } from 'lucide-react'
+import { addAsset, assetUsage, deleteAsset, importDroppedFiles, importFonts, importImages, replaceImage } from '../lib/actions'
 import { assetUrl, currentComp, useStore } from '../store'
 import { allLayers } from '@shared/tree'
 
@@ -19,6 +20,26 @@ export function AssetsPanel() {
   const assets = useStore((s) => s.assets)
   const rev = useStore((s) => s.assetsRev)
   const s = useStore.getState
+  const [sort, setSortState] = useState<'name' | 'usage'>(() => {
+    try {
+      return localStorage.getItem('bs-asset-sort') === 'usage' ? 'usage' : 'name'
+    } catch {
+      return 'name'
+    }
+  })
+  const setSort = (v: 'name' | 'usage') => {
+    setSortState(v)
+    try {
+      localStorage.setItem('bs-asset-sort', v)
+    } catch {
+      /* niet erg */
+    }
+  }
+  const usage = assetUsage(project)
+  const label = (a: string) => a.replace(/^assets\//, '')
+  const sorted = [...assets].sort((a, b) =>
+    sort === 'usage' ? (usage.get(b) ?? 0) - (usage.get(a) ?? 0) || label(a).localeCompare(label(b), 'nl', { numeric: true }) : label(a).localeCompare(label(b), 'nl', { numeric: true })
+  )
 
   return (
     <div
@@ -39,14 +60,27 @@ export function AssetsPanel() {
           </button>
         }
       >
+        {assets.length > 1 && (
+          <div className="row asset-sort">
+            <span className="faint">Sorteer</span>
+            <div className="seg">
+              <button className={sort === 'name' ? 'on' : ''} onClick={() => setSort('name')}>
+                Naam
+              </button>
+              <button className={sort === 'usage' ? 'on' : ''} onClick={() => setSort('usage')}>
+                Gebruik
+              </button>
+            </div>
+          </div>
+        )}
         <div className="list">
           {assets.length === 0 && (
             <div className="empty">Sleep afbeeldingen in de map assets/ of klik op + om te importeren.</div>
           )}
-          {assets.map((a) => (
+          {sorted.map((a) => (
             <div
               key={a}
-              className="list-item"
+              className={`list-item asset-item${usage.get(a) ? '' : ' unused'}`}
               title="Klik om als laag toe te voegen · sleep op een afbeeldingslaag in de tijdlijn of rechtermuisknop om te vervangen"
               draggable
               onDragStart={(e) => {
@@ -63,12 +97,26 @@ export function AssetsPanel() {
                     label: imgs.length > 1 ? `Vervang ${imgs.length} geselecteerde afbeeldingen` : 'Vervang geselecteerde afbeelding',
                     disabled: !imgs.length,
                     onClick: () => imgs.forEach((l) => void replaceImage(l.id, a))
-                  }
+                  },
+                  { label: 'Verwijderen…', onClick: () => void deleteAsset(a) }
                 ])
               }}
             >
               <img className="thumb" src={assetUrl(a, rev)} alt="" />
-              <span className="grow">{a.replace(/^assets\//, '')}</span>
+              <span className="grow">{label(a)}</span>
+              <span className="meta asset-uses" title={usage.get(a) ? `In ${usage.get(a)} laag/lagen gebruikt (alle formaten)` : 'Nergens gebruikt'}>
+                {usage.get(a) ? `${usage.get(a)}×` : 'niet gebruikt'}
+              </span>
+              <button
+                className="icon sm show-hover"
+                title="Verwijderen (naar de prullenbak)"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void deleteAsset(a)
+                }}
+              >
+                <Trash2 size={12} />
+              </button>
             </div>
           ))}
         </div>
