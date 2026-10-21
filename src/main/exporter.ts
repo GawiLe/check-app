@@ -1,14 +1,20 @@
-import { BrowserWindow } from 'electron'
 import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, extname, join } from 'node:path'
-import { pathToFileURL } from 'node:url'
-import { zipSync } from 'fflate'
+import { basename, dirname, extname, join } from 'node:path'
+import { zipSync, type Zippable } from 'fflate'
+
+/** Zip van de banner: tekst (HTML, SVG, JSON) gecomprimeerd; al gecomprimeerde bestanden (JPG, PNG, GIF, WebP, WOFF2) los opgeslagen, want nogmaals comprimeren levert vrijwel niets op en kost veel tijd. */
+export function zipBanner(files: Record<string, Uint8Array>): Uint8Array {
+  const z: Zippable = {}
+  for (const [n, d] of Object.entries(files)) z[n] = /\.(jpe?g|png|gif|webp|woff2?)$/i.test(n) ? [d, { level: 0 }] : d
+  return zipSync(z, { level: 9 })
+}
 import type { ExportRequest } from '@shared/api'
 import { buildBanner, charsPerFont } from '@shared/build'
 import { fontsInline, TARGET_IDS, TARGETS } from '@shared/specs'
 import { inside } from './paths'
+import { renderWindow, serveDir } from './render'
 import type { Composition, ExportResult, ExportTarget, Project } from '@shared/types'
 import { initialLoad, validateBanner } from '@shared/validate'
 import { subsetToWoff2 } from './fonts'
@@ -28,6 +34,17 @@ export const projectFolder = (name: string) =>
     .replace(/^[.\s-]+/, '')
     .trim()
     .slice(0, 80) || 'banner'
+
+/**
+ * Naam van een banner: <Project>_<B>x<H>px. Twee formaten met dezelfde maat (bijv. twee keer 300×250)
+ * krijgen een volgnummer, zodat de een de ander nooit overschrijft.
+ */
+export function bannerName(project: Project, comp: Composition): string {
+  const size = (c: Composition) => `${Math.round(Number(c.width)) || 0}x${Math.round(Number(c.height)) || 0}`
+  const same = project.compositions.filter((c) => size(c) === size(comp))
+  const n = same.findIndex((c) => c.id === comp.id)
+  return `${fileStem(project.name)}_${size(comp)}px${n > 0 ? `_${n + 1}` : ''}`
+}
 
 /** Bestandsnaam van het project zonder spaties (bijv. "Bannerv1"), voor map en zips. */
 export const fileStem = (name: string) =>
@@ -165,14 +182,14 @@ async function exportOne(
   target: ExportTarget,
   fonts: Record<string, Buffer>
 ): Promise<ExportResult> {
-  const name = `${fileStem(project.name)}_${comp.width}x${comp.height}px`
+  const name = bannerName(project, comp)
   await mkdir(targetDir, { recursive: true })
   const outDir = await mkdtemp(join(tmpdir(), 'bnnr-'))
 
   const { files, built, imageNotes } = await pack(dir, project, comp, target, fonts)
   for (const [n, data] of Object.entries(files)) await writeFile(join(outDir, n), data)
 
-  const zip = zipSync(files, { level: 9 })
+  const zip = zipBanner(files)
   const zipPath = join(targetDir, `${name}.zip`)
   await writeFile(zipPath, zip)
 
@@ -230,15 +247,11 @@ async function exportOne(
 
 /** Rendert het eindframe van de banner naar een JPG (backup-afbeelding voor CM360/GAM). */
 export async function renderBackup(indexHtml: string, comp: Composition, outFile: string): Promise<void> {
-  const win = new BrowserWindow({
-    show: false,
-    width: comp.width,
-    height: comp.height,
-    useContentSize: true,
-    webPreferences: { offscreen: true, javascript: true, sandbox: true }
-  })
+  // Afgeschermd renderen: alleen de tijdelijke exportmap, geen netwerk en geen toegang tot andere bestanden
+  const served = serveDir(dirname(indexHtml))
+  const win = renderWindow(Math.round(Number(comp.width)) || 1, Math.round(Number(comp.height)) || 1)
   try {
-    await win.loadURL(pathToFileURL(indexHtml).href)
+    await win.loadURL(served.url)
     await win.webContents.executeJavaScript(`new Promise(function(res){
       var n=0;(function w(){ if(document.body.className.indexOf('r')>=0||n++>100){ if(window.BS)BS.seek(BS.end); requestAnimationFrame(function(){requestAnimationFrame(res)}) } else setTimeout(w,30) })()
     })`)
@@ -249,6 +262,7 @@ export async function renderBackup(indexHtml: string, comp: Composition, outFile
     await writeFile(outFile, jpg)
   } finally {
     win.destroy()
+    served.release()
   }
 }
 
@@ -282,7 +296,7 @@ export async function estimateSize(dir: string, project: Project, compId: string
   if (!comp || !TARGET_IDS.includes(target)) throw new Error('Onbekend formaat of platform')
   const fonts = await prepareFonts(dir, project, comp, estimateFonts)
   const { files } = await pack(dir, project, comp, target, fonts)
-  const zip = zipSync(files, { level: 9 })
+  const zip = zipBanner(files)
   const fileList = Object.entries(files).map(([n, d]) => ({ name: n, bytes: d.byteLength }))
   return { zipBytes: zip.byteLength, initialLoadBytes: initialLoad(fileList, project.politeLoad) }
 }

@@ -106,10 +106,61 @@ function useTimeDrag(pps: number) {
 const propsFor = (l: Layer): AnimProp[] =>
   ANIM_PROPS.filter((p) => p !== 'reveal' || l.type === 'writeon' || l.revealMode !== 'none')
 
+/** Tijdcode (volgt de tijd; los onderdeel zodat niet de hele tijdlijn opnieuw tekent). */
+function TimeCode({ origin }: { origin: number }) {
+  const time = useStore((s) => s.time)
+  return <span className="timecode">{formatTime(Math.max(0, time - origin))}</span>
+}
+
+function Playhead({ xOf }: { xOf: (t: number) => number }) {
+  const time = useStore((s) => s.time)
+  return <div className="playhead" style={{ left: xOf(time) }} />
+}
+
+/** Eigenschap-rij (naam, keyframe-navigator, waarden op de playhead): volgt de tijd zelf. */
+function PropRow(props: { layer: Layer; group: PropGroupId; offset: number; depth: number; onToggle: () => void }) {
+  const { layer: l, group: g, offset, depth } = props
+  const time = useStore((s) => s.time)
+  const s = useStore.getState
+  const st = layerStateAt(l, time - offset)
+  const members = groupProps(l, g)
+  const hasKeyHere = members.some((m) => l.tracks[m]?.some((k) => Math.abs(k.t - (time - offset)) < 1 / 60))
+  // Keyframe-navigator (zoals in After Effects): playhead precies op het vorige / volgende keyframe
+  const keyTimes = groupTimes(effectiveLayer(l), g).map((t) => offset + t)
+  const prevKey = [...keyTimes].reverse().find((t) => t < time - 1e-4)
+  const nextKey = keyTimes.find((t) => t > time + 1e-4)
+  const goTo = (t: number | undefined) => {
+    if (t == null) return
+    s().setPlaying(false)
+    s().setTime(t)
+  }
+  const on = members.some((m) => l.tracks[m]?.length)
+  return (
+    <div className="tl-name sub" style={{ paddingLeft: 30 + depth * 16 }}>
+      <button className="kf-nav" title="Naar vorig keyframe" disabled={prevKey == null} onClick={() => goTo(prevKey)}>
+        ◀
+      </button>
+      <button
+        className={`kf-btn${on ? ' on' : ''}${hasKeyHere ? ' here' : ''}`}
+        title={hasKeyHere ? 'Keyframe op de playhead weghalen' : 'Keyframe op de playhead zetten'}
+        onClick={props.onToggle}
+      >
+        ◆
+      </button>
+      <button className="kf-nav" title="Naar volgend keyframe" disabled={nextKey == null} onClick={() => goTo(nextKey)}>
+        ▶
+      </button>
+      <span className="grow">{GROUP_LABEL[g]}</span>
+      <PropValues layer={l} group={g} st={st} animated={on} />
+    </div>
+  )
+}
+
 export function Timeline() {
   const comp = useStore(currentComp)!
   const project = useStore((st) => st.project)!
-  const time = useStore((s) => s.time)
+  // Geen abonnement op de tijd hier: dan tekent de hele tijdlijn elk beeldje opnieuw tijdens afspelen.
+  // Alleen de playhead, de tijdcode en de waarden per eigenschap (PropRow) volgen de tijd.
   const playing = useStore((s) => s.playing)
   const autoKey = useStore((s) => s.autoKey)
   const selection = useStore((s) => s.selection)
@@ -396,7 +447,7 @@ export function Timeline() {
 
   /** Keyframe op de playhead voor de hele groep toevoegen of weghalen (◆ in de eigenschap-rij). */
   const toggleKeyAtPlayhead = (l: Layer, g: PropGroupId, offset: number) => {
-    const t = round(time - offset)
+    const t = round(s().time - offset)
     const st = layerStateAt(l, t)
     updateLayer(l.id, (x) => {
       const members = groupProps(x, g)
@@ -532,38 +583,9 @@ export function Timeline() {
     )
     if (!open) return
     // Eigenschappen, zoals in After Effects: Positie (X+Y), Schaal, Rotatie, Dekking …
-    const st = layerStateAt(l, time - offset)
     for (const g of visibleGroups(l, shownProps[l.id])) {
-      const members = groupProps(l, g)
-      const hasKeyHere = members.some((m) => l.tracks[m]?.some((k) => Math.abs(k.t - (time - offset)) < 1 / 60))
-      // Keyframe-navigator (zoals in After Effects): playhead precies op het vorige / volgende keyframe
-      const keyTimes = groupTimes(effectiveLayer(l), g).map((t) => offset + t)
-      const prevKey = [...keyTimes].reverse().find((t) => t < time - 1e-4)
-      const nextKey = keyTimes.find((t) => t > time + 1e-4)
-      const goTo = (t: number | undefined) => {
-        if (t == null) return
-        s().setPlaying(false)
-        s().setTime(t)
-      }
-      const on = members.some((m) => l.tracks[m]?.length)
       rows.push(
-        <div key={l.id + g + 'n'} className="tl-name sub" style={{ paddingLeft: 30 + depth * 16 }}>
-          <button className="kf-nav" title="Naar vorig keyframe" disabled={prevKey == null} onClick={() => goTo(prevKey)}>
-            ◀
-          </button>
-          <button
-            className={`kf-btn${on ? ' on' : ''}${hasKeyHere ? ' here' : ''}`}
-            title={hasKeyHere ? 'Keyframe op de playhead weghalen' : 'Keyframe op de playhead zetten'}
-            onClick={() => toggleKeyAtPlayhead(l, g, offset)}
-          >
-            ◆
-          </button>
-          <button className="kf-nav" title="Naar volgend keyframe" disabled={nextKey == null} onClick={() => goTo(nextKey)}>
-            ▶
-          </button>
-          <span className="grow">{GROUP_LABEL[g]}</span>
-          <PropValues layer={l} group={g} st={st} animated={on} />
-        </div>,
+        <PropRow key={l.id + g + 'n'} layer={l} group={g} offset={offset} depth={depth} onToggle={() => toggleKeyAtPlayhead(l, g, offset)} />,
         <div key={l.id + g + 't'} className="tl-track sub" onPointerDown={startMarquee}>
           {groupDiamonds(l, g, offset)}
         </div>
@@ -632,7 +654,7 @@ export function Timeline() {
         <button className="icon" title="Naar eindframe (End)" onClick={() => s().setTime(endFrame)}>
           <SkipForward size={15} />
         </button>
-        <span className="timecode">{formatTime(Math.max(0, time - origin))}</span>
+        <TimeCode origin={origin} />
         {range.group ? (
           <span className="faint tl-duration" style={{ whiteSpace: 'nowrap' }} title="Duur van deze compositie (zet zijn uit-punt): sleep of klik om te typen">
             /
@@ -744,7 +766,7 @@ export function Timeline() {
             <div className="out-of-range" style={{ left: xOf(origin + length), right: 0 }} />
             <div className="endmarker" style={{ left: xOf(origin + length) }} />
             {!range.group && endFrame < comp.duration && <div className="endframe" style={{ left: xOf(endFrame) }} title="Eindframe" />}
-            <div className="playhead" style={{ left: xOf(time) }} />
+            <Playhead xOf={xOf} />
           </div>
         </div>
       </div>

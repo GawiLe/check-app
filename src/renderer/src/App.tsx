@@ -56,7 +56,8 @@ const isTyping = () => {
 }
 
 export function App() {
-  const project = useStore((s) => s.project)
+  // Alleen óf er een project is: anders tekent de hele app (alle panelen) bij elke bewerking opnieuw
+  const project = useStore((s) => !!s.project)
   const dialog = useStore((s) => s.dialog)
   const playing = useStore((s) => s.playing)
   const status = useStore((s) => s.status)

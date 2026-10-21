@@ -408,6 +408,11 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
         />
       </Row>
       <div className="hint-text">Nodig als je AI via Anthropic gebruikt. Sleutels worden versleuteld opgeslagen op deze computer (OS-sleutelhanger).</div>
+      {settings?.keyPlain && (
+        <div className="warn-text">
+          Let op: de sleutelhanger van dit systeem is niet beschikbaar, dus je sleutel staat onversleuteld in de instellingen (alleen leesbaar voor jouw gebruiker).
+        </div>
+      )}
       <Row label="Model">
         <input value={model} onChange={(e) => setModel(e.target.value)} />
       </Row>

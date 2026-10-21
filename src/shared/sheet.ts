@@ -57,9 +57,19 @@ export function parseDelimited(text: string): Table {
   return rows.filter((r) => r.some((c) => c.trim() !== ''))
 }
 
+/**
+ * Cellen die Excel als formule zou uitvoeren (=, +, @, of - gevolgd door iets anders dan een getal)
+ * krijgen een ' ervoor; bij het inlezen gaat die er weer af. "-50%" blijft gewoon "-50%".
+ */
+const FORMULA = /^(?:[=@\t\r]|[+-][^\d\s.,%€$])/
+const unformula = (s: string) => (/^'(?:[=@\t\r]|[+-][^\d\s.,%€$])/.test(s) ? s.slice(1) : s)
+
 /** CSV schrijven met puntkomma's (zoals Excel in het Nederlands verwacht). */
 export function toCsv(table: Table): string {
-  const esc = (s: string) => (/[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s)
+  const esc = (v: string) => {
+    const s = FORMULA.test(v) ? `'${v}` : v
+    return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
   return table.map((r) => r.map(esc).join(';')).join('\r\n') + '\r\n'
 }
 
@@ -76,6 +86,11 @@ const xmlText = (s: string) =>
 /** Alle tekst binnen <t>-elementen (ook rich text met meerdere runs). */
 const runs = (xml: string) => [...xml.matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g)].map((m) => xmlText(m[1])).join('')
 
+/** Excel heeft maximaal 16384 kolommen; alles daarbuiten is geen echte cel. */
+const MAX_COLS = 16384
+const MAX_XML = 64 * 1024 * 1024
+const reEsc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
 const colIndex = (ref: string) => {
   const letters = ref.match(/^[A-Z]+/i)?.[0].toUpperCase() ?? 'A'
   let n = 0
@@ -85,7 +100,14 @@ const colIndex = (ref: string) => {
 
 /** Eerste werkblad van een Excel-bestand (.xlsx) als tabel. Alleen waarden; geen formules of opmaak. */
 export function parseXlsx(data: Uint8Array): Table {
-  const zip = unzipSync(data)
+  // Alleen de onderdelen die we lezen, en nooit een onredelijk groot uitgepakt bestand (zip-bom)
+  const zip = unzipSync(data, {
+    filter: (f) => {
+      if (!/^xl\/(workbook\.xml|_rels\/workbook\.xml\.rels|sharedStrings\.xml|worksheets\/[^/]+\.xml)$/.test(f.name)) return false
+      if (f.originalSize > MAX_XML) throw new Error('Dit Excel-bestand is te groot om in te lezen.')
+      return true
+    }
+  })
   const dec = new TextDecoder()
   const read = (name: string) => (zip[name] ? dec.decode(zip[name]) : '')
   const shared = [...read('xl/sharedStrings.xml').matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) => runs(m[1]))
@@ -93,7 +115,7 @@ export function parseXlsx(data: Uint8Array): Table {
   let sheetPath = 'xl/worksheets/sheet1.xml'
   const rid = read('xl/workbook.xml').match(/<sheet\b[^>]*\br:id="([^"]+)"/)?.[1]
   if (rid) {
-    const target = read('xl/_rels/workbook.xml.rels').match(new RegExp(`<Relationship\\b[^>]*Id="${rid}"[^>]*Target="([^"]+)"`))?.[1] ?? read('xl/_rels/workbook.xml.rels').match(new RegExp(`<Relationship\\b[^>]*Target="([^"]+)"[^>]*Id="${rid}"`))?.[1]
+    const target = read('xl/_rels/workbook.xml.rels').match(new RegExp(`<Relationship\\b[^>]*Id="${reEsc(rid)}"[^>]*Target="([^"]+)"`))?.[1] ?? read('xl/_rels/workbook.xml.rels').match(new RegExp(`<Relationship\\b[^>]*Target="([^"]+)"[^>]*Id="${reEsc(rid)}"`))?.[1]
     if (target) sheetPath = target.startsWith('/') ? target.slice(1) : `xl/${target}`
   }
   const sheet = read(sheetPath) || read(Object.keys(zip).find((k) => /^xl\/worksheets\/sheet\d+\.xml$/.test(k)) ?? '')
@@ -112,6 +134,7 @@ export function parseXlsx(data: Uint8Array): Table {
       else if (type === 'inlineStr') value = runs(body)
       else if (v != null) value = xmlText(v)
       const idx = ref ? colIndex(ref) : row.length
+      if (idx < 0 || idx >= MAX_COLS) continue
       while (row.length < idx) row.push('')
       row[idx] = value
     }
@@ -185,7 +208,7 @@ export function tableToVariants(
     if (norm(name) === 'origineel') continue
     const values: Record<string, string> = {}
     for (const { i, field } of cols) {
-      const raw = row[i] ?? ''
+      const raw = unformula(row[i] ?? '')
       if (field.kind === 'text') {
         if (raw.trim() !== '') values[field.key] = raw.replace(/\r\n/g, '\n')
       } else if (raw.trim() !== '') {

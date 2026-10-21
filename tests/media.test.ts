@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
 // media.ts gebruikt Electron alleen in de export zelf; tijden en GIF-codering zijn los te testen.
-vi.mock('electron', () => ({ BrowserWindow: class {}, ipcMain: { on() {}, removeListener() {} } }))
-vi.mock('../src/main/exporter', () => ({ fileStem: (s: string) => s, pack: async () => ({}), prepareFonts: async () => ({}) }))
+vi.mock('electron', () => ({ BrowserWindow: class {}, ipcMain: { on() {}, removeListener() {} }, session: { fromPartition: () => ({}) } }))
+vi.mock('../src/main/exporter', () => ({ fileStem: (s: string) => s, bannerName: () => 'b', pack: async () => ({}), prepareFonts: async () => ({}) }))
 const { encodeGif, frameTimes } = await import('../src/main/media')
 
 describe('MP4/GIF', () => {

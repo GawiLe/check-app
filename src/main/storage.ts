@@ -1,6 +1,6 @@
-import { safeName } from './paths'
+import { ensureDirInside, safeName, writeInside } from './paths'
 import { app, safeStorage } from 'electron'
-import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { cp, lstat, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { basename, extname, join } from 'node:path'
 import type { Boilerplate, OpenedProject } from '@shared/api'
@@ -47,7 +47,14 @@ export async function readSettings(): Promise<StoredSettings> {
 
 export async function writeSettings(s: StoredSettings): Promise<void> {
   await mkdir(app.getPath('userData'), { recursive: true })
-  await writeFile(settingsPath(), JSON.stringify(s, null, 2))
+  // In één keer vervangen (nooit half geschreven) en alleen leesbaar voor jezelf: er kunnen sleutels in staan
+  await writeInside(app.getPath('userData'), 'settings.json', JSON.stringify(s, null, 2), 0o600)
+}
+
+/** Staat een sleutel onversleuteld op schijf (geen OS-sleutelhanger beschikbaar)? */
+export async function apiKeyIsPlain(): Promise<boolean> {
+  const s = await readSettings()
+  return !!(s.apiKeyPlain || s.falKeyPlain)
 }
 
 const SLOTS = { anthropic: ['apiKeyEnc', 'apiKeyPlain', 'ANTHROPIC_API_KEY'], fal: ['falKeyEnc', 'falKeyPlain', 'FAL_KEY'] } as const
@@ -67,7 +74,14 @@ export async function storeApiKey(key: string, which: 'anthropic' | 'fal' = 'ant
 export async function loadApiKey(which: 'anthropic' | 'fal' = 'anthropic'): Promise<string | null> {
   const s = await readSettings()
   const [enc, plain, env] = SLOTS[which]
-  if (s[enc]) return safeStorage.decryptString(Buffer.from(s[enc]!, 'base64'))
+  if (s[enc]) {
+    try {
+      return safeStorage.decryptString(Buffer.from(s[enc]!, 'base64'))
+    } catch {
+      // Sleutelhanger gewijzigd of niet bereikbaar: dan opnieuw invullen
+      return null
+    }
+  }
   return s[plain] ?? process.env[env] ?? null
 }
 
@@ -88,7 +102,8 @@ export async function readProject(dir: string): Promise<OpenedProject> {
 }
 
 export async function writeProject(dir: string, project: Project): Promise<void> {
-  await writeFile(join(dir, PROJECT_FILE), JSON.stringify(project, null, 2))
+  // Via een tijdelijk bestand: nooit een half geschreven project, en nooit via een symlink naar buiten
+  await writeInside(dir, PROJECT_FILE, JSON.stringify(project, null, 2))
 }
 
 export async function initProjectDir(dir: string, project: Project, sourceDir?: string): Promise<void> {
@@ -97,7 +112,8 @@ export async function initProjectDir(dir: string, project: Project, sourceDir?: 
   if (sourceDir) {
     for (const d of ['assets', 'fonts']) {
       const src = join(sourceDir, d)
-      if (existsSync(src)) await cp(src, join(dir, d), { recursive: true })
+      // Snelkoppelingen (symlinks) niet meenemen: die kunnen naar bestanden buiten het project wijzen
+      if (existsSync(src)) await cp(src, join(dir, d), { recursive: true, filter: async (f) => !(await lstat(f)).isSymbolicLink() })
     }
   }
   await writeProject(dir, project)
@@ -105,7 +121,7 @@ export async function initProjectDir(dir: string, project: Project, sourceDir?: 
 
 /** Kopieert bestanden naar een submap van het project en geeft projectpaden terug. */
 export async function copyIntoProject(dir: string, sub: 'assets' | 'fonts', files: string[]): Promise<string[]> {
-  await mkdir(join(dir, sub), { recursive: true })
+  await ensureDirInside(dir, sub)
   const out: string[] = []
   for (const f of files) {
     const ext = extname(f).toLowerCase()
@@ -114,8 +130,10 @@ export async function copyIntoProject(dir: string, sub: 'assets' | 'fonts', file
       .replace(/^-+|-+$/g, '')
       .toLowerCase() || 'bestand'
     let name = `${stem}${ext}`
-    for (let i = 2; existsSync(join(dir, sub, name)); i++) name = `${stem}-${i}${ext}`
-    await cp(f, join(dir, sub, name))
+    // lstat: ook een kapotte symlink telt als bezet
+    const taken = (n: string) => lstat(join(dir, sub, n)).then(() => true, () => false)
+    for (let i = 2; await taken(name); i++) name = `${stem}-${i}${ext}`
+    await writeInside(dir, `${sub}/${name}`, await readFile(f))
     out.push(`${sub}/${name}`)
   }
   return out
@@ -192,5 +210,5 @@ export async function readPresets(): Promise<UserPreset[]> {
 
 export async function writePresets(list: UserPreset[]): Promise<void> {
   await mkdir(app.getPath('userData'), { recursive: true })
-  await writeFile(presetsPath(), JSON.stringify(list, null, 2))
+  await writeInside(app.getPath('userData'), 'presets.json', JSON.stringify(Array.isArray(list) ? list : [], null, 2))
 }

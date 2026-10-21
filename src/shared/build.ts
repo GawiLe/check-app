@@ -34,7 +34,11 @@ export const escapeHtml = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
 /** Houd CSS-waarden veilig: geen tekens waarmee je uit een declaratie kunt breken. */
-export const cssValue = (s: string): string => s.replace(/[<>{};"\\]/g, '')
+export const cssValue = (s: string): string =>
+  String(s ?? '')
+    .replace(/[<>{};"\\]/g, '')
+    // Kleuren en verlopen hebben nooit een url() of image-set() nodig: geen externe bestanden of tracking
+    .replace(/url\s*\(|image-set\s*\(|[a-z][a-z0-9+.-]*:\/\//gi, '')
 
 const n4 = (v: number): string => String(Number.isFinite(v) ? Math.round(v * 10000) / 10000 : 1)
 const n = (v: number): string => {
@@ -103,7 +107,9 @@ function fontStack(fonts: FontAsset[], id: string | null): string {
 }
 
 export function buildBanner(project: Project, comp: Composition, opts: BuildOptions): BuildOutput {
-  const { width: W, height: H } = comp
+  // Altijd hele getallen (het projectbestand komt niet per se uit deze app)
+  const W = Math.max(1, Math.min(10000, Math.round(Number(comp.width)) || 1))
+  const H = Math.max(1, Math.min(10000, Math.round(Number(comp.height)) || 1))
   const css: string[] = []
   const body: string[] = []
   const assets: string[] = []
@@ -467,10 +473,12 @@ const jsString = (v: string) => JSON.stringify(v).replace(/</g, '\\u003c')
  * vangen klikken op, al het andere laat de klik door naar de banner.
  */
 function clickSetup(project: Project, comp: Composition, opts: BuildOptions) {
-  const fallback = project.clickTag || 'https://www.example.com'
+  // Alleen http(s)-adressen; iets anders (bijv. javascript:) komt nooit in de banner
+  const web = (u: unknown) => (typeof u === 'string' && /^https?:\/\/[^\s"'<>]+$/i.test(u.trim()) ? u.trim() : '')
+  const fallback = web(project.clickTag) || 'https://www.example.com'
   const exits = exitLayers(comp)
   const exitOf = new Map(exits.map((l, i) => [l.id, i + 1]))
-  const exitUrl = (n: number) => exits[n - 1].exit!.url.trim() || fallback
+  const exitUrl = (n: number) => web(exits[n - 1].exit?.url) || fallback
   const preview = opts.mode !== 'export'
 
   if (opts.target === 'adform') {

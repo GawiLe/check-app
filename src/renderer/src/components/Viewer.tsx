@@ -11,7 +11,7 @@ import type { PenPoint } from '@shared/path'
 import { activeAt, findDeep, isolatedComposition, localTime } from '@shared/tree'
 import { addPenShape, addShapeRect, addTextAt, applyLibrary, importDroppedFiles, openComp, setAnchor } from '../lib/actions'
 import { openEmptyMenu, openLayerMenu } from '../lib/menus'
-import { assetUrl, currentComp, setLayerValue, updateLayer, useStore, viewRange } from '../store'
+import { assetUrl, batch, currentComp, setLayerValue, updateLayer, useStore, viewRange } from '../store'
 import { DRAG_TYPE } from './Library'
 import { SizeMeter } from './SizeMeter'
 import { viewOf } from '../lib/windows'
@@ -35,6 +35,8 @@ function BannerFrame(props: { project: Project; comp: Composition; time: number;
       const own = frames.some((f) => f.current?.contentWindow === e.source)
       const d = e.data as { bs?: string; ids?: unknown }
       if (!own || d?.bs !== 'overflow' || !Array.isArray(d.ids)) return
+      // De runtime meldt dit als hij klaar is (fonts en afbeeldingen geladen): dan het nieuwe frame tonen
+      if (loading.current && loading.current.frame.contentWindow === e.source) loading.current.done()
       const ids = d.ids.filter((x): x is string => typeof x === 'string')
       const cur = useStore.getState().overflowIds
       if (ids.join() !== cur.join()) useStore.setState({ overflowIds: ids })
@@ -58,31 +60,54 @@ function BannerFrame(props: { project: Project; comp: Composition; time: number;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.fonts, project.name, project.clickTag, comp, rev])
 
+  // Nieuwe preview laden: tijdens slepen niet wachten tot je stilstaat, maar hooguit elke 40 ms
+  // bijwerken (de banner beweegt mee). Twee frames om en om; het nieuwe wordt pas zichtbaar als de
+  // runtime klaar is (fonts en afbeeldingen geladen), zodat er nooit een leeg beeld tussen zit.
   const seq = useRef(0)
+  const htmlRef = useRef(html)
+  htmlRef.current = html
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const loading = useRef<{ frame: HTMLIFrameElement; done: () => void } | null>(null)
   useEffect(() => {
-    const t = setTimeout(async () => {
+    if (timer.current) return
+    timer.current = setTimeout(async () => {
+      timer.current = null
       const mine = ++seq.current
       const next = 1 - active.current
       const f = frames[next].current
       if (!f) return
-      f.onload = () => {
-        const seek = () => f.contentWindow?.postMessage({ bs: 'seek', t: timeRef.current }, '*')
-        seek()
-        setTimeout(() => {
-          seek()
-          f.style.visibility = 'visible'
-          const old = frames[active.current].current
-          if (old && old !== f) old.style.visibility = 'hidden'
-          active.current = next
-        }, 40)
+      let swapped = false
+      const swap = () => {
+        if (swapped || mine !== seq.current) return
+        swapped = true
+        loading.current = null
+        // Eerst naar de juiste tijd, dan (een frame later) tonen
+        f.contentWindow?.postMessage({ bs: 'seek', t: timeRef.current }, '*')
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            if (mine !== seq.current) return
+            f.contentWindow?.postMessage({ bs: 'seek', t: timeRef.current }, '*')
+            f.style.visibility = 'visible'
+            const old = frames[active.current].current
+            if (old && old !== f) old.style.visibility = 'hidden'
+            active.current = next
+          })
+        )
       }
+      f.onload = () => {
+        f.contentWindow?.postMessage({ bs: 'seek', t: timeRef.current }, '*')
+        // Klaar-melding van de runtime (zie hieronder); als vangnet na 400 ms toch wisselen
+        setTimeout(swap, 400)
+      }
+      loading.current = { frame: f, done: swap }
       // Via bsproj:// (eigen document met eigen CSP) in plaats van srcdoc, dat de CSP van de editor zou erven
-      const url = await window.bs.setPreview(`${slotId}-${next}`, html)
+      const url = await window.bs.setPreview(`${slotId}-${next}`, htmlRef.current)
       if (mine === seq.current) f.src = url
-    }, 30)
-    return () => clearTimeout(t)
+    }, 40)
+    // Geen opruimen per wijziging: de timer loopt door en pakt dan de nieuwste HTML
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [html])
+  useEffect(() => () => void (timer.current && clearTimeout(timer.current)), [])
 
   useEffect(() => {
     frames[active.current].current?.contentWindow?.postMessage({ bs: 'seek', t: time }, '*')
@@ -419,14 +444,17 @@ function SingleViewer() {
           const at = { ...moved, x: moved.x + snap.dx, y: moved.y + snap.dy }
           setSnapUi({ guides: snap.guides, measures: measuresFor(at, d.targets, frame).filter((m) => m.to - m.from >= 1) })
         } else setSnapUi(null)
-        for (const st of d.start) {
-          // Verschuiving omrekenen naar de ruimte van de compositie waar de laag in zit
-          const r = rad(-st.pr)
-          const wx = mx / st.ps
-          const wy = my / st.ps
-          setLayerValue(st.id, 'x', Math.round(st.x + wx * Math.cos(r) - wy * Math.sin(r)), 'move')
-          setLayerValue(st.id, 'y', Math.round(st.y + wx * Math.sin(r) + wy * Math.cos(r)), 'move')
-        }
+        // Alle gesleepte lagen, X én Y, als één bewerking per muisbeweging
+        batch(() => {
+          for (const st of d.start) {
+            // Verschuiving omrekenen naar de ruimte van de compositie waar de laag in zit
+            const r = rad(-st.pr)
+            const wx = mx / st.ps
+            const wy = my / st.ps
+            setLayerValue(st.id, 'x', Math.round(st.x + wx * Math.cos(r) - wy * Math.sin(r)), 'move')
+            setLayerValue(st.id, 'y', Math.round(st.y + wx * Math.sin(r) + wy * Math.cos(r)), 'move')
+          }
+        }, 'move')
         break
       }
       case 'resize': {

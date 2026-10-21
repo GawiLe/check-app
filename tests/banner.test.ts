@@ -1534,3 +1534,42 @@ describe('compositie los bekijken', () => {
     expect(html).toContain('width=120,height=80')
   })
 })
+
+describe('code-element: sanitizer (allowlist)', () => {
+  it('laat geen scripts, event-handlers of externe bestanden door, ook niet verstopt', async () => {
+    const { cleanCodeHtml, cleanCodeCss } = await import('../src/shared/code')
+    const attacks = [
+      '<scr<a>ipt>alert(1)</scr<a>ipt>',
+      '<svg/onload=alert(1)>',
+      '<img src="x"/onerror=alert(1)>',
+      '<sty<a>le>*{background:red}</sty<a>le>',
+      '<svg><a href="javascript:alert(1)">x</a></svg>',
+      '<svg><use href="https://evil.example/x.svg#a"/></svg>',
+      '<svg><animate attributeName="href" to="javascript:alert(1)"/></svg>',
+      '<div style="background:url(https://evil.example/t.png)">x</div>',
+      '<div style="background:\\75 rl(https://evil.example/t.png)">x</div>',
+      '<svg><rect fill="&#106;avascript:alert(1)"/></svg>',
+      '<iframe src="https://evil.example"></iframe>',
+      '<svg><foreignObject><body onload=alert(1)></body></foreignObject></svg>',
+      '<div srcset="https://evil.example/a.png 1x">x</div>',
+      '<<script>script>alert(1)<</script>/script>'
+    ]
+    for (const a of attacks) {
+      const out = cleanCodeHtml(a)
+      expect(out, a).not.toMatch(/<script|<style|<iframe|<img|<a[\s>]|onload|onerror|javascript:|evil\.example|<foreignobject|srcset/i)
+    }
+    expect(cleanCodeCss('.root{background:url(https://evil.example/a.png);b:image-set("https://evil.example/b.png" 1x);c:\\75 rl(https://evil.example)}')).not.toMatch(/evil\.example|\\\\/)
+  })
+
+  it('laat een gewoon laadsymbool (SVG, verloop, animatie) intact', async () => {
+    const { cleanCodeHtml } = await import('../src/shared/code')
+    const svg =
+      '<svg viewBox="0 0 80 80" width="80" height="80"><defs><linearGradient id="g"><stop offset="0" stop-color="#e30613"/></linearGradient></defs>' +
+      '<circle class="ring" cx="40" cy="40" r="30" fill="none" stroke="url(#g)" stroke-width="8" stroke-dasharray="120 80"/>' +
+      '<rect x="1" y="2" width="3" height="4"><animateTransform attributeName="transform" type="rotate" values="0 40 40;360 40 40" dur="1s" repeatCount="indefinite"/></rect></svg>' +
+      '<div class="dot" style="opacity:.5">Laden…</div>'
+    const out = cleanCodeHtml(svg)
+    for (const part of ['viewBox="0 0 80 80"', 'stroke="url(#g)"', 'stop-color="#e30613"', 'attributeName="transform"', 'values="0 40 40;360 40 40"', 'class="dot"', 'style="opacity:.5"', 'Laden…'])
+      expect(out, part).toContain(part)
+  })
+})

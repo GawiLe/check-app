@@ -384,10 +384,7 @@ function CompDesign() {
 
 function LayerDesign({ layer }: { layer: Layer }) {
   const overflowIds = useStore((s) => s.overflowIds)
-  const time = useStore((s) => s.time)
   const project = useStore((s) => s.project)!
-  const project_ = useStore.getState().project!
-  const st = layerStateAt(layer, layerLocalTime(project_, useStore.getState().compId, layer.id, time))
   const up = (fn: (l: Layer) => void, co?: string) => updateLayer(layer.id, fn, co)
   const Icon = TYPE_ICON[layer.type]
   const anim = (p: AnimProp) => !!layer.tracks[p]?.length
@@ -1143,8 +1140,13 @@ function CompMotion() {
   )
 }
 
-function LayerMotion({ layer }: { layer: Layer }) {
+/** "Op 2.35s": volgt de playhead (los onderdeel, zodat het paneel niet elk beeldje opnieuw tekent). */
+function AtTime() {
   const time = useStore((s) => s.time)
+  return <span className="label">Op {time.toFixed(2)}s</span>
+}
+
+function LayerMotion({ layer }: { layer: Layer }) {
   const [dur, setDur] = useState(0.6)
 
   return (
@@ -1181,14 +1183,14 @@ function LayerMotion({ layer }: { layer: Layer }) {
 
       <Section title="Extra effecten" defaultOpen={false}>
         <div className="row">
-          <span className="label">Op {time.toFixed(2)}s</span>
+          <AtTime />
           <div className="grow">
             <Num label="Duur" value={dur} step={0.05} min={0.05} max={10} decimals={2} suffix="s" onChange={(v) => setDur(v)} />
           </div>
         </div>
         <div className="chips">
           {PRESETS.filter((p) => ['pulse', 'wipeLeft', 'wipeUp', 'writeOn', 'fadeOut'].includes(p.id)).map((p) => (
-            <button key={p.id} onClick={() => applyPreset(p.id, time, dur)}>
+            <button key={p.id} onClick={() => applyPreset(p.id, useStore.getState().time, dur)}>
               {p.label}
             </button>
           ))}

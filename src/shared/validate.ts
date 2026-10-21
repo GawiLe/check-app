@@ -59,8 +59,11 @@ export function validateBanner(input: ValidationInput): ValidationIssue[] {
 
   // Externe requests (alles behalve de clickTag-URL's; het Adform-script wordt via document.write geladen)
   const withoutClickTag = html.replace(/var clickTag\d*\s*=[^;]*;/g, '')
-  const external = withoutClickTag.match(/(?:src|href)\s*=\s*["']?(?:https?:)?\/\/[^"'\s>]+/g)
-  if (external) add('error', 'extern', `Externe bronnen gevonden: ${external.slice(0, 3).join(', ')}`)
+  const external = [
+    ...(withoutClickTag.match(/(?:src|href|srcset)\s*=\s*["']?(?:https?:)?\/\/[^"'\s>]+/g) ?? []),
+    ...(withoutClickTag.match(/(?:url|image-set)\s*\(\s*["']?(?:https?:)?\/\/[^)"'\s]+/gi) ?? [])
+  ]
+  if (external.length) add('error', 'extern', `Externe bronnen gevonden: ${external.slice(0, 3).join(', ')}`)
 
   // Gewicht
   const initial = initialLoad(files, input.politeLoad)

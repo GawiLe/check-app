@@ -62,6 +62,7 @@ async function usable(dir: string, marker: { template: string; variantId: string
  * uit assets/ zijn, of een bestand naast de spreadsheet (wordt dan naar assets/ gekopieerd).
  */
 export async function readVariantSheet(dir: string, file: string): Promise<{ table: Table; images: Record<string, string>; file: string }> {
+  if ((await stat(file)).size > 50 * 1024 * 1024) throw new Error('Deze spreadsheet is te groot (maximaal 50 MB).')
   const buf = await readFile(file)
   const table = /\.xlsx$/i.test(file) ? parseXlsx(buf) : parseDelimited(buf.toString('utf8'))
   const assets = new Set(await listAssets(dir))

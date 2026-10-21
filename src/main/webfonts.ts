@@ -3,6 +3,7 @@ import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { newId } from '@shared/factory'
+import { inside, writeInside } from './paths'
 import type { FontAsset } from '@shared/types'
 import { CATALOG_URL, fontFileUrl, normalizeCatalog, POPULAR_FONTS, type WebFont } from '@shared/webfonts'
 
@@ -38,12 +39,11 @@ export async function installWebFont(dir: string, font: WebFont, weight: number,
   if (!/^[a-z0-9-]+$/.test(font.id) || !Number.isInteger(weight)) throw new Error('Ongeldige fontnaam.')
   const name = `${font.id}-${weight}${style === 'italic' ? '-italic' : ''}.woff2`
   const rel = `fonts/${name}`
-  if (!existsSync(join(dir, rel))) {
+  if (!existsSync(inside(dir, rel))) {
     let res = await net.fetch(fontFileUrl(font.id, weight, style))
     if (!res.ok) res = await net.fetch(fontFileUrl(font.id, weight, style, 'latin-ext'))
     if (!res.ok) throw new Error(`Kon ${font.family} ${weight} niet downloaden (HTTP ${res.status}). Ben je online?`)
-    await mkdir(join(dir, 'fonts'), { recursive: true })
-    await writeFile(join(dir, rel), Buffer.from(await res.arrayBuffer()))
+    await writeInside(dir, rel, Buffer.from(await res.arrayBuffer()))
   }
   return { id: newId('f'), family: font.family, file: rel, weight, style }
 }

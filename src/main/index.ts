@@ -1,8 +1,9 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, session, shell } from 'electron'
+import { createHash } from 'node:crypto'
 import { existsSync, watch, type FSWatcher } from 'node:fs'
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
-import { basename, dirname, extname, join, resolve } from 'node:path'
-import { inside } from './paths'
+import { readFile, rename, writeFile } from 'node:fs/promises'
+import { basename, dirname, extname, join, resolve, sep } from 'node:path'
+import { ensureDirInside, inside, safeName } from './paths'
 import type { BannerStudioApi, Settings } from '@shared/api'
 import type { Project } from '@shared/types'
 import { aiAnimate, aiCode } from './ai'
@@ -15,6 +16,7 @@ import { describeFont, textToGlyphPaths } from './fonts'
 import { fontCatalog, installWebFont } from './webfonts'
 import {
   addRecent,
+  apiKeyIsPlain,
   boilerplateSource,
   copyIntoProject,
   deleteBoilerplate,
@@ -36,7 +38,9 @@ import {
 
 // Bestanden uit de geopende projectmap worden in de preview geladen via bsproj://
 protocol.registerSchemesAsPrivileged([
-  { scheme: 'bsproj', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }
+  { scheme: 'bsproj', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
+  // Afgeschermd renderen van de export (backup-afbeelding, MP4, GIF): zie render.ts
+  { scheme: 'bsrender', privileges: { standard: true, secure: true } }
 ])
 
 if (process.env.BS_USER_DATA) app.setPath('userData', process.env.BS_USER_DATA)
@@ -47,6 +51,8 @@ let dirty = false
 let forceClose = false
 /** Exportmappen die de gebruiker zelf koos (dialoog of eerder onthouden): alleen daarheen wordt geëxporteerd. */
 const approvedExportDirs = new Set<string>()
+/** Variantmappen die de app zelf net gemaakt heeft (mogen getoond worden in Finder). */
+const madeDirs = new Set<string>()
 let quitting = false
 let mainClosing = false
 
@@ -74,6 +80,16 @@ const previews = new Map<string, string>()
 let previewRev = 0
 const PREVIEW_CSP =
   "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src bsproj: data:; font-src bsproj: data:; media-src 'none'; connect-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'"
+
+/**
+ * CSP van een preview: alleen precies de scripts die de app zelf in de banner zet mogen draaien
+ * (op vingerafdruk, sha256), geen andere inline code. Zo kan iets uit een projectbestand nooit een
+ * eigen script laten lopen, ook niet als het ergens langs zou glippen.
+ */
+function previewCsp(html: string): string {
+  const hashes = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => `'sha256-${createHash('sha256').update(m[1], 'utf8').digest('base64')}'`)
+  return PREVIEW_CSP.replace("script-src 'unsafe-inline'", `script-src ${hashes.join(' ') || "'none'"}`)
+}
 
 const FONT_MIME: Record<string, string> = { '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.otf': 'font/otf' }
 
@@ -205,14 +221,13 @@ const handlers: Handlers = {
   listAssets: (dir) => listAssets(dir),
   async deleteAsset(dir, rel) {
     // Alleen bestanden in assets/; naar de prullenbak (terug te halen), anders naar .bnnr/prullenbak in het project
-    if (typeof rel !== 'string' || !/^assets\/[^/]+$/.test(rel)) throw new Error('Alleen bestanden in assets/ kunnen weg.')
+    if (typeof rel !== 'string' || !/^assets\/[^/]+$/.test(rel) || !safeName(basename(rel))) throw new Error('Alleen bestanden in assets/ kunnen weg.')
     const file = inside(dir, rel)
     try {
       await shell.trashItem(file)
       return 'trash'
     } catch {
-      const bin = join(dir, '.bnnr', 'prullenbak')
-      await mkdir(bin, { recursive: true })
+      const bin = await ensureDirInside(dir, '.bnnr/prullenbak')
       await rename(file, join(bin, `${Date.now()}-${basename(file)}`))
       return 'project'
     }
@@ -260,7 +275,10 @@ const handlers: Handlers = {
   estimateSize: (dir, project, compId, target) => estimateSize(dir, project, compId, target),
   createVariants: (req) => {
     if (req?.exportOutDir != null && (typeof req.exportOutDir !== 'string' || !approvedExportDirs.has(resolve(req.exportOutDir)))) throw new Error('Kies eerst een exportmap.')
-    return createVariants(req)
+    return createVariants(req).then((res) => {
+      for (const r of res) madeDirs.add(resolve(r.dir))
+      return res
+    })
   },
   async setDirty(v) {
     dirty = !!v
@@ -283,7 +301,11 @@ const handlers: Handlers = {
   },
 
   async revealInFolder(path) {
-    shell.showItemInFolder(path)
+    // Alleen iets in een geopend project, een gekozen exportmap of een net gemaakte variant
+    const p = typeof path === 'string' ? resolve(path) : ''
+    const ok = [...openDirs, ...approvedExportDirs, ...madeDirs].some((r) => p === r || p.startsWith(r + sep))
+    if (!ok) throw new Error('Niet toegestaan.')
+    shell.showItemInFolder(p)
   },
 
   listBoilerplates: () => listBoilerplates(),
@@ -295,6 +317,7 @@ const handlers: Handlers = {
     return {
       hasApiKey: !!(await loadApiKey()),
       hasFalKey: !!(await loadApiKey('fal')),
+      keyPlain: await apiKeyIsPlain(),
       aiProvider: s.aiProvider ?? 'anthropic',
       falModel: s.falModel || DEFAULT_FAL_MODEL,
       model: s.model || DEFAULT_MODEL,
@@ -484,7 +507,7 @@ async function createWindow() {
     backgroundColor: '#1d1d1f',
     title: 'Bnnr Studio',
     icon: APP_ICON,
-    webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false, contextIsolation: true, backgroundThrottling: false }
+    webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: true, contextIsolation: true, backgroundThrottling: false }
   })
   win.on('closed', () => {
     // De losse panelen sluiten mee, maar blijven "los" voor de volgende keer
@@ -511,6 +534,10 @@ async function createWindow() {
   })
   // Een bestand dat naast het canvas wordt losgelaten mag de app niet wegnavigeren
   win.webContents.on('will-navigate', (e) => e.preventDefault())
+  // Frames (de preview) mogen alleen naar een preview-document, nooit naar iets anders
+  win.webContents.on('will-frame-navigate', (e) => {
+    if (!e.isMainFrame && !e.url.startsWith(`bsproj://${PREVIEW_HOST}/`) && e.url !== 'about:blank') e.preventDefault()
+  })
   // Geen nieuwe vensters, behalve een los paneel (leeg venster dat de editor zelf vult, zie Popouts.tsx).
   // Banner-code in de preview kan dit niet: die iframes mogen geen pop-ups openen (sandbox zonder allow-popups).
   win.webContents.setWindowOpenHandler(({ url, frameName }) => {
@@ -529,29 +556,48 @@ async function createWindow() {
     })
     child.webContents.on('will-navigate', (e) => e.preventDefault())
     child.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+    child.webContents.on('will-frame-navigate', (e) => {
+      if (!e.isMainFrame && !e.url.startsWith(`bsproj://${PREVIEW_HOST}/`) && e.url !== 'about:blank') e.preventDefault()
+    })
   })
   if (process.env.ELECTRON_RENDERER_URL) await win.loadURL(process.env.ELECTRON_RENDERER_URL)
   else await win.loadFile(join(__dirname, '../renderer/index.html'))
 }
 
+// Elk venster en frame: geen <webview>, en pop-ups alleen waar dat uitdrukkelijk is toegestaan
+app.on('web-contents-created', (_e, wc) => {
+  wc.on('will-attach-webview', (ev) => ev.preventDefault())
+  wc.setWindowOpenHandler(() => ({ action: 'deny' }))
+})
+
 app.whenReady().then(async () => {
   if (process.platform === 'darwin' && existsSync(APP_ICON)) app.dock?.setIcon(APP_ICON)
+  // Geen camera, microfoon, locatie, meldingen e.d.; alleen tekst naar het klembord (code kopiëren)
+  session.defaultSession.setPermissionRequestHandler((_wc, perm, cb) => cb(perm === 'clipboard-sanitized-write'))
   protocol.handle('bsproj', async (req) => {
     if (!currentDir) return new Response('Geen project', { status: 404 })
     try {
       const url = new URL(req.url)
-      if (url.hostname === PREVIEW_HOST)
-        return new Response(previews.get(url.pathname.slice(1)) ?? '', {
-          headers: { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': PREVIEW_CSP, 'cache-control': 'no-store' }
+      if (url.hostname === PREVIEW_HOST) {
+        const html = previews.get(url.pathname.slice(1)) ?? ''
+        return new Response(html, {
+          headers: { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': previewCsp(html), 'cache-control': 'no-store' }
         })
+      }
       const rel = decodeURIComponent(`${url.hostname}${url.pathname}`)
+      // Alleen afbeeldingen en fonts van het project (geen projectbestand, versies of andere bestanden)
+      if (!/^(assets|fonts)\/[^/]+$/.test(rel)) return new Response('Niet gevonden', { status: 404 })
       const file = inside(currentDir, rel)
       const ext = extname(file).toLowerCase()
       return new Response(await readFile(file), {
         headers: {
           'content-type': MIME[ext] ?? FONT_MIME[ext] ?? 'application/octet-stream',
           'access-control-allow-origin': '*',
-          'cache-control': 'no-store'
+          // Als document geopend (bijv. een SVG): niets mag draaien of laden
+          'content-security-policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'",
+          // Afbeeldingen en fonts mogen in de preview gecachet worden: de URL bevat ?v=<versie>, die
+          // verandert zodra het bestand op schijf wijzigt. Zo hoeft een herladen preview niets opnieuw te halen.
+          'cache-control': url.searchParams.has('v') ? 'private, max-age=31536000, immutable' : 'no-store'
         }
       })
     } catch {

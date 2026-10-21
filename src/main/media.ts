@@ -3,15 +3,15 @@
 // met WebCodecs in een apart onzichtbaar venster (preload/media.ts), GIF met gifenc in dit proces.
 // Resultaat altijd in een eigen map: <exportmap>/<project>/MP4/ en /GIF/.
 import { BrowserWindow, ipcMain, type IpcMainEvent } from 'electron'
+import { renderWindow, serveDir } from './render'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { dirname, join } from 'node:path'
 import { applyPalette, GIFEncoder, quantize } from 'gifenc'
 import type { MediaRequest, MediaResult } from '@shared/api'
 import { endFrameTime } from '@shared/motion'
 import type { Composition } from '@shared/types'
-import { fileStem, pack, prepareFonts } from './exporter'
+import { bannerName, fileStem, pack, prepareFonts } from './exporter'
 
 /**
  * Bannertijd van elk beeldje: alle loops achter elkaar, de laatste loop tot het eindbeeld
@@ -35,23 +35,23 @@ export function frameTimes(comp: Pick<Composition, 'duration' | 'loops' | 'endFr
 
 /** Onzichtbaar venster met de banner; `grab(t)` geeft het beeld op bannertijd t als BGRA. */
 async function openBanner(indexHtml: string, comp: Composition, scale: number, even: boolean) {
-  const round = (v: number) => (even ? Math.ceil(v / 2) * 2 : Math.round(v))
-  const width = round(comp.width * scale)
-  const height = round(comp.height * scale)
-  const win = new BrowserWindow({
-    show: false,
-    width,
-    height,
-    useContentSize: true,
-    webPreferences: { offscreen: true, sandbox: true, javascript: true, backgroundThrottling: false }
-  })
-  await win.loadURL(pathToFileURL(indexHtml).href)
+  // Venster op de echte maat; voor MP4 (H.264 wil even maten) wordt het beeld daarna hooguit 1 px
+  // opgerekt in plaats van er een strook achtergrond bij te zetten
+  const winW = Math.max(1, Math.round((Number(comp.width) || 1) * scale))
+  const winH = Math.max(1, Math.round((Number(comp.height) || 1) * scale))
+  const width = even ? Math.ceil(winW / 2) * 2 : winW
+  const height = even ? Math.ceil(winH / 2) * 2 : winH
+  // Afgeschermd renderen: alleen de tijdelijke exportmap, geen netwerk en geen toegang tot andere bestanden
+  const served = serveDir(dirname(indexHtml))
+  const win = renderWindow(winW, winH)
+  win.on('closed', served.release)
+  await win.loadURL(served.url)
   win.webContents.setZoomFactor(scale)
   // Wachten tot afbeeldingen en fonts geladen zijn (de runtime zet dan class "r" op body)
   await win.webContents.executeJavaScript(`new Promise(function(res){var n=0;(function w(){if(document.body.className.indexOf('r')>=0||n++>200){if(window.BS)BS.pause();res()}else setTimeout(w,30)})()})`)
   const grab = async (t: number): Promise<Buffer> => {
-    await win.webContents.executeJavaScript(`BS.seek(${t});new Promise(function(r){requestAnimationFrame(function(){requestAnimationFrame(r)})})`)
-    let img = await win.webContents.capturePage({ x: 0, y: 0, width, height })
+    await win.webContents.executeJavaScript(`BS.seek(${Number(t) || 0});new Promise(function(r){requestAnimationFrame(function(){requestAnimationFrame(r)})})`)
+    let img = await win.webContents.capturePage({ x: 0, y: 0, width: winW, height: winH })
     const s = img.getSize()
     if (s.width !== width || s.height !== height) img = img.resize({ width, height, quality: 'best' })
     return img.toBitmap()
@@ -103,7 +103,7 @@ const sameFrame = (a: Uint8Array, b: Uint8Array) => a === b || Buffer.compare(Bu
 async function openEncoder(tmp: string) {
   const win = new BrowserWindow({
     show: false,
-    webPreferences: { preload: join(__dirname, '../preload/media.js'), sandbox: false, contextIsolation: true, backgroundThrottling: false }
+    webPreferences: { preload: join(__dirname, '../preload/media.js'), sandbox: true, contextIsolation: true, backgroundThrottling: false }
   })
   const page = join(tmp, 'encoder.html')
   await writeFile(page, '<!doctype html><meta charset="utf-8"><title>mp4</title>')
@@ -139,7 +139,7 @@ export async function exportMedia(req: MediaRequest, onProgress?: (msg: string) 
       const { files } = await pack(req.dir, req.project, comp, 'generic', fonts)
       for (const [n, data] of Object.entries(files)) await writeFile(join(dir, n), data)
       const index = join(dir, 'index.html')
-      const name = `${stem}_${comp.width}x${comp.height}px`
+      const name = bannerName(req.project, comp)
 
       if (mp4) {
         onProgress?.(`MP4 ${comp.width}×${comp.height}…`)

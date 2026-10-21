@@ -162,7 +162,8 @@ export const useStore = create<State>((set, get) => ({
   future: [],
   lastCoalesce: null,
   assets: [],
-  assetsRev: 0,
+  // Per sessie uniek begin: zo kan een gecachete afbeelding van een vorige keer nooit blijven hangen
+  assetsRev: Date.now() % 1e9,
   dialog: null,
   status: null,
   exportResults: null,
@@ -195,14 +196,23 @@ export const useStore = create<State>((set, get) => ({
     }),
 
   update: (fn, coalesce, skipSync) => {
+    // Binnen batch(): alles verzamelen en straks als één bewerking toepassen
+    if (batching) {
+      batching.fns.push(fn)
+      batching.coalesce ??= coalesce
+      return
+    }
     const { project, past, lastCoalesce } = get()
     if (!project) return
-    const next = structuredClone(project)
-    fn(next)
-    snapProject(next)
+    const copy = structuredClone(project)
+    fn(copy)
+    snapProject(copy)
     const { compId } = get()
-    if (compId && !skipSync) syncFormats(project, next, compId)
-    snapProject(next)
+    if (compId && !skipSync) syncFormats(project, copy, compId)
+    snapProject(copy)
+    // Ongewijzigde delen houden hun identiteit (sneller tekenen, minder geheugen); niets veranderd = niets doen
+    const next = keepUnchanged(project, copy)
+    if (next === project) return
     const now = Date.now()
     const merge = coalesce && lastCoalesce && lastCoalesce.key === coalesce && now - lastCoalesce.at < 1000
     set({
@@ -331,6 +341,59 @@ function applyValue(l: Layer, prop: AnimProp, value: number, time: number, autoK
  * Staat de playhead op een geselecteerd keyframe van deze laag en zijn er meer keyframes van deze
  * eigenschap geselecteerd, dan schuiven die allemaal evenveel mee (bijv. een hele slide-in hoger zetten).
  */
+let batching: { fns: ((p: Project) => void)[]; coalesce?: string } | null = null
+
+/**
+ * Meerdere bewerkingen als één: bijv. X én Y van alle gesleepte lagen per muisbeweging. Eén kopie van
+ * het project, één keer formaten synchroniseren, één stap in Ongedaan maken.
+ */
+export function batch(fn: () => void, coalesce?: string) {
+  if (batching) return fn()
+  batching = { fns: [], coalesce }
+  let fns: ((p: Project) => void)[] = []
+  let co: string | undefined
+  try {
+    fn()
+  } finally {
+    fns = batching.fns
+    co = batching.coalesce
+    batching = null
+  }
+  if (fns.length) useStore.getState().update((p) => fns.forEach((f) => f(p)), co)
+}
+
+/**
+ * Structureel delen: neemt van `next` alles over wat inhoudelijk gelijk is aan `prev` als het
+ * oorspronkelijke object. Het resultaat is `prev` zelf als er niets veranderd is.
+ */
+export function keepUnchanged<T>(prev: T, next: T): T {
+  if (prev === next) return prev
+  if (typeof prev !== 'object' || typeof next !== 'object' || prev === null || next === null) return Object.is(prev, next) ? prev : next
+  if (Array.isArray(prev) !== Array.isArray(next)) return next
+  const a = prev as unknown as Record<string, unknown>
+  const b = next as unknown as Record<string, unknown>
+  let same = true
+  if (Array.isArray(prev)) {
+    const pa = prev as unknown[]
+    const na = next as unknown as unknown[]
+    if (pa.length !== na.length) same = false
+    for (let i = 0; i < na.length; i++) {
+      const v = i < pa.length ? keepUnchanged(pa[i], na[i]) : na[i]
+      na[i] = v
+      if (v !== pa[i]) same = false
+    }
+    return same ? prev : next
+  }
+  const keys = Object.keys(b)
+  if (keys.length !== Object.keys(a).length) same = false
+  for (const k of keys) {
+    const v = Object.prototype.hasOwnProperty.call(a, k) ? keepUnchanged(a[k], b[k]) : b[k]
+    b[k] = v
+    if (v !== a[k]) same = false
+  }
+  return same ? prev : next
+}
+
 export function setLayerValue(layerId: string, prop: AnimProp, value: number, coalesce?: string) {
   setLayersValue([layerId], prop, value, coalesce, layerId, true)
 }
@@ -415,7 +478,14 @@ export function updateComp(fn: (c: Composition) => void, coalesce?: string) {
   useStore.getState().update((p) => fn(findComp(p, compId)), coalesce)
 }
 
-export const assetUrl = (path: string, rev: number) => `bsproj://${path.split('/').map(encodeURIComponent).join('/')}?v=${rev}`
+/** Korte hash van de projectmap: hoort in de URL, zodat de cache van twee projecten nooit door elkaar loopt. */
+const dirKey = (dir: string | null) => {
+  let h = 5381
+  for (const ch of dir ?? '') h = ((h * 33) ^ ch.charCodeAt(0)) >>> 0
+  return h.toString(36)
+}
+export const assetUrl = (path: string, rev: number) =>
+  `bsproj://${path.split('/').map(encodeURIComponent).join('/')}?v=${rev}-${dirKey(useStore.getState().dir)}`
 
 /** De lagenlijst waarin je nu werkt: het formaat zelf, of de geopende compositie (tab). */
 /**

@@ -25,6 +25,8 @@ export interface Boilerplate {
 export interface Settings {
   hasApiKey: boolean
   hasFalKey: boolean
+  /** Sleutel staat onversleuteld op schijf (geen OS-sleutelhanger beschikbaar). */
+  keyPlain?: boolean
   aiProvider: 'anthropic' | 'fal'
   falModel: string
   model: string

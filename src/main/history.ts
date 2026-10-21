@@ -1,8 +1,8 @@
-import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { readdir, readFile, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { VersionInfo } from '@shared/api'
 import { PROJECT_FILE, type Project } from '@shared/types'
-import { safeName } from './paths'
+import { ensureDirInside, safeName, writeInside } from './paths'
 
 // Automatisch opslaan en versiegeschiedenis, in een verborgen map .bnnr in het project:
 //   .bnnr/autosave.bsproj         herstelkopie van niet-opgeslagen werk (elke minuut)
@@ -14,8 +14,7 @@ const autosavePath = (dir: string) => join(dir, META, 'autosave.bsproj')
 const versionsDir = (dir: string) => join(dir, META, 'versions')
 
 export async function writeAutosave(dir: string, project: Project) {
-  await mkdir(join(dir, META), { recursive: true })
-  await writeFile(autosavePath(dir), JSON.stringify(project))
+  await writeInside(dir, `${META}/autosave.bsproj`, JSON.stringify(project))
 }
 
 export async function clearAutosave(dir: string) {
@@ -37,14 +36,13 @@ export async function readNewerAutosave(dir: string): Promise<{ project: Project
 
 /** Versie bewaren (na Opslaan). Slaat over als er niets veranderd is sinds de vorige versie. */
 export async function addVersion(dir: string, project: Project) {
-  const vdir = versionsDir(dir)
-  await mkdir(vdir, { recursive: true })
+  const vdir = await ensureDirInside(dir, `${META}/versions`)
   const text = JSON.stringify(project)
   const list = (await readdir(vdir)).filter((f) => f.endsWith('.bsproj')).sort()
   const last = list[list.length - 1]
   if (last && (await readFile(join(vdir, last), 'utf8').catch(() => '')) === text) return
   const id = new Date().toISOString().replace(/[:.]/g, '-')
-  await writeFile(join(vdir, `${id}.bsproj`), text)
+  await writeInside(dir, `${META}/versions/${id}.bsproj`, text)
   for (const old of [...list, `${id}.bsproj`].sort().slice(0, -MAX_VERSIONS)) await rm(join(vdir, old), { force: true })
 }
 
