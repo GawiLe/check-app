@@ -216,6 +216,7 @@ export const useStore = create<State>((set, get) => ({
     const now = Date.now()
     const merge = coalesce && lastCoalesce && lastCoalesce.key === coalesce && now - lastCoalesce.at < 1000
     set({
+      ...reconcile(get(), next),
       project: next,
       dirty: true,
       past: merge ? past : [...past.slice(-HISTORY), project],
@@ -227,13 +228,14 @@ export const useStore = create<State>((set, get) => ({
   undo: () => {
     const { past, project, future } = get()
     if (!past.length || !project) return
-    set({ project: past[past.length - 1], past: past.slice(0, -1), future: [project, ...future], dirty: true, lastCoalesce: null })
+    const prev = past[past.length - 1]
+    set({ ...reconcile(get(), prev), project: prev, past: past.slice(0, -1), future: [project, ...future], dirty: true, lastCoalesce: null })
   },
 
   redo: () => {
     const { past, project, future } = get()
     if (!future.length || !project) return
-    set({ project: future[0], future: future.slice(1), past: [...past, project], dirty: true, lastCoalesce: null })
+    set({ ...reconcile(get(), future[0]), project: future[0], future: future.slice(1), past: [...past, project], dirty: true, lastCoalesce: null })
   },
 
   markSaved: () => set({ dirty: false }),
@@ -488,6 +490,26 @@ export const assetUrl = (path: string, rev: number) =>
   `bsproj://${path.split('/').map(encodeURIComponent).join('/')}?v=${rev}-${dirKey(useStore.getState().dir)}`
 
 /** De lagenlijst waarin je nu werkt: het formaat zelf, of de geopende compositie (tab). */
+/**
+ * Na undo/redo of een teruggezette versie: verwijzingen naar formaten of lagen die niet meer bestaan
+ * loslaten (anders wijst de editor naar iets dat er niet is). Ongewijzigd = dezelfde waarden.
+ */
+function reconcile(s: State, p: Project): Partial<State> {
+  const comp = p.compositions.find((c) => c.id === s.compId) ?? p.compositions.find((c) => c.id === p.baseCompositionId) ?? p.compositions[0]
+  if (!comp) return { compId: null, tabs: [], activeTab: null, selection: [], selectedKey: null, selectedKeys: [], editingText: null }
+  if (comp.id !== s.compId) return { compId: comp.id, tabs: [], activeTab: null, selection: [], selectedKey: null, selectedKeys: [], editingText: null }
+  const has = (id: string) => !!findDeep(comp.layers, id)
+  const keep = <T,>(list: T[], ok: (x: T) => boolean) => (list.every(ok) ? list : list.filter(ok))
+  return {
+    tabs: keep(s.tabs, has),
+    activeTab: s.activeTab && !has(s.activeTab) ? null : s.activeTab,
+    selection: keep(s.selection, has),
+    selectedKeys: keep(s.selectedKeys, (k) => has(k.layerId)),
+    selectedKey: s.selectedKey && !has(s.selectedKey.layerId) ? null : s.selectedKey,
+    editingText: s.editingText && !has(s.editingText) ? null : s.editingText
+  }
+}
+
 /**
  * Tijdbereik van wat je nu bekijkt: het formaat (0 tot de duur) of een geopende compositie
  * (vanaf zijn in-punt in het formaat, zo lang als de compositie). De tijd in de store blijft altijd

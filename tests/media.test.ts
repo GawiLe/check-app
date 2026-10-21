@@ -24,4 +24,15 @@ describe('MP4/GIF', () => {
     expect(descriptors).toBeGreaterThanOrEqual(2)
     expect(bytes[bytes.length - 1]).toBe(0x3b)
   })
+
+  it('GIF: vertragingen tellen precies op tot de echte duur (geen drift)', () => {
+    const w = 2
+    const h = 2
+    // 30 verschillende beeldjes op 30 fps = 1 s; per beeldje 33,3 ms, in GIF alleen hele honderdsten
+    const frames = Array.from({ length: 30 }, (_, k) => new Uint8Array(w * h * 4).map((_, i) => (i % 4 === 3 ? 255 : (k * 8 + i) % 256)))
+    const bytes = encodeGif(frames, w, h, 30, 64)
+    let total = 0
+    for (let i = 0; i < bytes.length - 5; i++) if (bytes[i] === 0x21 && bytes[i + 1] === 0xf9 && bytes[i + 2] === 0x04) total += (bytes[i + 4] | (bytes[i + 5] << 8)) * 10
+    expect(total).toBe(1000)
+  })
 })

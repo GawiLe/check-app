@@ -6,6 +6,7 @@ import { addFormat, exportFolder, newProject, rememberedSvgMode, replaceImage, r
 import { FolderOpen, Image as ImageIcon, Shapes } from 'lucide-react'
 import { assetUrl, currentComp, useStore } from '../store'
 import { findDeep } from '@shared/tree'
+import { normalizeProject } from '@shared/sync'
 import { Modal, Row } from './ui'
 import { VariantsDialog } from './Variants'
 import { SHORTCUT_GROUPS } from '../lib/shortcuts'
@@ -272,19 +273,17 @@ function ExportDialog({ onClose }: { onClose: () => void }) {
       {mediaResults && (
         <div style={{ marginTop: 14 }}>
           {mediaResults.map((r) => (
-            <div className="result" key={r.file}>
+            <div className="result" key={`${r.kind}-${r.composition}-${r.file}`}>
               <header>
                 <b>
                   {r.kind.toUpperCase()} · {r.composition}
                 </b>
-                <span className="muted">
-                  {kb(r.bytes)} · {r.note}
-                </span>
-                <button onClick={() => window.bs.revealInFolder(r.file)}>Toon {r.kind.toUpperCase()}</button>
+                <span className="muted">{r.file ? `${kb(r.bytes)} · ${r.note}` : r.note}</span>
+                {r.file && <button onClick={() => window.bs.revealInFolder(r.file)}>Toon {r.kind.toUpperCase()}</button>}
               </header>
               {r.warning && (
                 <ul className="issues">
-                  <li className="warning">{r.warning}</li>
+                  <li className={r.file ? 'warning' : 'error'}>{r.warning}</li>
                 </ul>
               )}
             </div>
@@ -599,7 +598,7 @@ function VersionsDialog({ onClose }: { onClose: () => void }) {
     const version = await window.bs.readVersion(dir, id)
     useStore.getState().update((p) => {
       for (const k of Object.keys(p)) delete (p as unknown as Record<string, unknown>)[k]
-      Object.assign(p, structuredClone(version))
+      Object.assign(p, normalizeProject(structuredClone(version)))
     }, undefined, true)
     useStore.getState().setStatus('Versie teruggezet. Ongedaan maken (Cmd/Ctrl+Z) zet je huidige werk terug; opslaan maakt het definitief.')
     onClose()

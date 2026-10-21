@@ -17,7 +17,7 @@ import type { ExportTarget, Layer, LayerType, MediaOptions } from '@shared/types
 import type { MediaResult } from '@shared/api'
 import { parseSvg, shapesToLayers } from './svgimport'
 import { round } from '@shared/anim'
-import { assetUrl, contextOf, currentComp, findComp, findLayer, layerLocalTime, setLayerValue, updateLayer, useStore, type SelectedKey, type SvgMode } from '../store'
+import { assetUrl, batch, contextOf, currentComp, findComp, findLayer, layerLocalTime, setLayerValue, updateLayer, useStore, viewRange, type SelectedKey, type SvgMode } from '../store'
 
 const S = () => useStore.getState()
 
@@ -145,7 +145,8 @@ export function addClickArea() {
     l.shape!.strokeWidth = 0
     l.exit = { url: '' }
     Object.assign(l, { width: 200, height: 60 })
-    l.x = Math.round(((S().activeTab ? l.width : comp.width) - l.width) / 2)
+    const box = contextOf(S().project!, S().compId, S().activeTab).group ?? comp
+    l.x = Math.round((box.width - l.width) / 2)
   })
 }
 
@@ -238,7 +239,9 @@ export async function addImageLayer(path: string, at?: { x: number; y: number })
   }
   const w = img.naturalWidth || 200
   const h = img.naturalHeight || 150
-  const s = Math.min(1, (comp.width - 40) / w, (comp.height - 40) / h)
+  // In een geopende compositie: passend in die compositie
+  const box = contextOf(S().project!, S().compId, S().activeTab).group ?? comp
+  const s = Math.max(0.01, Math.min(1, (box.width - 40) / w, (box.height - 40) / h))
   addLayer('image', (l) => {
     l.name = path.split('/').pop()!
     l.image!.src = path
@@ -249,8 +252,8 @@ export async function addImageLayer(path: string, at?: { x: number; y: number })
       l.x = Math.round(p0.x - l.width / 2)
       l.y = Math.round(p0.y - l.height / 2)
     } else {
-      l.x = Math.round((comp.width - l.width) / 2)
-      l.y = Math.round((comp.height - l.height) / 2)
+      l.x = Math.round((box.width - l.width) / 2)
+      l.y = Math.round((box.height - l.height) / 2)
     }
   })
 }
@@ -353,14 +356,17 @@ export function deleteSelection() {
   if (selectedKey) {
     // Alle geselecteerde keyframes, per groep (Positie verwijdert X én Y op dat moment)
     const keys = S().selectedKeys.length ? S().selectedKeys : [selectedKey]
-    for (const key of keys)
-      updateLayer(key.layerId, (l) => {
-        for (const m of groupProps(l, groupOf(key.prop))) {
-          const kfs = (l.tracks[m] ?? []).filter((k) => Math.abs(k.t - key.t) > 1e-4)
-          if (kfs.length) l.tracks[m] = kfs
-          else delete l.tracks[m]
-        }
-      })
+    // Eén undo-stap voor alle keyframes samen
+    batch(() => {
+      for (const key of keys)
+        updateLayer(key.layerId, (l) => {
+          for (const m of groupProps(l, groupOf(key.prop))) {
+            const kfs = (l.tracks[m] ?? []).filter((k) => Math.abs(k.t - key.t) > 1e-4)
+            if (kfs.length) l.tracks[m] = kfs
+            else delete l.tracks[m]
+          }
+        })
+    })
     S().selectKey(null)
     return
   }
@@ -446,15 +452,17 @@ export function moveToEdge(layerId: string, where: 'front' | 'back') {
 
 /** Alle animatie van de selectie verwijderen (keyframes, binnenkomst, accent, uitgang). */
 export function removeAnimation() {
-  for (const id of S().selection)
-    updateLayer(id, (l) => {
-      for (const p of ANIM_PROPS) {
-        const kfs = l.tracks[p]
-        if (kfs?.length) l[p] = kfs[kfs.length - 1].v
-      }
-      l.tracks = {}
-      l.intro = l.outro = l.emphasis = null
-    })
+  batch(() => {
+    for (const id of S().selection)
+      updateLayer(id, (l) => {
+        for (const p of ANIM_PROPS) {
+          const kfs = l.tracks[p]
+          if (kfs?.length) l[p] = kfs[kfs.length - 1].v
+        }
+        l.tracks = {}
+        l.intro = l.outro = l.emphasis = null
+      })
+  })
 }
 
 // ---------- Keyframe-assistent ----------
@@ -536,12 +544,14 @@ export function setInOut(which: 'in' | 'out') {
 
 export function clearInOut() {
   const { selection } = S()
-  for (const id of selection)
-    updateLayer(id, (l) => {
-      if (l.type !== 'group') delete l.start
-      else l.start = 0
-      delete l.end
-    })
+  batch(() => {
+    for (const id of selection)
+      updateLayer(id, (l) => {
+        if (l.type !== 'group') delete l.start
+        else l.start = 0
+        delete l.end
+      })
+  })
 }
 
 export function applyPreset(presetId: string, start: number, duration: number) {
@@ -550,17 +560,20 @@ export function applyPreset(presetId: string, start: number, duration: number) {
   const comp = currentComp(S())
   if (!preset || !comp || !selection.length) return
   S().update((p) => {
+    const c = findComp(p, compId)
     for (const id of selection) {
-      const l = findLayer(p, compId, id)
-      if (!l) continue
-      const res = preset.apply(l, { start, duration, compWidth: comp.width, compHeight: comp.height })
+      const f = findDeep(c.layers, id)
+      if (!f) continue
+      const l = f.layer
+      // In een groep: de tijd en de maat van die groep (de compositie waar de laag in zit)
+      const box = f.ancestors[f.ancestors.length - 1] ?? c
+      const res = preset.apply(l, { start: Math.max(0, localTime(start, f.ancestors)), duration, compWidth: box.width, compHeight: box.height })
       l.tracks = mergeTracks(l.tracks, res.tracks)
       if (res.revealMode) {
         l.revealMode = res.revealMode
         l.reveal = 1
       }
     }
-    const c = findComp(p, compId)
     c.duration = Math.max(c.duration, Math.ceil(start + duration))
   })
 }
@@ -573,7 +586,7 @@ export async function aiAnimate(prompt: string): Promise<string | null> {
     S().update((p) => {
       const comp = findComp(p, compId)
       for (const r of res.layers) {
-        const l = comp.layers.find((x) => x.id === r.layerId)
+        const l = findDeep(comp.layers, r.layerId)?.layer
         if (!l) continue
         l.tracks = { ...l.tracks, ...r.tracks }
         if (r.revealMode) l.revealMode = r.revealMode
@@ -748,12 +761,14 @@ export async function saveAsBoilerplate(name: string) {
 
 /** Geeft meerdere lagen dezelfde binnenkomst, na elkaar (van boven naar onder in beeld). */
 export function staggerIntros(libraryId: string, gap: number) {
-  const { selection, compId } = S()
+  const { selection, compId, activeTab } = S()
   const item = LIBRARY.find((i) => i.id === libraryId)
   if (!item) return
   S().update((p) => {
     const comp = findComp(p, compId)
-    const targets = comp.layers
+    // De lagen van wat je ziet: de hele banner of de geopende compositie
+    const ctx = contextOf(p, compId, activeTab)
+    const targets = ctx.list
       .filter((l) => l.visible && (selection.length > 1 ? selection.includes(l.id) : !l.locked))
       .sort((a, b) => a.y - b.y || a.x - b.x)
     targets.forEach((l, i) => {
@@ -763,7 +778,8 @@ export function staggerIntros(libraryId: string, gap: number) {
       else applyLibraryItem(l, item, comp, at)
     })
     const last = targets.length ? 0.2 + (targets.length - 1) * gap + 1.2 : 0
-    comp.duration = Math.max(comp.duration, Math.ceil(last + 2))
+    if (!ctx.group) comp.duration = Math.max(comp.duration, Math.ceil(last + 2))
+    else if (ctx.group.end != null) ctx.group.end = Math.max(ctx.group.end, (ctx.group.start ?? 0) + last + 0.5)
   })
   S().setStatus('Keyframes gezet, laag na laag. Per laag bij te stellen in de tijdlijn.')
 }
@@ -1070,7 +1086,8 @@ export function goToLayerEdge(which: 'in' | 'out') {
 export function jumpKeyframe(dir: -1 | 1) {
   const comp = currentComp(S())
   if (!comp) return
-  const { selection, time } = S()
+  const { selection, time, project, compId, activeTab } = S()
+  if (!project) return
   const times: number[] = []
   const visit = (list: Layer[], ancestors: Layer[]) => {
     for (const l of list) {
@@ -1082,9 +1099,12 @@ export function jumpKeyframe(dir: -1 | 1) {
       if (l.children) visit(l.children, [...ancestors, l])
     }
   }
-  visit(comp.layers, [])
+  // Alleen wat je ziet: in een geopende compositie de lagen en de tijd van die compositie
+  const ctx = contextOf(project, compId, activeTab)
+  visit(ctx.list, ctx.ancestors)
+  const r = viewRange(S())
   const eps = 1e-3
-  const sorted = [...new Set(times)].sort((a, b) => a - b)
+  const sorted = [...new Set(times)].filter((t) => t >= r.origin - eps && t <= r.origin + r.length + eps).sort((a, b) => a - b)
   const next = dir > 0 ? sorted.find((t) => t > time + eps) : [...sorted].reverse().find((t) => t < time - eps)
   if (next == null) return
   S().setPlaying(false)
@@ -1147,9 +1167,27 @@ export function replaceSelectedImage() {
 
 /** ⌘] / ⌘[ (met ⇧: helemaal): selectie naar voren of naar achteren. */
 export function arrangeSelection(where: 'forward' | 'backward' | 'front' | 'back') {
-  const sel = S().selection
-  if (where === 'forward') sel.forEach((id) => moveLayer(id, -1))
-  if (where === 'backward') [...sel].reverse().forEach((id) => moveLayer(id, 1))
-  if (where === 'front') [...sel].reverse().forEach((id) => moveToEdge(id, 'front'))
-  if (where === 'back') sel.forEach((id) => moveToEdge(id, 'back'))
+  const { selection, compId } = S()
+  if (!selection.length) return
+  S().update((p) => {
+    const comp = findComp(p, compId)
+    // Per lijst (dezelfde groep) de selectie als blok verplaatsen; de volgorde onderling blijft gelijk
+    const lists = new Map<Layer[], Set<string>>()
+    for (const id of selection) {
+      const f = findDeep(comp.layers, id)
+      if (!f) continue
+      if (!lists.has(f.list)) lists.set(f.list, new Set())
+      lists.get(f.list)!.add(id)
+    }
+    for (const [list, ids] of lists) {
+      const sel = (l: Layer) => ids.has(l.id)
+      let out = [...list]
+      if (where === 'front') out = [...list.filter(sel), ...list.filter((l) => !sel(l))]
+      else if (where === 'back') out = [...list.filter((l) => !sel(l)), ...list.filter(sel)]
+      else if (where === 'forward') {
+        for (let i = 1; i < out.length; i++) if (sel(out[i]) && !sel(out[i - 1])) [out[i - 1], out[i]] = [out[i], out[i - 1]]
+      } else for (let i = out.length - 2; i >= 0; i--) if (sel(out[i]) && !sel(out[i + 1])) [out[i], out[i + 1]] = [out[i + 1], out[i]]
+      list.splice(0, list.length, ...out)
+    }
+  })
 }

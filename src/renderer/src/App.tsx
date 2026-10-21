@@ -252,11 +252,13 @@ export function App() {
           break
         }
         case 'PageDown':
-          s.setTime(Math.min(comp.duration, s.time + (e.shiftKey ? 10 * frame : frame)))
+        case 'PageUp': {
+          // Binnen het bereik van wat je ziet (de hele banner, of de geopende compositie)
+          const r = viewRange(s)
+          const t = s.time + (e.key === 'PageUp' ? -1 : 1) * (e.shiftKey ? 10 * frame : frame)
+          s.setTime(Math.max(r.origin, Math.min(r.origin + r.length, t)))
           break
-        case 'PageUp':
-          s.setTime(s.time - (e.shiftKey ? 10 * frame : frame))
-          break
+        }
         case 'Delete':
         case 'Backspace':
           deleteSelection()

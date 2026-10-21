@@ -1,7 +1,7 @@
 import { lstatSync, realpathSync } from 'node:fs'
 import { lstat, mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
-import { dirname, normalize, relative, resolve, sep } from 'node:path'
+import { basename, dirname, join, normalize, relative, resolve, sep } from 'node:path'
 
 /**
  * Volledig pad van `rel` binnen `dir`. Gooit een fout als het pad (ook via `..`, een absoluut pad
@@ -63,7 +63,8 @@ export async function writeInside(dir: string, rel: string, data: string | Uint8
   const full = inside(dir, rel)
   await ensureDirInside(dir, relative(resolve(dir), dirname(full)))
   if ((await lstat(full).catch(() => null))?.isDirectory()) throw new Error(`Is een map: ${rel}`)
-  const tmp = `${full}.${randomUUID().slice(0, 8)}.tmp`
+  // Verborgen tijdelijk bestand (begint met een punt): verschijnt nooit in de assetlijst
+  const tmp = join(dirname(full), `.${basename(full)}.${randomUUID().slice(0, 8)}.tmp`)
   await writeFile(tmp, data, { flag: 'wx', mode })
   try {
     await rename(tmp, full)

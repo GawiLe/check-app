@@ -199,9 +199,10 @@ export function syncFormats(prev: Project, next: Project, compId: string): void 
     for (const l of changed) {
       const target = dst.layers.find((x) => x.linkId === l.linkId)
       if (target) {
-        const before = prevById.get(l.id)!
+        const before = prevById.get(l.id)
         // Geometrie hangt samen (x hangt af van de breedte): bij een wijziging alles herberekenen.
-        applyFromBase(src, l, dst, target, layerKeys(before, l).filter((k) => !same(getKey(before, k), getKey(l, k))).flatMap(geometryGroup))
+        // Nieuwe laag in de basis die al een gekoppelde laag in dit formaat heeft: alles overnemen (behalve overrides).
+        applyFromBase(src, l, dst, target, before ? layerKeys(before, l).filter((k) => !same(getKey(before, k), getKey(l, k))).flatMap(geometryGroup) : undefined)
       } else if (added.has(l.id)) dst.layers.push(mapLayerToFormat(l, src, dst.width, dst.height))
     }
     if (orderChanged || added.size) reorderLike(src, dst)

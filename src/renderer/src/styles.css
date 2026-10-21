@@ -3205,3 +3205,15 @@ body.popout-window {
   flex: 1;
   font-size: 14px;
 }
+
+/* Vangnet bij een fout in de interface */
+.error-boundary {
+  margin: 24px auto;
+  max-width: 520px;
+  padding: 16px 18px;
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

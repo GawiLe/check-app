@@ -128,6 +128,16 @@ describe('validatie', () => {
     expect(rules).toEqual(expect.arrayContaining(['loops', 'duur', 'bestandstype', 'clickTag', 'gewicht']))
   })
 
+  it('speelduur: de laatste loop telt tot het eindbeeld', () => {
+    // 3 loops van 11 s met eindbeeld op 7 s = 29 s (niet 33 s): binnen de 30 s van CM360
+    const ok = { ...comp, duration: 11, loops: 3, endFrame: 7 }
+    const issues = validateBanner({ target: 'cm360', comp: ok, html, files, zipBytes: 3000, backupBytes: 20000 })
+    expect(issues.filter((i) => i.rule === 'duur' && i.level === 'error')).toEqual([])
+    const tooLong = { ...ok, endFrame: 11 }
+    const issues2 = validateBanner({ target: 'cm360', comp: tooLong, html, files, zipBytes: 3000, backupBytes: 20000 })
+    expect(issues2.some((i) => i.rule === 'duur' && i.level === 'error')).toBe(true)
+  })
+
   it('herkent lichte achtergronden', () => {
     expect(isLight('#ffffff')).toBe(true)
     expect(isLight('#fff')).toBe(true)

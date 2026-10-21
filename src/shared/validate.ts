@@ -1,3 +1,4 @@
+import { endFrameTime } from './motion'
 import { TARGETS } from './specs'
 import type { Composition, ExportTarget, ValidationIssue } from './types'
 
@@ -89,7 +90,9 @@ export function validateBanner(input: ValidationInput): ValidationIssue[] {
   if (!files.some((f) => f.name === 'index.html')) add('error', 'index', 'index.html ontbreekt in de root van de ZIP.')
 
   // Animatie
-  const total = comp.duration * comp.loops
+  // Echte speelduur: alle loops, de laatste tot het eindbeeld (daar stopt de banner)
+  const loops = Math.max(1, Math.round(comp.loops))
+  const total = comp.duration * (loops - 1) + endFrameTime(comp)
   if (comp.loops > spec.maxLoops) add('error', 'loops', `${comp.loops} loops; maximum is ${spec.maxLoops}.`)
   if (total > spec.maxAnimationSeconds)
     add('error', 'duur', `Totale animatieduur ${total.toFixed(1)}s; maximum is ${spec.maxAnimationSeconds}s.`)

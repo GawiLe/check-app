@@ -10,6 +10,7 @@ import { AssetsPanel } from './LeftPanel'
 import { Library } from './Library'
 import { Timeline } from './Timeline'
 import { Viewer } from './Viewer'
+import { ErrorBoundary } from './ErrorBoundary'
 
 type ViewMode = 'design' | 'code' | 'both'
 
@@ -81,8 +82,8 @@ const PANELS: Record<PanelId, () => React.ReactNode> = {
 export function Workspace() {
   return (
     <div className="dock-root">
-      <Dock render={(id) => PANELS[id]()} />
-      <Popouts render={(id) => PANELS[id]()} />
+      <Dock render={(id) => <ErrorBoundary label="dit paneel">{PANELS[id]()}</ErrorBoundary>} />
+      <Popouts render={(id) => <ErrorBoundary label="dit paneel">{PANELS[id]()}</ErrorBoundary>} />
     </div>
   )
 }

@@ -486,6 +486,18 @@ src/renderer/src/dock/  werkruimte: indeling als boom van splitsingen en tabgroe
 - **Wat je ziet is wat je exporteert.** De preview in de editor is dezelfde HTML als de export, met dezelfde runtime, in een iframe. Een test controleert dat runtime en editor op elk tijdstip identieke waarden geven.
 - De runtime (`src/shared/runtime.ts`) gebruikt geen libraries. Hij speelt af na `load` en `document.fonts.ready` (geen FOUT) en stopt op het eindframe.
 
+### Veiligheid
+
+Een project is een gewone map die je kunt delen of krijgen. De app gaat er daarom van uit dat een projectbestand niet te vertrouwen is:
+
+- **Preview:** eigen document via `bsproj://` met een strenge CSP (geen netwerk; alleen de scripts die de app zelf in de banner zet, op sha256-vingerafdruk). Alleen bestanden uit `assets/` en `fonts/` zijn bereikbaar.
+- **Export, backup-JPG, MP4 en GIF** renderen in een aparte, afgeschermde sessie (`src/main/render.ts`): geen netwerk, geen permissies, alleen de tijdelijke exportmap.
+- **Code-elementen** gaan door een allowlist-opschoner (`src/shared/code.ts`): alleen opmaak- en SVG-elementen, geen scripts, event-handlers, externe url's of CSS-escapes.
+- **Bestanden schrijven** gaat via `src/main/paths.ts`: nooit buiten de projectmap (ook niet via `..` of symlinks), via een tijdelijk bestand + hernoemen (nooit een half geschreven project).
+- **Vensters** draaien met `contextIsolation` en `sandbox`; geen camera/microfoon/locatie, geen `<webview>`, geen pop-ups behalve de losgemaakte panelen. Het hoofdproces accepteert IPC alleen van het hoofdvenster, en alleen voor het geopende project.
+- **Spreadsheets:** grenzen aan grootte en kolommen (geen zip-bom), en formules krijgen bij CSV-export een `'` (geen formule-injectie in Excel).
+- **API-sleutels** staan versleuteld in de OS-sleutelhanger; is die er niet, dan waarschuwt de app.
+
 ## AI: animatiecode laten schrijven
 
 De AI is bedoeld voor animaties die je zelf lastig kunt maken. Paneel **AI**:
@@ -505,8 +517,12 @@ Sleutels worden versleuteld opgeslagen via de sleutelhanger van het OS.
 ## Roadmap-ideeën
 
 - Slimmere formaat-afleiding met ankers per laag (links/rechts/midden, schaal-regels).
+- Structuurwijzigingen in de basis (groeperen, lagen verplaatsen tussen groepen) slimmer doorzetten naar formaten met eigen aanpassingen.
+- Preview tijdens slepen live bijwerken in plaats van herladen (nog vloeiender bij zware projecten).
+- GIF-codering en de KB-teller in een apart proces, zodat de editor nooit even stokt.
 - Extra platforms: Flashtalking, Xandr.
 - Video-laag en sprite-sheets.
 - Mockups in de app en *Publiceren naar klantportaal*.
-- Installeerbare app (.dmg) met automatische updates.
+- Installeerbare, ondertekende app (.dmg, notarized) met automatische updates.
+- Overzicht "Alle formaten" naast elkaar met één klik naar het formaat; asset-miniaturen in het paneel.
 - AI-effecten als herbruikbare presets opslaan.

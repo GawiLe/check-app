@@ -155,9 +155,16 @@ export async function pack(dir: string, project: Project, comp: Composition, tar
     if (m && !built.fontIds.includes(fid)) delete files[m[1]]
   }
   const imageNotes: string[] = []
+  const missing: string[] = []
   for (const p of new Set(built.assets.map(same))) {
     const o = optimized[p]
-    files[assetNames[p]] = o ? o.data : await readFile(inside(dir, p))
+    // Ontbrekende afbeelding (verwijderd of hernoemd): melden in de controle, niet de hele export laten mislukken
+    const data = o ? o.data : await readFile(inside(dir, p)).catch(() => null)
+    if (!data) {
+      missing.push(basename(p))
+      continue
+    }
+    files[assetNames[p]] = data
     if (o) {
       const size = o.to[0] < o.from[0] ? `${o.from[0]}×${o.from[1]} → ${o.to[0]}×${o.to[1]} px, ` : ''
       imageNotes.push(`${basename(p)}: ${size}${kbs(o.origBytes)} → ${kbs(o.data.byteLength)}${o.ext !== extname(p).toLowerCase() ? ` (als ${o.ext.slice(1).toUpperCase()})` : ''}`)
@@ -165,7 +172,7 @@ export async function pack(dir: string, project: Project, comp: Composition, tar
   }
   files['index.html'] = new TextEncoder().encode(built.html)
   for (const [n, text] of Object.entries(built.extraFiles)) files[n] = new TextEncoder().encode(text)
-  return { files, built, imageNotes }
+  return { files, built, imageNotes, missing }
 }
 
 const kbs = (b: number) => `${(b / 1024).toFixed(1)} KB`
@@ -186,7 +193,7 @@ async function exportOne(
   await mkdir(targetDir, { recursive: true })
   const outDir = await mkdtemp(join(tmpdir(), 'bnnr-'))
 
-  const { files, built, imageNotes } = await pack(dir, project, comp, target, fonts)
+  const { files, built, imageNotes, missing } = await pack(dir, project, comp, target, fonts)
   for (const [n, data] of Object.entries(files)) await writeFile(join(outDir, n), data)
 
   const zip = zipBanner(files)
@@ -210,7 +217,13 @@ async function exportOne(
   await rm(outDir, { recursive: true, force: true })
 
   const fileList = Object.entries(files).map(([n, d]) => ({ name: n, bytes: d.byteLength }))
-  const issues = validateBanner({ target, comp, html: built.html, files: fileList, zipBytes: zip.byteLength, backupBytes, politeLoad: project.politeLoad })
+  let issues = validateBanner({ target, comp, html: built.html, files: fileList, zipBytes: zip.byteLength, backupBytes, politeLoad: project.politeLoad })
+  if (missing.length) {
+    issues = [
+      ...missing.map((m) => ({ level: 'error' as const, rule: 'afbeelding', message: `Afbeelding ontbreekt: ${m} staat niet (meer) in assets/. Vervang de afbeelding of verwijder de laag.` })),
+      ...issues.filter((i) => i.rule !== 'ok')
+    ]
+  }
 
   // Laat zien wat het verkleinen van de fonts oplevert
   const chars = charsPerFont(project, comp)

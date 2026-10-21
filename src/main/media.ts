@@ -85,11 +85,17 @@ export function encodeGif(frames: Uint8Array[], width: number, height: number, f
   const ms = 1000 / fps
   let i = 0
   let first = true
+  // GIF-vertragingen zijn hele honderdsten: het afrondingsverschil schuift door naar het volgende beeldje,
+  // zodat de GIF in totaal precies even lang duurt als de banner (geen drift bij bijv. 15 of 30 fps)
+  let exact = 0
+  let written = 0
   while (i < frames.length) {
     let j = i + 1
     while (j < frames.length && sameFrame(frames[j], frames[i])) j++
-    const delay = Math.round((ms * (j - i)) / 10) * 10
-    gif.writeFrame(applyPalette(frames[i], palette), width, height, { palette: first ? palette : undefined, delay: Math.max(20, delay), repeat: first ? -1 : undefined, first })
+    exact += ms * (j - i)
+    const delay = Math.max(20, Math.round((exact - written) / 10) * 10)
+    written += delay
+    gif.writeFrame(applyPalette(frames[i], palette), width, height, { palette: first ? palette : undefined, delay, repeat: first ? -1 : undefined, first })
     first = false
     i = j
   }
@@ -108,14 +114,29 @@ async function openEncoder(tmp: string) {
   const page = join(tmp, 'encoder.html')
   await writeFile(page, '<!doctype html><meta charset="utf-8"><title>mp4</title>')
   await win.loadFile(page)
-  const next = (channel: string) =>
-    new Promise<unknown[]>((resolve) => {
+  // Antwoord van het encodervenster, met een time-out: loopt de encoder vast, dan een duidelijke fout
+  const next = (channel: string, ms = 30000) =>
+    new Promise<unknown[]>((resolve, reject) => {
+      const done = () => {
+        clearTimeout(timer)
+        ipcMain.removeListener(channel, h)
+        if (!win.isDestroyed()) win.webContents.removeListener('render-process-gone', gone)
+      }
       const h = (e: IpcMainEvent, ...args: unknown[]) => {
         if (e.sender !== win.webContents) return
-        ipcMain.removeListener(channel, h)
+        done()
         resolve(args)
       }
+      const gone = () => {
+        done()
+        reject(new Error('De MP4-encoder is gestopt.'))
+      }
+      const timer = setTimeout(() => {
+        done()
+        reject(new Error('De MP4-encoder reageert niet (time-out).'))
+      }, ms)
       ipcMain.on(channel, h)
+      win.webContents.on('render-process-gone', gone)
     })
   return { win, next }
 }
@@ -141,13 +162,18 @@ export async function exportMedia(req: MediaRequest, onProgress?: (msg: string) 
       const index = join(dir, 'index.html')
       const name = bannerName(req.project, comp)
 
+      // Gaat één formaat mis, dan de rest gewoon afmaken en de fout bij dat formaat melden
+      const failed = (kind: 'mp4' | 'gif', err: unknown) =>
+        results.push({ kind, composition: comp.name, file: '', bytes: 0, note: `${comp.width}×${comp.height}`, warning: `Mislukt: ${(err as Error)?.message ?? err}` })
+
       if (mp4) {
         onProgress?.(`MP4 ${comp.width}×${comp.height}…`)
         const fps = Math.min(60, Math.max(10, Math.round(mp4.fps || 30)))
         const scale = mp4.scale === 1 ? 1 : 2
-        encoder ??= await openEncoder(tmp)
-        const banner = await openBanner(index, comp, scale, true)
+        let banner: Awaited<ReturnType<typeof openBanner>> | null = null
         try {
+          encoder ??= await openEncoder(tmp)
+          banner = await openBanner(index, comp, scale, true)
           const ready = encoder.next('mp4:ready')
           encoder.win.webContents.send('mp4:start', { width: banner.width, height: banner.height, fps })
           await ready
@@ -159,7 +185,7 @@ export async function exportMedia(req: MediaRequest, onProgress?: (msg: string) 
             const [err] = await ack
             if (err) throw new Error(`MP4-codering mislukt: ${err}`)
           }
-          const done = encoder.next('mp4:done')
+          const done = encoder.next('mp4:done', 120000)
           encoder.win.webContents.send('mp4:end')
           const [err, bytes] = (await done) as [string | null, Uint8Array | null]
           if (err || !bytes) throw new Error(`MP4-codering mislukt: ${err ?? 'geen uitvoer'}`)
@@ -167,23 +193,30 @@ export async function exportMedia(req: MediaRequest, onProgress?: (msg: string) 
           await mkdir(join(base, 'MP4'), { recursive: true })
           await writeFile(file, bytes)
           results.push({ kind: 'mp4', composition: comp.name, file, bytes: bytes.byteLength, note: `${banner.width}×${banner.height} (${scale}×), ${fps} fps, ${(times.length / fps).toFixed(1)} s` })
+        } catch (err) {
+          failed('mp4', err)
+          // Een vastgelopen encoder niet hergebruiken voor het volgende formaat
+          encoder?.win.destroy()
+          encoder = null
         } finally {
-          banner.win.destroy()
+          banner?.win.destroy()
         }
       }
 
       if (gif) {
         onProgress?.(`GIF ${comp.width}×${comp.height}…`)
         const fps0 = Math.min(30, Math.max(4, Math.round(gif.fps || 15)))
-        const banner = await openBanner(index, comp, 1, false)
+        let banner: Awaited<ReturnType<typeof openBanner>> | null = null
         try {
+          banner = await openBanner(index, comp, 1, false)
+          const b = banner
           // Elk uniek tijdstip één keer vastleggen (loops herhalen dezelfde beeldjes)
           const cache = new Map<number, Uint8Array>()
           const framesAt = async (fps: number) => {
             const out: Uint8Array[] = []
             for (const t of frameTimes(comp, fps)) {
               let f = cache.get(t)
-              if (!f) cache.set(t, (f = toRgba(await banner.grab(t))))
+              if (!f) cache.set(t, (f = toRgba(await b.grab(t))))
               out.push(f)
             }
             return out
@@ -199,7 +232,7 @@ export async function exportMedia(req: MediaRequest, onProgress?: (msg: string) 
           ]
           let best: { bytes: Uint8Array; fps: number; colors: number } | null = null
           for (const [fps, colors] of tries) {
-            const bytes = encodeGif(await framesAt(fps), banner.width, banner.height, fps, colors)
+            const bytes = encodeGif(await framesAt(fps), b.width, b.height, fps, colors)
             best = { bytes, fps, colors }
             if (bytes.byteLength <= max) break
           }
@@ -212,11 +245,13 @@ export async function exportMedia(req: MediaRequest, onProgress?: (msg: string) 
             composition: comp.name,
             file,
             bytes: best!.bytes.byteLength,
-            note: `${banner.width}×${banner.height}, ${best!.fps} fps, ${best!.colors} kleuren`,
+            note: `${b.width}×${b.height}, ${best!.fps} fps, ${best!.colors} kleuren`,
             ...(over ? { warning: `Groter dan ${gif.maxKb} KB, ook met minder kleuren en een lagere fps. Maak de animatie korter of rustiger.` } : {})
           })
+        } catch (err) {
+          failed('gif', err)
         } finally {
-          banner.win.destroy()
+          banner?.win.destroy()
         }
       }
     }
