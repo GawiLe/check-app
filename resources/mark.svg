@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1254 1254" width="1254" height="1254">
+  <title>Bnnr Studio</title>
+  <!-- Beeldmerk: tijdlijn met vijf lagen, de oranje laag met afspeelknop, en de playhead -->
+  <defs>
+    <radialGradient id="achtergrond" cx="50%" cy="45%" r="70%">
+      <stop offset="0" stop-color="#03362A"/>
+      <stop offset="1" stop-color="#012A1F"/>
+    </radialGradient>
+  </defs>
+  <rect width="1254" height="1254" rx="282" fill="url(#achtergrond)"/>
+  <g>
+    <path d="M279 328a36 36 0 0 1 36-36h558a60 60 0 0 1 0 120h-558a36 36 0 0 1-36-36z" fill="#0A6F4E"/>
+    <path d="M279 478a36 36 0 0 1 36-36h420a53 53 0 0 1 0 106h-420a36 36 0 0 1-36-36z" fill="#74C394"/>
+    <path d="M279 611a36 36 0 0 1 36-36h568a72 72 0 0 1 0 144h-568a36 36 0 0 1-36-36z" fill="#FD6000"/>
+    <path d="M279 782a36 36 0 0 1 36-36h423a53 53 0 0 1 0 106h-423a36 36 0 0 1-36-36z" fill="#74C394"/>
+    <path d="M279 915a36 36 0 0 1 36-36h598a62 62 0 0 1 0 124h-598a36 36 0 0 1-36-36z" fill="#0A6F4E"/>
+  </g>
+  <polygon points="599,607 599,687 668,647" fill="#FAF2E9" stroke="#FAF2E9" stroke-width="18" stroke-linejoin="round"/>
+  <g fill="none" stroke="#FAF2E9" stroke-width="29" stroke-linecap="round">
+    <path d="M433 337V993"/>
+    <circle cx="433" cy="292.5" r="44"/>
+  </g>
+</svg>

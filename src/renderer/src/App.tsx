@@ -342,9 +342,7 @@ function Welcome() {
   return (
     <div className="welcome">
       <div className="card">
-        <div className="brand">
-          <div className="logo" /> Bnnr Studio
-        </div>
+        <div className="wordmark" role="img" aria-label="Bnnr Studio" />
         <p>Lichte HTML5-banners voor CM360, Google Ads en Ad Manager. Eén werkbestand, alle formaten.</p>
         <div className="buttons">
           <button className="primary" onClick={() => useStore.getState().setDialog('new')}>

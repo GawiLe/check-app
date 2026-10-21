@@ -479,6 +479,7 @@ src/main/     Electron hoofdproces: projectmappen, fonts (subset + write-on pade
 src/preload/  veilige brug naar de renderer (window.bs)
 src/renderer/ React-editor: viewer, tijdlijn, inspector, codeweergave, dialogen
 src/renderer/src/dock/  werkruimte: indeling als boom van splitsingen en tabgroepen
+resources/    app-icoon: mark.svg (beeldmerk, bron) → icon.svg / icon.png (macOS-raster, 1024 px)
 ```
 
 - **Formaten koppelen** gebeurt in `src/shared/sync.ts`: na elke wijziging worden inhoud en timing doorgezet naar lagen met hetzelfde `linkId`.
