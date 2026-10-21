@@ -51,12 +51,20 @@ export function Scrub(props: {
       onPointerMove={(e) => {
         const d = drag.current
         if (!d) return
+        // Knop al losgelaten (bijv. buiten het venster): stoppen met slepen
+        if (e.buttons === 0) {
+          drag.current = null
+          return
+        }
         const dx = e.clientX - d.x
         if (Math.abs(dx) > 2) d.moved = true
         if (d.moved) {
           const raw = d.v + dx * step * (e.shiftKey ? 10 : 1)
           onChange(clamp(Math.round(raw / step) * step), true)
         }
+      }}
+      onLostPointerCapture={() => {
+        if (drag.current?.moved) drag.current = null
       }}
       onPointerUp={() => {
         if (drag.current && !drag.current.moved) {

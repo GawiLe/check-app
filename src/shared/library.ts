@@ -17,7 +17,7 @@ export interface LibraryItem {
   motion?: Partial<Motion>
   emphasis?: EmphasisType
   /** Alleen zinvol voor write-on of lagen met een wipe. */
-  reveal?: 'writeon' | 'wipeLeft' | 'wipeUp'
+  reveal?: 'writeon' | 'wipeLeft' | 'wipeRight' | 'wipeUp' | 'wipeDown'
 }
 
 const m = (p: Partial<Motion>): Partial<Motion> => ({ fade: true, dx: 0, dy: 0, scale: 1, rotation: 0, reveal: false, ease: 'easeOut', ...p })
@@ -36,8 +36,10 @@ export const LIBRARY: LibraryItem[] = [
   { id: 'zoomOutIn', label: 'Zoom uit', kind: 'intro', motion: m({ scale: 1.4 }) },
   { id: 'rotateIn', label: 'Draai in', kind: 'intro', motion: m({ scale: 0.5, rotation: -90, ease: 'backOut' }) },
   { id: 'writeOn', label: 'Write-on', kind: 'intro', reveal: 'writeon', motion: m({ fade: false, reveal: true, ease: 'easeInOut', duration: 1.2 }) },
-  { id: 'wipeLeft', label: 'Wipe links', kind: 'intro', reveal: 'wipeLeft', motion: m({ fade: false, reveal: true, ease: 'easeInOut', duration: 0.7 }) },
-  { id: 'wipeUp', label: 'Wipe omhoog', kind: 'intro', reveal: 'wipeUp', motion: m({ fade: false, reveal: true, ease: 'easeInOut', duration: 0.7 }) },
+  { id: 'wipeLeft', label: 'Wipe van links', kind: 'intro', reveal: 'wipeLeft', motion: m({ fade: false, reveal: true, ease: 'easeInOut', duration: 0.7 }) },
+  { id: 'wipeRight', label: 'Wipe van rechts', kind: 'intro', reveal: 'wipeRight', motion: m({ fade: false, reveal: true, ease: 'easeInOut', duration: 0.7 }) },
+  { id: 'wipeUp', label: 'Wipe van onder', kind: 'intro', reveal: 'wipeUp', motion: m({ fade: false, reveal: true, ease: 'easeInOut', duration: 0.7 }) },
+  { id: 'wipeDown', label: 'Wipe van boven', kind: 'intro', reveal: 'wipeDown', motion: m({ fade: false, reveal: true, ease: 'easeInOut', duration: 0.7 }) },
   // Accent
   { id: 'pulse', label: 'Pulse', kind: 'emphasis', emphasis: 'pulse' },
   { id: 'heartbeat', label: 'Heartbeat', kind: 'emphasis', emphasis: 'heartbeat' },
@@ -70,12 +72,17 @@ const DEFAULT_DURATION: Record<LibraryKind, number> = { intro: 0.6, emphasis: 1,
 export function applyLibraryItem(l: Layer, item: LibraryItem, comp: Composition, at?: number): void {
   const fallback = item.kind === 'intro' ? 0.3 : item.kind === 'emphasis' ? Math.min(comp.duration - 1, 3) : Math.max(0, comp.duration - 0.6)
   const start = round(Math.max(0, at ?? fallback))
-  if (item.reveal === 'wipeLeft' || item.reveal === 'wipeUp') {
-    if (l.type !== 'writeon') l.revealMode = item.reveal
+  if (item.reveal && item.reveal !== 'writeon') {
+    // Op een write-on laag: de letters schrijven zich vanuit dezelfde kant; anders een wipe
+    if (l.type === 'writeon') {
+      const dir = ({ wipeLeft: 'left', wipeRight: 'right', wipeUp: 'bottom', wipeDown: 'top' } as const)[item.reveal]
+      if (dir === 'left') delete l.writeon!.direction
+      else l.writeon!.direction = dir
+    } else l.revealMode = item.reveal
   }
   if (item.reveal === 'writeon' && l.type !== 'writeon') {
-    // Write-on kan alleen op een write-on laag; op andere lagen een wipe van links.
-    l.revealMode = 'wipeLeft'
+    // Write-on kan alleen op een write-on laag; op andere lagen een wipe (de gekozen kant, anders van links)
+    if (l.revealMode === 'none' || l.revealMode === 'draw') l.revealMode = l.revealMode === 'draw' ? 'draw' : 'wipeLeft'
   }
   // Tijdelijke laag zonder keyframes, met als rustwaarden de stand van de laag op het rustmoment
   const tmp: Layer = { ...structuredClone({ ...l, children: undefined }), tracks: {}, intro: null, outro: null, emphasis: null }

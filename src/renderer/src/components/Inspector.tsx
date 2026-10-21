@@ -5,7 +5,7 @@ import { endFrameTime } from '@shared/motion'
 import { LIBRARY } from '@shared/library'
 import { baseComp, isLinkedToBase, overrideLabel } from '@shared/sync'
 import { GROUP_LABEL, groupProps, layerGroups, type PropGroupId } from '@shared/propgroups'
-import { findDeep, layerLength, trimIn, trimOut } from '@shared/tree'
+import { findDeep, layerLength, shiftTiming, trimIn, trimOut } from '@shared/tree'
 import { PRESETS } from '@shared/presets'
 import { TARGET_IDS, TARGETS } from '@shared/specs'
 import { exitLayers, shadowCss, shadowPs } from '@shared/build'
@@ -31,7 +31,7 @@ import {
   staggerIntros,
   ungroupSelection
 } from '../lib/actions'
-import { currentComp, layerLocalTime, setLayerValue, toggleStopwatch, updateComp, updateLayer, useStore } from '../store'
+import { currentComp, layerLocalTime, setLayerValue, toggleStopwatch, updateComp, updateLayer, useStore, viewRange } from '../store'
 import { FontPicker } from './FontPicker'
 import { ColorInput, Num, Row, Scrub, Section, SectionStack, Switch, TextInput } from './ui'
 
@@ -61,7 +61,7 @@ export function DesignPanel() {
   return (
     <SectionStack id="design" className="panel-scroll">
       <FormatNotice />
-      {layer ? <LayerDesign layer={layer} /> : count > 1 ? <Multi n={count} /> : <CompDesign />}
+      {layer ? <LayerDesign layer={layer} /> : count > 1 ? <Multi n={count} /> : <OpenCompOr />}
     </SectionStack>
   )
 }
@@ -193,6 +193,62 @@ function TimeRange({ layer }: { layer: Layer }) {
 }
 
 // ---------------- Ontwerp ----------------
+
+/** Niets geselecteerd: in een geopende compositie de instellingen van die compositie, anders van het formaat. */
+function OpenCompOr() {
+  const project = useStore((s) => s.project)!
+  const compId = useStore((s) => s.compId)
+  const activeTab = useStore((s) => s.activeTab)
+  const group = viewRange({ project, compId, activeTab }).group
+  return group ? <GroupCompDesign group={group} /> : <CompDesign />
+}
+
+/** Instellingen van een geopende compositie: naam, maat (het canvas van de compositie), duur en in-punt. */
+function GroupCompDesign({ group }: { group: Layer }) {
+  const up = (fn: (l: Layer) => void, co?: string) => updateLayer(group.id, fn, co)
+  const start = group.start ?? 0
+  const length = layerLength(group)
+  return (
+    <Section title={<><Folder size={13} /> Compositie</>}>
+      <Row label="Naam">
+        <TextInput value={group.name} onCommit={(v) => v.trim() && up((l) => void (l.name = v.trim()))} />
+      </Row>
+      <div className="row">
+        <span className="label">Maat</span>
+        <div className="grow">
+          <Num label="B" value={Math.round(group.width)} min={1} max={4000} onChange={(v, co) => up((l) => void (l.width = Math.round(v)), co ? 'gw' : undefined)} />
+        </div>
+        <div className="grow">
+          <Num label="H" value={Math.round(group.height)} min={1} max={4000} onChange={(v, co) => up((l) => void (l.height = Math.round(v)), co ? 'gh' : undefined)} />
+        </div>
+      </div>
+      <div className="row">
+        <span className="label">Duur</span>
+        <div className="grow">
+          <Num label="s" value={Math.round(length * 10) / 10} step={0.1} min={0.1} max={30} decimals={1} onChange={(v, co) => up((l) => void (l.end = Math.round((start + v) * 100) / 100), co ? 'gd' : undefined)} />
+        </div>
+      </div>
+      <div className="row">
+        <span className="label">Begint op</span>
+        <div className="grow">
+          <Num
+            label="s"
+            title="In-punt in het formaat: de hele compositie (met al zijn animaties) schuift mee"
+            value={Math.round(start * 100) / 100}
+            step={0.05}
+            min={0}
+            max={60}
+            decimals={2}
+            onChange={(v, co) => up((l) => shiftTiming(l, v - (l.start ?? 0)), co ? 'gs' : undefined)}
+          />
+        </div>
+      </div>
+      <div className="hint-text">
+        De maat is het canvas van de compositie (zo zie je hem als je hem opent). De lagen erin blijven staan; wat buiten de maat valt is in het formaat gewoon zichtbaar, tenzij je een masker gebruikt. Formaat-instellingen vind je via het formaat-tabblad onder in de tijdlijn.
+      </div>
+    </Section>
+  )
+}
 
 function CompDesign() {
   const project = useStore((s) => s.project)!
@@ -484,6 +540,23 @@ function LayerDesign({ layer }: { layer: Layer }) {
             </div>
             <div className="grow">
               <Num label="Vul" title="Hoe snel de vulling na de lijn komt (0 = alleen lijn)" value={layer.writeon.fillAfter} step={0.01} min={0} max={1} decimals={2} onChange={(v, co) => up((l) => void (l.writeon!.fillAfter = v), co ? 'wf' : undefined)} />
+            </div>
+          </div>
+          <div className="row">
+            <span className="label">Richting</span>
+            <div className="seg grow writeon-dir">
+              {(
+                [
+                  ['left', '→', 'Van links naar rechts'],
+                  ['right', '←', 'Van rechts naar links'],
+                  ['top', '↓', 'Van boven naar onder (regel voor regel)'],
+                  ['bottom', '↑', 'Van onder naar boven (regel voor regel)']
+                ] as const
+              ).map(([v, label, title]) => (
+                <button key={v} title={title} className={(layer.writeon!.direction ?? 'left') === v ? 'on' : ''} onClick={() => up((l) => void (v === 'left' ? delete l.writeon!.direction : (l.writeon!.direction = v)))}>
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
           {!layer.writeon.glyphs.length && (

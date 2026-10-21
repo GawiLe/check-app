@@ -159,9 +159,8 @@ export function toggleExit(layerId: string) {
 
 /** Canvas-coördinaat → coördinaat binnen de geopende compositie (zonder schaal/rotatie van de groepen). */
 export function toContext(x: number, y: number) {
-  const { project, compId, activeTab } = S()
-  const ctx = contextOf(project!, compId, activeTab)
-  return ctx.ancestors.reduce((p, g) => ({ x: p.x - g.x, y: p.y - g.y }), { x, y })
+  // Het canvas toont een geopende compositie los, op zijn eigen coördinaten: niets om te rekenen
+  return { x, y }
 }
 
 /** Vorm tekenen met het rechthoek- of ellipsgereedschap. */

@@ -1,6 +1,6 @@
 import { exitLayers } from '@shared/build'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Maximize, Minus, Plus, Star } from 'lucide-react'
+import { Grid2x2, Maximize, Minus, Plus, Star } from 'lucide-react'
 import { layerStateAt, restStateAt } from '@shared/anim'
 import { resizeFromHandle } from '@shared/geometry'
 import { measuresFor, snapMove, union, type Guide, type Measure, type Rect } from '@shared/snap'
@@ -8,10 +8,10 @@ import { buildBanner, TEXT_CASE } from '@shared/build'
 import type { Composition, Layer, Project } from '@shared/types'
 import { anchorOf } from '@shared/geometry'
 import type { PenPoint } from '@shared/path'
-import { activeAt, findDeep, localTime } from '@shared/tree'
+import { activeAt, findDeep, isolatedComposition, localTime } from '@shared/tree'
 import { addPenShape, addShapeRect, addTextAt, applyLibrary, importDroppedFiles, openComp, setAnchor } from '../lib/actions'
 import { openEmptyMenu, openLayerMenu } from '../lib/menus'
-import { assetUrl, currentComp, setLayerValue, updateLayer, useStore } from '../store'
+import { assetUrl, currentComp, setLayerValue, updateLayer, useStore, viewRange } from '../store'
 import { DRAG_TYPE } from './Library'
 import { SizeMeter } from './SizeMeter'
 import { viewOf } from '../lib/windows'
@@ -257,14 +257,25 @@ type Drag =
 
 function SingleViewer() {
   const project = useStore((s) => s.project)!
-  const comp = useStore(currentComp)!
+  const formatComp = useStore(currentComp)!
   const zoom = useStore((s) => s.zoom)
-  const time = useStore((s) => s.time)
+  const globalTime = useStore((s) => s.time)
   const rev = useStore((s) => s.assetsRev)
   const selection = useStore((s) => s.selection)
   const overflowIds = useStore((s) => s.overflowIds)
   const tool = useStore((s) => s.tool)
   const activeTab = useStore((s) => s.activeTab)
+  // Geopende compositie: alleen die, op zijn eigen maat, met tijd vanaf zijn eigen 0 s (zoals in After Effects)
+  const range = viewRange({ project, compId: formatComp.id, activeTab })
+  const isolatedGroup = range.group
+  const comp = useMemo(
+    () => (isolatedGroup ? isolatedComposition(formatComp, isolatedGroup) : formatComp),
+    [formatComp, isolatedGroup]
+  )
+  const time = globalTime - range.origin
+  // Transparant bekijken: achtergrond en rand weg, schaakbord eronder (alleen in de editor)
+  const transparent = useStore((s) => s.transparentBg)
+  const shownComp = useMemo(() => (transparent ? { ...comp, background: 'transparent', border: null } : comp), [comp, transparent])
   const editingText = useStore((s) => s.editingText)
   const [hover, setHover] = useState<string | null>(null)
   const [, force] = useState(0)
@@ -276,7 +287,7 @@ function SingleViewer() {
 
   const boxes = boxesAt(comp.layers, time)
   const boxOf = (id: string) => boxes.find((b) => b.layer.id === id)
-  const ctxGroup = activeTab ? findDeep(comp.layers, activeTab)?.layer : null
+  const ctxGroup = isolatedGroup
   // Alleen lagen in de lijst waarin je werkt zijn klikbaar (formaat of geopende compositie).
   const ctxList = ctxGroup?.children ?? comp.layers
   const candidates = boxes.filter((b) => !b.layer.locked && ctxList.includes(b.layer))
@@ -603,14 +614,15 @@ function SingleViewer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comp.id, comp.width, comp.height])
 
-  const ctxBox = ctxGroup ? boxOf(ctxGroup.id) : undefined
+  // De geopende compositie staat los op het canvas: geen kader van de groep in het formaat
+  const ctxBox: Box | undefined = undefined
   const penPts = pen.current
 
   return (
     <div ref={viewerRef} className={`viewer tool-${tool}`} onWheel={(e) => (e.ctrlKey || e.metaKey) && zoomTo(zoom * (e.deltaY < 0 ? 1.1 : 0.9))}>
       <div className="stage-wrap">
-        <div className="stage" style={{ width: comp.width * zoom, height: comp.height * zoom }}>
-          <BannerFrame project={project} comp={comp} time={time} zoom={zoom} rev={rev} />
+        <div className={`stage${transparent ? ' checker' : ''}`} style={{ width: comp.width * zoom, height: comp.height * zoom }}>
+          <BannerFrame project={project} comp={shownComp} time={time} zoom={zoom} rev={rev} />
           <div
             ref={overlayRef}
             className="overlay"
@@ -739,9 +751,16 @@ function SingleViewer() {
       {tool === 'pen' && (
         <div className="tool-hint">Klik voor punten, sleep voor een bocht. Klik op het eerste punt om de vorm te sluiten. Open lijn: dubbelklik, Enter of Esc. Lijndikte en kleur stel je daarna in bij Ontwerp → Lijn.</div>
       )}
-      {ctxGroup && <div className="tool-hint top">Compositie "{ctxGroup.name}" geopend: je bewerkt de lagen hierin. Klik op het formaat-tabblad onder om terug te gaan.</div>}
+      {ctxGroup && <div className="tool-hint top">Compositie "{ctxGroup.name}" ({comp.width}×{comp.height}, {comp.duration}s): alleen deze compositie, tijd vanaf 0. Terug via het formaat-tabblad in de tijdlijn.</div>}
       <SizeMeter />
       <div className="floating">
+        <button
+          className={`icon sm${transparent ? ' on' : ''}`}
+          title={transparent ? 'Met achtergrond bekijken' : 'Transparant bekijken (zonder achtergrond; de export houdt hem)'}
+          onClick={() => useStore.getState().setTransparentBg(!transparent)}
+        >
+          <Grid2x2 size={13} />
+        </button>
         <button className="icon sm" title="Uitzoomen" onClick={() => zoomTo(zoom / 1.25)}>
           <Minus size={14} />
         </button>

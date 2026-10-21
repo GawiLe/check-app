@@ -166,7 +166,11 @@ export interface WriteOnProps {
   viewBox: [number, number, number, number]
   /** Hoe snel de vulling na de lijn verschijnt (0 = alleen lijn). */
   fillAfter: number
+  /** Richting waarin de letters zich schrijven: van links (standaard), van rechts, van boven of van onder. */
+  direction?: WriteOnDirection
 }
+
+export type WriteOnDirection = 'left' | 'right' | 'top' | 'bottom'
 
 /** Wipe-reveal voor niet-write-on lagen, gestuurd door `reveal`. */
 /** Wipe (bijsnijden vanaf een kant) of `draw`: de lijn van een vorm tekent zich (zoals Trim Paths in After Effects). */

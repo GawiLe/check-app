@@ -1506,3 +1506,31 @@ describe('hoofdletters', () => {
     expect(build(p).html).toContain('text-transform:capitalize')
   })
 })
+
+describe('write-on richting', () => {
+  it('volgorde van de letters: van links, rechts, boven en onder (regel voor regel)', async () => {
+    const { orderGlyphs } = await import('../src/shared/build')
+    // Twee regels: A B (boven), C D (onder); glyphs als vierkantjes
+    const sq = (x: number, y: number, n: string) => ({ n, d: `M${x} ${y}L${x + 10} ${y}L${x + 10} ${y + 10}L${x} ${y + 10}Z` })
+    const g = [sq(0, 0, 'A'), sq(20, 0, 'B'), sq(0, 30, 'C'), sq(20, 30, 'D')]
+    const names = (dir?: 'left' | 'right' | 'top' | 'bottom') => orderGlyphs(g, dir).map((x) => x.n).join('')
+    expect(names()).toBe('ABCD')
+    expect(names('right')).toBe('BADC')
+    expect(names('top')).toBe('ABCD')
+    expect(names('bottom')).toBe('CDAB')
+  })
+})
+
+describe('compositie los bekijken', () => {
+  it('eigen maat, tijd vanaf 0 en alleen de eigen inhoud', async () => {
+    const { isolatedComposition } = await import('../src/shared/tree')
+    const p = createStarterProject('Iso')
+    const c = p.compositions[0]
+    const g = createLayer('group', c)
+    Object.assign(g, { width: 120, height: 80, start: 2, end: 5, children: [createLayer('shape', c)] })
+    const iso = isolatedComposition(c, g)
+    expect([iso.width, iso.height, iso.duration, iso.loops, iso.layers.length]).toEqual([120, 80, 3, 1, 1])
+    const html = build({ ...p, compositions: [iso] }).html
+    expect(html).toContain('width=120,height=80')
+  })
+})

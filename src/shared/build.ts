@@ -4,7 +4,7 @@ import { minifiedRuntime, WIPE_INDEX } from './runtime'
 import { allLayers, walk } from './tree'
 import { anchorOf } from './geometry'
 import { cleanCodeHtml, scopeCodeCss } from './code'
-import { BLEND_MODES, type AnimProp, type Composition, type ExportTarget, type FontAsset, type Gradient, type Layer, type LayerMask, type Project, type Shadow, type ShapeProps } from './types'
+import { BLEND_MODES, type AnimProp, type Composition, type ExportTarget, type FontAsset, type Gradient, type Layer, type LayerMask, type Project, type Shadow, type ShapeProps, type WriteOnDirection } from './types'
 
 // Bouwt de banner-HTML uit een compositie. Wordt zowel door de editor (preview)
 // als door de exporter gebruikt, zodat wat je ziet ook echt is wat je exporteert.
@@ -208,7 +208,10 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
         }
         case 'writeon': {
           const w = l.writeon!
-          const paths = w.glyphs.map((g) => `<path pathLength="1" d="${escapeHtml(g.d)}"/>`).join('')
+          // Volgorde van de letters = volgorde van schrijven (de runtime tekent pad na pad)
+          const paths = orderGlyphs(w.glyphs, w.direction)
+            .map((g) => `<path pathLength="1" d="${escapeHtml(g.d)}"/>`)
+            .join('')
           const vb = w.viewBox.map(n).join(' ')
           inner = `<svg viewBox="${vb}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" fill="${cssValue(w.color)}" stroke="${cssValue(w.color)}" stroke-width="${n(w.strokeWidth)}" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="1 1" style="overflow:visible">${paths}</svg>`
           break
@@ -314,6 +317,45 @@ export function buildBanner(project: Project, comp: Composition, opts: BuildOpti
     '</body></html>'
 
   return { html, assets: [...new Set(assets)], fontIds, extraFiles: click.files }
+}
+
+/** Midden en hoogte van een glyph-pad (uit de coördinaten in het pad; goed genoeg om op te sorteren). */
+function glyphCenter(d: string): { x: number; y: number; h: number } {
+  const n = (d.match(/-?\d*\.?\d+(?:e-?\d+)?/gi) ?? []).map(Number)
+  let x0 = Infinity
+  let x1 = -Infinity
+  let y0 = Infinity
+  let y1 = -Infinity
+  for (let i = 0; i + 1 < n.length; i += 2) {
+    x0 = Math.min(x0, n[i])
+    x1 = Math.max(x1, n[i])
+    y0 = Math.min(y0, n[i + 1])
+    y1 = Math.max(y1, n[i + 1])
+  }
+  return Number.isFinite(x0) ? { x: (x0 + x1) / 2, y: (y0 + y1) / 2, h: y1 - y0 } : { x: 0, y: 0, h: 0 }
+}
+
+/**
+ * Glyphs in de volgorde waarin ze geschreven worden. Van links: zoals getypt. Van rechts: elke regel
+ * van rechts naar links. Van boven / van onder: regel voor regel (boven → onder of onder → boven),
+ * binnen een regel van links naar rechts.
+ */
+export function orderGlyphs<T extends { d: string }>(glyphs: T[], direction?: WriteOnDirection): T[] {
+  if (!direction || direction === 'left' || glyphs.length < 2) return glyphs
+  const c = glyphs.map((g, i) => ({ g, i, ...glyphCenter(g.d) }))
+  // Regels herkennen: glyphs waarvan het midden minder dan een halve letterhoogte verschilt, staan op dezelfde regel
+  const hs = c.map((x) => x.h).sort((a, b) => a - b)
+  const tol = Math.max(1, hs[Math.floor(hs.length / 2)] * 0.5)
+  const byY = [...c].sort((a, b) => a.y - b.y)
+  const lines: (typeof c)[] = []
+  for (const x of byY) {
+    const line = lines[lines.length - 1]
+    if (line && x.y - line[0].y < tol) line.push(x)
+    else lines.push([x])
+  }
+  for (const line of lines) line.sort((a, b) => (direction === 'right' ? b.x - a.x : a.x - b.x) || a.i - b.i)
+  if (direction === 'bottom') lines.reverse()
+  return lines.flat().map((x) => x.g)
 }
 
 /** SVG-lijnattributen van een vorm: kleur, dikte, uiteinden, stippellijn of tekenen (`draw`, via pathLength). */

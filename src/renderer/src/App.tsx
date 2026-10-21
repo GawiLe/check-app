@@ -28,7 +28,7 @@ import {
   replaceSelectedImage,
   ungroupSelection
 } from './lib/actions'
-import { contextOf, currentComp, layerLocalTime, setLayerValue, useStore, type Tool } from './store'
+import { contextOf, currentComp, layerLocalTime, setLayerValue, useStore, viewRange, type Tool } from './store'
 import { allLayers, findDeep } from '@shared/tree'
 import { restStateAt } from '@shared/anim'
 import { endFrameTime } from '@shared/motion'
@@ -164,7 +164,9 @@ export function App() {
       if (!comp) return
       let t = s.time + (now - last) / 1000
       last = now
-      if (t >= comp.duration) t = 0
+      // In een geopende compositie: alleen die compositie afspelen (en daarbinnen herhalen)
+      const r = viewRange(s)
+      if (t >= r.origin + r.length || t < r.origin) t = r.origin
       s.setTime(t)
       raf = requestAnimationFrame(tick)
     }
@@ -241,11 +243,13 @@ export function App() {
           s.setPlaying(!s.playing)
           break
         case 'Home':
-          s.setTime(0)
+          s.setTime(viewRange(s).origin)
           break
-        case 'End':
-          s.setTime(endFrameTime(comp))
+        case 'End': {
+          const r = viewRange(s)
+          s.setTime(r.group ? r.origin + r.length : endFrameTime(comp))
           break
+        }
         case 'PageDown':
           s.setTime(Math.min(comp.duration, s.time + (e.shiftKey ? 10 * frame : frame)))
           break

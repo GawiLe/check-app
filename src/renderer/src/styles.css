@@ -559,6 +559,9 @@ input[type='range'] {
   pointer-events: none;
   background: #fff;
 }
+.viewer .stage.checker iframe {
+  background: transparent;
+}
 .viewer .overlay {
   position: absolute;
   inset: 0;
@@ -3182,4 +3185,23 @@ body.popout-window {
 .asset-item.unused .asset-uses {
   opacity: 0.55;
   font-style: italic;
+}
+
+/* Transparant bekijken: schaakbord onder de banner */
+.stage.checker {
+  background-color: #fff;
+  background-image: linear-gradient(45deg, #d9d9d9 25%, transparent 25%), linear-gradient(-45deg, #d9d9d9 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #d9d9d9 75%), linear-gradient(-45deg, transparent 75%, #d9d9d9 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+.floating .icon.on {
+  color: var(--accent);
+}
+.writeon-dir {
+  display: flex;
+}
+.writeon-dir button {
+  flex: 1;
+  font-size: 14px;
 }

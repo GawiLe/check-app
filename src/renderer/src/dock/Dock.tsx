@@ -44,13 +44,14 @@ function SplitView({ node, render }: { node: SplitNode; render: (id: PanelId) =>
       useDock.getState().resize(node.id, sizes)
     }
     const up = () => {
-      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointermove', guarded)
       window.removeEventListener('pointerup', up)
       window.removeEventListener('pointercancel', up)
       window.removeEventListener('blur', up)
       document.body.classList.remove('dock-resizing', 'dock-resizing-row', 'dock-resizing-col')
     }
-    window.addEventListener('pointermove', move)
+    const guarded = (ev: PointerEvent) => (ev.buttons === 0 ? up() : move(ev))
+    window.addEventListener('pointermove', guarded)
     window.addEventListener('pointerup', up)
     // Ook opruimen als de muis buiten het venster wordt losgelaten of de app de focus verliest
     window.addEventListener('pointercancel', up)

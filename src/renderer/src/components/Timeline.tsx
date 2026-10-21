@@ -32,7 +32,7 @@ import { ANIM_PROPS, EASES } from '@shared/types'
 import { applyLibrary, keyAssist, moveLayer, openComp, renameLayer, reorderTo, replaceImage } from '../lib/actions'
 import { ASSET_DRAG } from './LeftPanel'
 import { openEmptyMenu, openKeyMenu, openLayerMenu } from '../lib/menus'
-import { contextOf, currentComp, findLayer, setLayersValue, toggleScaleLink, updateComp, updateLayer, useStore, type SelectedKey } from '../store'
+import { contextOf, currentComp, findLayer, setLayersValue, toggleScaleLink, updateComp, updateLayer, useStore, viewRange, type SelectedKey } from '../store'
 import { EASE_LABEL } from './Inspector'
 import { DRAG_TYPE } from './Library'
 import { formatTime, InlineRename, Scrub } from './ui'
@@ -54,23 +54,52 @@ const PROP_LABEL: Record<AnimProp, string> = {
 }
 const TYPE_ICON = { text: Type, image: ImageIcon, shape: Square, writeon: PenLine, group: Folder, code: Code2 }
 
-/** Sleepgedrag via pointer capture; geeft de verschuiving in seconden door. */
+/**
+ * Slepen zolang de muisknop is ingedrukt. Stopt bij loslaten, ook als dat buiten het venster of boven
+ * de preview (iframe) gebeurt: dan komt er geen pointerup binnen, maar bij de eerstvolgende beweging
+ * is `buttons` 0. Ook bij focusverlies of het kwijtraken van de pointer capture.
+ */
+export function whilePressed(e: React.PointerEvent | PointerEvent, onMove: (ev: PointerEvent) => void, onEnd?: () => void) {
+  const el = e.currentTarget as HTMLElement | null
+  const w = viewOf(el)
+  try {
+    el?.setPointerCapture(e.pointerId)
+  } catch {
+    /* niet erg */
+  }
+  let done = false
+  const end = () => {
+    if (done) return
+    done = true
+    w.removeEventListener('pointermove', move)
+    w.removeEventListener('pointerup', end)
+    w.removeEventListener('pointercancel', end)
+    w.removeEventListener('blur', end)
+    el?.removeEventListener('lostpointercapture', end)
+    onEnd?.()
+  }
+  const move = (ev: PointerEvent) => (ev.buttons === 0 ? end() : onMove(ev))
+  w.addEventListener('pointermove', move)
+  w.addEventListener('pointerup', end)
+  w.addEventListener('pointercancel', end)
+  w.addEventListener('blur', end)
+  el?.addEventListener('lostpointercapture', end)
+}
+
+/** Sleepgedrag (alleen met ingedrukte muisknop); geeft de verschuiving in seconden door. */
 function useTimeDrag(pps: number) {
   return (e: React.PointerEvent, onDelta: (dt: number) => void, onClick?: () => void) => {
     e.stopPropagation()
-    const el = e.currentTarget as HTMLElement
-    el.setPointerCapture(e.pointerId)
     const x0 = e.clientX
     let moved = false
-    el.onpointermove = (ev) => {
-      if (Math.abs(ev.clientX - x0) > 2) moved = true
-      if (moved) onDelta(snap((ev.clientX - x0) / pps))
-    }
-    el.onpointerup = () => {
-      el.onpointermove = null
-      el.onpointerup = null
-      if (!moved) onClick?.()
-    }
+    whilePressed(
+      e,
+      (ev) => {
+        if (Math.abs(ev.clientX - x0) > 2) moved = true
+        if (moved) onDelta(snap((ev.clientX - x0) / pps))
+      },
+      () => !moved && onClick?.()
+    )
   }
 }
 
@@ -102,25 +131,30 @@ export function Timeline() {
     s().setShownProps(rest)
   }
 
-  const span = Math.max(comp.duration + 1, 4)
+  // Geopende compositie: de tijdlijn begint op zijn in-punt (= 0 s) en duurt zo lang als de compositie.
+  // De tijd in de store blijft die van het formaat; xOf/tOf rekenen vanaf `origin`.
+  const range = viewRange({ project, compId: comp.id, activeTab })
+  const origin = range.origin
+  const length = range.group ? range.length : comp.duration
+  const span = Math.max(length + 1, 4)
   const width = span * pps + 24
-  const xOf = (t: number) => t * pps + 10
-  const tOf = (x: number) => (x - 10) / pps
-  const endFrame = endFrameTime(comp)
+  const xOf = (t: number) => (t - origin) * pps + 10
+  const tOf = (x: number) => (x - 10) / pps + origin
+  const endFrame = range.group ? origin + length : endFrameTime(comp)
   const derived = project.syncFormats && comp.id !== project.baseCompositionId
   const baseLinks = new Set(project.compositions.find((c) => c.id === project.baseCompositionId)?.layers.map((x) => x.linkId))
 
+  // Scrubben: alleen zolang de muisknop is ingedrukt
   const scrub = (e: React.PointerEvent) => {
+    if (e.button !== 0) return
     const el = e.currentTarget as HTMLElement
-    el.setPointerCapture(e.pointerId)
     const set = (ev: { clientX: number }) => {
       const r = el.getBoundingClientRect()
-      s().setTime(Math.max(0, Math.min(span, snap(tOf(ev.clientX - r.left)))))
+      s().setTime(Math.max(origin, Math.min(origin + span, snap(tOf(ev.clientX - r.left)))))
     }
     set(e)
     s().setPlaying(false)
-    el.onpointermove = (ev) => set(ev)
-    el.onpointerup = () => (el.onpointermove = null)
+    whilePressed(e, set)
   }
 
   // Keyframe slepen (tijden zijn lokaal binnen een groep; offset = in-punten van de groepen).
@@ -180,12 +214,14 @@ export function Timeline() {
     }
     const w = viewOf(e.currentTarget as Node)
     const up = () => {
-      w.removeEventListener('pointermove', move)
+      w.removeEventListener('pointermove', guarded)
       w.removeEventListener('pointerup', up)
       w.removeEventListener('pointercancel', up)
       w.removeEventListener('blur', up)
     }
-    w.addEventListener('pointermove', move)
+    // Losgelaten waar we het niet zagen (bijv. boven de preview): stoppen
+    const guarded = (ev: PointerEvent) => (ev.buttons === 0 ? up() : move(ev))
+    w.addEventListener('pointermove', guarded)
     w.addEventListener('pointerup', up)
     // Ook opruimen als de muis buiten het venster wordt losgelaten of de app de focus verliest
     w.addEventListener('pointercancel', up)
@@ -223,16 +259,19 @@ export function Timeline() {
     }
     const w = viewOf(e.currentTarget as Node)
     const up = () => {
-      w.removeEventListener('pointermove', move)
+      w.removeEventListener('pointermove', guarded)
       w.removeEventListener('pointerup', up)
       w.removeEventListener('pointercancel', up)
+      w.removeEventListener('blur', up)
       setMarquee(null)
       // Gewoon klikken op lege ruimte: keyframe-selectie opheffen
       if (!moved && !additive) useStore.setState({ selectedKeys: [], selectedKey: null })
     }
-    w.addEventListener('pointermove', move)
+    const guarded = (ev: PointerEvent) => (ev.buttons === 0 ? up() : move(ev))
+    w.addEventListener('pointermove', guarded)
     w.addEventListener('pointerup', up)
     w.addEventListener('pointercancel', up)
+    w.addEventListener('blur', up)
   }
 
   /** Hele laag in de tijd verschuiven (balk slepen), of in/uit trimmen (randen slepen). */
@@ -543,7 +582,7 @@ export function Timeline() {
   for (let t = 0; t <= span + 1e-6; t = round(t + minor, 3)) {
     const major = Math.abs(t - Math.round(t)) < 1e-6
     ticks.push(
-      <div key={t} className={`tick${major ? ' major' : ''}`} style={{ left: xOf(t) }}>
+      <div key={t} className={`tick${major ? ' major' : ''}`} style={{ left: xOf(origin + t) }}>
         {major && <span>{Math.round(t)}s</span>}
       </div>
     )
@@ -584,7 +623,7 @@ export function Timeline() {
         <span className="faint tl-tabs-hint">Dubbelklik op een compositie om hem hier te openen</span>
       </div>
       <div className="transport">
-        <button className="icon" title="Naar begin (Home)" onClick={() => s().setTime(0)}>
+        <button className="icon" title="Naar begin (Home)" onClick={() => s().setTime(origin)}>
           <SkipBack size={15} />
         </button>
         <button className="icon" title="Afspelen / pauze (spatie)" onClick={() => s().setPlaying(!playing)}>
@@ -593,12 +632,27 @@ export function Timeline() {
         <button className="icon" title="Naar eindframe (End)" onClick={() => s().setTime(endFrame)}>
           <SkipForward size={15} />
         </button>
-        <span className="timecode">{formatTime(time)}</span>
-        <span className="faint tl-duration" style={{ whiteSpace: 'nowrap' }} title="Duur van de animatie (één loop): sleep of klik om te typen">
-          /
-          <Scrub value={comp.duration} step={0.1} min={0.5} max={30} decimals={1} suffix="s" onChange={(v, co) => updateComp((c) => void (c.duration = Math.round(v * 10) / 10), co ? 'tl-dur' : undefined)} />
-          {comp.loops > 1 ? ` · ${comp.loops}×` : ''}
-        </span>
+        <span className="timecode">{formatTime(Math.max(0, time - origin))}</span>
+        {range.group ? (
+          <span className="faint tl-duration" style={{ whiteSpace: 'nowrap' }} title="Duur van deze compositie (zet zijn uit-punt): sleep of klik om te typen">
+            /
+            <Scrub
+              value={round(length, 1)}
+              step={0.1}
+              min={0.1}
+              max={30}
+              decimals={1}
+              suffix="s"
+              onChange={(v, co) => updateLayer(range.group!.id, (l) => void (l.end = round((l.start ?? 0) + Math.round(v * 10) / 10)), co ? 'tl-gdur' : undefined)}
+            />
+          </span>
+        ) : (
+          <span className="faint tl-duration" style={{ whiteSpace: 'nowrap' }} title="Duur van de animatie (één loop): sleep of klik om te typen">
+            /
+            <Scrub value={comp.duration} step={0.1} min={0.5} max={30} decimals={1} suffix="s" onChange={(v, co) => updateComp((c) => void (c.duration = Math.round(v * 10) / 10), co ? 'tl-dur' : undefined)} />
+            {comp.loops > 1 ? ` · ${comp.loops}×` : ''}
+          </span>
+        )}
         <div className="vsep" />
         <button
           className={`icon rec${autoKey ? ' on' : ''}`}
@@ -656,6 +710,7 @@ export function Timeline() {
         )}
         <button
           className="ghost sm"
+          hidden={!!range.group}
           title="Duur aanpassen aan de laatste animatie"
           onClick={() => {
             const last = Math.max(0, ...comp.layers.map((l) => (l.start ?? 0) + layerLength({ ...l, outro: null }) - 1.5))
@@ -686,9 +741,9 @@ export function Timeline() {
           </div>
           {rows}
           <div style={{ position: 'absolute', left: NAME_W, top: 0, bottom: 0, width, pointerEvents: 'none', zIndex: 1 }}>
-            <div className="out-of-range" style={{ left: xOf(comp.duration), right: 0 }} />
-            <div className="endmarker" style={{ left: xOf(comp.duration) }} />
-            {endFrame < comp.duration && <div className="endframe" style={{ left: xOf(endFrame) }} title="Eindframe" />}
+            <div className="out-of-range" style={{ left: xOf(origin + length), right: 0 }} />
+            <div className="endmarker" style={{ left: xOf(origin + length) }} />
+            {!range.group && endFrame < comp.duration && <div className="endframe" style={{ left: xOf(endFrame) }} title="Eindframe" />}
             <div className="playhead" style={{ left: xOf(time) }} />
           </div>
         </div>

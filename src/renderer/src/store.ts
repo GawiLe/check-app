@@ -6,7 +6,7 @@ import type { UserPreset } from '@shared/library'
 import type { MediaResult } from '@shared/api'
 import { useDock } from './dock/store'
 import { normalizeProject, syncFormats } from '@shared/sync'
-import { findDeep, localTime } from '@shared/tree'
+import { findDeep, layerLength, localTime } from '@shared/tree'
 import type { AnimProp, Composition, ExportResult, Layer, Project } from '@shared/types'
 import { ANIM_PROPS } from '@shared/types'
 
@@ -48,6 +48,9 @@ export interface State {
   time: number
   playing: boolean
   zoom: number
+  /** Canvas zonder achtergrond (schaakbord): alleen weergave, de export houdt de achtergrond. */
+  transparentBg: boolean
+  setTransparentBg(on: boolean): void
   dirty: boolean
   past: Project[]
   future: Project[]
@@ -139,6 +142,21 @@ export const useStore = create<State>((set, get) => ({
   time: 0,
   playing: false,
   zoom: 1,
+  transparentBg: (() => {
+    try {
+      return localStorage.getItem('bs-transparent') === '1'
+    } catch {
+      return false
+    }
+  })(),
+  setTransparentBg: (on) => {
+    try {
+      localStorage.setItem('bs-transparent', on ? '1' : '0')
+    } catch {
+      /* niet erg */
+    }
+    set({ transparentBg: on })
+  },
   dirty: false,
   past: [],
   future: [],
@@ -222,12 +240,19 @@ export const useStore = create<State>((set, get) => ({
   setClipboard: (l) => set({ clipboard: l }),
   openMenu: (x, y, items) => set({ menu: { x, y, items } }),
   closeMenu: () => set({ menu: null }),
-  openTab: (id) => set({ tabs: get().tabs.includes(id) ? get().tabs : [...get().tabs, id], activeTab: id, selection: [], selectedKeys: [], selectedKey: null }),
+  // Een compositie openen of erheen gaan: begint op zijn eigen 0 s (zoals in After Effects)
+  openTab: (id) => {
+    set({ tabs: get().tabs.includes(id) ? get().tabs : [...get().tabs, id], activeTab: id, selection: [], selectedKeys: [], selectedKey: null, playing: false })
+    set({ time: viewRange(get()).origin })
+  },
   closeTab: (id) => {
     const tabs = get().tabs.filter((t) => t !== id)
     set({ tabs, activeTab: get().activeTab === id ? (tabs[tabs.length - 1] ?? null) : get().activeTab })
   },
-  setActiveTab: (id) => set({ activeTab: id, selection: [], selectedKeys: [], selectedKey: null }),
+  setActiveTab: (id) => {
+    set({ activeTab: id, selection: [], selectedKeys: [], selectedKey: null, playing: false })
+    if (id) set({ time: viewRange(get()).origin })
+  },
   setTool: (t) => set({ tool: t, editingText: null }),
   setEditingText: (id) => set({ editingText: id }),
   setRenaming: (id) => set({ renaming: id }),
@@ -393,6 +418,19 @@ export function updateComp(fn: (c: Composition) => void, coalesce?: string) {
 export const assetUrl = (path: string, rev: number) => `bsproj://${path.split('/').map(encodeURIComponent).join('/')}?v=${rev}`
 
 /** De lagenlijst waarin je nu werkt: het formaat zelf, of de geopende compositie (tab). */
+/**
+ * Tijdbereik van wat je nu bekijkt: het formaat (0 tot de duur) of een geopende compositie
+ * (vanaf zijn in-punt in het formaat, zo lang als de compositie). De tijd in de store blijft altijd
+ * de tijd van het formaat; een geopende compositie toont hem vanaf `origin` als 0 s.
+ */
+export function viewRange(s: Pick<State, 'project' | 'compId' | 'activeTab'>): { origin: number; length: number; group: Layer | null } {
+  const comp = s.project ? findComp(s.project, s.compId) : null
+  if (!comp || !s.project) return { origin: 0, length: 0, group: null }
+  const ctx = contextOf(s.project, comp.id, s.activeTab)
+  if (!ctx.group) return { origin: 0, length: comp.duration, group: null }
+  return { origin: ctx.offset, length: layerLength(ctx.group), group: ctx.group }
+}
+
 export function contextOf(p: Project, compId: string | null, activeTab: string | null) {
   const comp = findComp(p, compId)
   const f = activeTab ? findDeep(comp.layers, activeTab) : null

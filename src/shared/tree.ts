@@ -223,3 +223,22 @@ export function reorderLayer(comp: Composition, id: string, targetId: string, wh
   dst.list.splice(where === 'before' ? ti : ti + 1, 0, layer)
   return true
 }
+
+/**
+ * Een compositie (groep) als los formaat bekijken, zoals een pre-comp in After Effects: eigen maat,
+ * tijd vanaf 0, alleen de eigen inhoud (zonder de positie/schaal/dekking van de groep zelf).
+ */
+export function isolatedComposition(comp: Composition, group: Layer): Composition {
+  return {
+    ...comp,
+    id: `${comp.id}/${group.id}`,
+    name: group.name,
+    width: Math.max(1, Math.round(group.width)),
+    height: Math.max(1, Math.round(group.height)),
+    duration: round(layerLength(group)),
+    loops: 1,
+    endFrame: null,
+    border: null,
+    layers: group.children ?? []
+  }
+}

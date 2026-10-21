@@ -115,6 +115,7 @@ export const OVERRIDE_LABEL: Record<string, string> = {
   'writeon.content': 'write-on tekst',
   'writeon.size': 'write-on grootte',
   'writeon.color': 'write-on kleur',
+  'writeon.direction': 'write-on richting',
   'code.html': 'code (HTML)',
   'code.css': 'code (CSS)',
   duration: 'duur',

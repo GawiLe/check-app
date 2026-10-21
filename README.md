@@ -191,6 +191,7 @@ Lagen: selecteer en druk **Enter**, dubbelklik op de naam in de tijdlijn, of rec
 - **Kleuren:** naast elk kleurvlakje staat de hexcode. Typ of plak een code (`#e30613`, `e30613` of kort `f00`) en druk op Enter.
 - **Hoofdletters:** bij *Tekst → Hoofdletters* kies je *Aa* (zoals getypt), *AA* (alles hoofdletters), *aa* (alles kleine letters) of *Aa Bb* (elk woord een hoofdletter). De tekst zelf blijft zoals je hem typte; bij export komen de juiste letters in het verkleinde font.
 - **Lijn (stroke):** bij een vorm stel je onder *Lijn* in: kleur, dikte, **positie** (binnen, midden of buiten de rand), **stippellijn** (lengte van streep en gat; streep 0 met ronde uiteinden geeft stippen) en **uiteinden** (rond of recht). Tekst kan ook een lijn krijgen (rond de letters, de vulling blijft heel).
+- **Write-on richting:** bij een write-on laag kies je onder *Write-on → Richting* of de letters zich van links, van rechts, van boven of van onder schrijven (boven/onder: regel voor regel). De wipes in Animaties bestaan in alle vier richtingen; op een write-on laag zetten ze de schrijfrichting.
 - **Lijn laten tekenen:** de knop *Lijn laten tekenen* (of Wipe → *Lijn tekenen*) laat de lijn zich vanaf de playhead in 1 seconde tekenen, zoals Trim Paths in After Effects. Het zijn gewone keyframes op *Reveal* die je in de tijdlijn kunt verschuiven of aanpassen. Werkt voor pen-lijnen, rechthoeken en ellipsen.
 - **Rechtermuisknop** op een laag (canvas of tijdlijn) geeft onder meer:
   - *Voeg toe aan nieuwe compositie*
@@ -242,10 +243,15 @@ Per keyframe kun je daarnaast een andere curve kiezen (bijvoorbeeld overshoot, e
 
 Dubbelklik op een compositie, op het canvas of in de tijdlijn, en hij opent als eigen tab boven de tijdlijn, zoals een pre-comp in After Effects.
 
-- De tijdlijn toont dan alleen de lagen in die compositie.
-- Op het canvas klik je alleen die lagen aan. De compositie zelf heeft een groene stippellijn.
+- Je ziet dan **alleen die compositie**, los op zijn eigen maat, en de tijd begint op **0 s** (het in-punt van de compositie). De duur in de tijdlijnkop is de duur van de compositie; afspelen herhaalt alleen die compositie.
+- **Maat en duur van een compositie:** open hem en klik op een lege plek (niets geselecteerd); in *Ontwerp → Compositie* stel je naam, maat (B×H), duur en het moment waarop hij begint in. De duur kan ook in de tijdlijnkop. In het formaat kun je de maat ook bij *Transform → Maat* aanpassen, en de duur door de balk te trimmen.
+- In het formaat schuif je de compositie zelf naar de juiste plek in de tijd. Daar kun je hem ook uitklappen om de lagen erin te zien en te bewerken.
 - Nieuwe lagen, getekende vormen en geplakte lagen komen in die compositie terecht.
 - Met het formaat-tabblad (bijvoorbeeld 300×600) ga je terug; met × sluit je een tab.
+
+### Transparant bekijken
+
+Met het rasterknopje rechtsonder op het canvas zie je de banner (of een geopende compositie) zonder achtergrond, op een schaakbord. Handig voor een los getekend element. Dit is alleen weergave: de export houdt de achtergrond.
 
 ### Composities (pre-comps) en scènes
 
