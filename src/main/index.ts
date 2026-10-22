@@ -44,7 +44,9 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'bsrender', privileges: { standard: true, secure: true } }
 ])
 
-if (process.env.BS_USER_DATA) app.setPath('userData', process.env.BS_USER_DATA)
+// Eén instellingenmap voor `npm run dev` én de geïnstalleerde app (recente projecten, presets, boilerplates,
+// werkruimte), anders zou de app als "Bnnr Studio" een nieuwe, lege map krijgen
+app.setPath('userData', process.env.BS_USER_DATA || join(app.getPath('appData'), 'banner-studio'))
 
 let win: BrowserWindow | null = null
 // Niet-opgeslagen wijzigingen: bij sluiten/afsluiten eerst vragen wat ermee moet

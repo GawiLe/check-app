@@ -32,6 +32,21 @@ Eenmalig per Mac, in Terminal:
 
 Daarna is bijwerken altijd: `cd ~/banner-studio`, `git pull`, `npm install`, `npm run dev`.
 
+### Als gewone app installeren (DMG)
+
+Wil je Bnnr Studio als gewone app in je map Programma's (starten vanuit Launchpad of het Dock, zonder Terminal):
+
+```bash
+cd ~/banner-studio
+git pull
+npm install
+npm run dmg
+```
+
+De eerste keer duurt dit een paar minuten. Daarna gaat de DMG vanzelf open: sleep **Bnnr Studio** naar **Programma's**, werp de DMG uit en start de app vanuit Launchpad of de map Programma's. Bijwerken naar een nieuwe versie: dezelfde vier regels nog eens, en de app in Programma's vervangen.
+
+Deze DMG is bedoeld voor je eigen Mac (zonder Apple-account, "ad-hoc" ondertekend). Op een andere Mac waarschuwt macOS bij het openen; voor een DMG die je kunt delen, zie *Mac-app als ondertekende DMG* hieronder. De app en `npm run dev` gebruiken dezelfde instellingen (recente projecten, presets, boilerplates). Alleen een AI-sleutel moet je in de app één keer opnieuw invullen (de sleutelhanger hoort per app).
+
 Instellingen (recente projecten, API-sleutel, eigen presets, boilerplates) staan per Mac en gaan niet mee. Projectmappen kun je gewoon kopiëren of via een gedeelde map openen.
 
 ## Starten
@@ -41,6 +56,7 @@ npm install
 npm run dev        # app starten met hot reload
 npm test           # unit tests (builder, runtime, validatie, formaten)
 npm run typecheck
+npm run dmg        # Mac-app als DMG voor deze Mac (zonder Apple-account), opent hem meteen
 npm run dist:mac   # Mac-app als DMG (Apple silicon + Intel), ondertekend als de gegevens hieronder er zijn
 ```
 
