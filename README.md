@@ -65,7 +65,14 @@ npm run dist:mac
 
 Na een paar minuten (de notarisatie bij Apple duurt even) staan in `dist/` twee DMG's: `Bnnr-Studio-<versie>-arm64.dmg` (Apple silicon) en `-x64.dmg` (Intel). Controle: `spctl -a -vvv "dist/mac-arm64/Bnnr Studio.app"` moet *Notarized Developer ID* melden.
 
-**Via GitHub** (geen Mac nodig, bijv. voor een collega): zet in de repository onder *Settings → Secrets and variables → Actions* de secrets `MAC_CERT_P12_BASE64` (uitkomst van `base64 -i DeveloperID.p12 | pbcopy`), `MAC_CERT_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` en `APPLE_TEAM_ID`. Daarna: *Actions → Mac-app (DMG) → Run workflow*; de DMG's staan onder *Artifacts*. Een tag pushen (`git tag v0.2.0 && git push --tags`) maakt er meteen een release van.
+**Via GitHub** (geen Mac nodig, bijv. voor een collega): zet in de repository onder *Settings → Secrets and variables → Actions* de secrets `MAC_CERT_P12_BASE64` (uitkomst van `base64 -i DeveloperID.p12 | pbcopy`), `MAC_CERT_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` en `APPLE_TEAM_ID`. Daarna een tag pushen, vanaf de branch waarop je werkt:
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+GitHub bouwt dan op een Mac, ondertekent en notariseert, en zet de DMG's bij *Releases* (en onder *Actions → Artifacts*). Staat de workflow op de hoofdbranch (`main`), dan kan het ook zonder tag via *Actions → Mac-app (DMG) → Run workflow*.
 
 Zonder Apple-account bouwt `npm run dist:mac` de DMG ook, alleen niet ondertekend: macOS waarschuwt dan bij het eerste openen (rechtsklik → *Open*, of *Systeeminstellingen → Privacy en beveiliging → Toch openen*).
 
