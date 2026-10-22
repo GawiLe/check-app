@@ -7,7 +7,8 @@ import { FolderOpen, Image as ImageIcon, Shapes } from 'lucide-react'
 import { assetUrl, currentComp, useStore } from '../store'
 import { findDeep } from '@shared/tree'
 import { normalizeProject } from '@shared/sync'
-import { Modal, Row } from './ui'
+import { ColorInput, Modal, Row } from './ui'
+import { applyTheme, DEFAULT_THEME, loadTheme, sameTheme, saveTheme, THEME_PRESETS, type Theme } from '../lib/theme'
 import { VariantsDialog } from './Variants'
 import { SHORTCUT_GROUPS } from '../lib/shortcuts'
 
@@ -369,6 +370,17 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
   const [provider, setProvider] = useState<'anthropic' | 'fal'>('anthropic')
   const [falKey, setFalKey] = useState('')
   const [falModel, setFalModel] = useState('')
+  // Kleuren van de editor: meteen zichtbaar tijdens het kiezen, bewaard bij Opslaan, terug bij Annuleren
+  const [savedTheme] = useState(loadTheme)
+  const [theme, setThemeState] = useState<Theme>(savedTheme)
+  const setTheme = (t: Theme) => {
+    setThemeState(t)
+    applyTheme(t)
+  }
+  const cancel = () => {
+    applyTheme(savedTheme)
+    onClose()
+  }
   useEffect(() => {
     window.bs.getSettings().then((s) => {
       setSettings(s)
@@ -378,7 +390,38 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
     })
   }, [])
   return (
-    <Modal title="Instellingen" onClose={onClose}>
+    <Modal title="Instellingen" onClose={cancel}>
+      <div className="settings-head">Kleuren van de editor</div>
+      <div className="theme-presets">
+        {THEME_PRESETS.map((p) => (
+          <button key={p.name} className={`theme-preset${sameTheme(p.theme, theme) ? ' on' : ''}`} onClick={() => setTheme(p.theme)}>
+            <span className="sw" style={{ background: p.theme.accent }} />
+            <span className="sw" style={{ background: p.theme.layer }} />
+            {p.name}
+          </button>
+        ))}
+      </div>
+      <Row label="Accent">
+        <ColorInput value={theme.accent} title="Knoppen, selectie, grepen en actieve tabbladen" onChange={(v) => setTheme({ ...theme, accent: v })} />
+      </Row>
+      <Row label="Lagen (tijdlijn)">
+        <ColorInput value={theme.layer} title="Balken in de tijdlijn (groepen krijgen een verwante tint)" onChange={(v) => setTheme({ ...theme, layer: v })} />
+      </Row>
+      <Row label="Keyframes">
+        <ColorInput value={theme.key} title="Keyframes in de tijdlijn" onChange={(v) => setTheme({ ...theme, key: v })} />
+      </Row>
+      <div className="hint-text">
+        Je ziet het meteen. Opslaan bewaart het op deze computer; het geldt alleen voor de editor, niet voor je banners.
+        {!sameTheme(theme, DEFAULT_THEME) && (
+          <>
+            {' '}
+            <button className="link" onClick={() => setTheme(DEFAULT_THEME)}>
+              Terug naar standaard
+            </button>
+          </>
+        )}
+      </div>
+      <div className="settings-head">AI</div>
       <Row label="AI via">
         <select value={provider} onChange={(e) => setProvider(e.target.value as 'anthropic' | 'fal')}>
           <option value="anthropic">Anthropic (Claude)</option>
@@ -428,16 +471,17 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
             className="danger"
             onClick={async () => {
               await window.bs.setApiKey('', provider)
-              onClose()
+              cancel()
             }}
           >
             {provider === 'fal' ? 'fal-sleutel verwijderen' : 'Sleutel verwijderen'}
           </button>
         )}
-        <button onClick={onClose}>Annuleren</button>
+        <button onClick={cancel}>Annuleren</button>
         <button
           className="primary"
           onClick={async () => {
+            saveTheme(theme)
             if (key) await window.bs.setApiKey(key.trim())
             if (falKey) await window.bs.setApiKey(falKey.trim(), 'fal')
             await window.bs.setModel(model.trim())

@@ -5,6 +5,10 @@ import './styles.css'
 import { useStore } from './store'
 import { parseSvg } from './lib/svgimport'
 import { useDock } from './dock/store'
+import { applyTheme, loadTheme } from './lib/theme'
+
+// Eigen kleuren van de editor (Instellingen → Kleuren)
+applyTheme(loadTheme())
 
 // Voor de rooktest (scripts/smoke.mjs)
 ;(window as unknown as { __bsStore: typeof useStore }).__bsStore = useStore

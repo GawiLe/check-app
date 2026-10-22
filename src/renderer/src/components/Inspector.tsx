@@ -312,7 +312,7 @@ function CompDesign() {
         <Row label="Rand">
           <Switch
             checked={!!comp.border && comp.border.width > 0}
-            onChange={(on) => updateComp((c) => void (c.border = on ? { color: '#cccccc', width: 1 } : null))}
+            onChange={(on) => updateComp((c) => void (c.border = on ? { color: '#000000', width: 1 } : null))}
           />
           {comp.border && (
             <>

@@ -103,12 +103,18 @@ export function groupLayers(comp: Composition, ids: string[], name = 'Groep'): L
   const y = Math.min(...members.map((f) => f.layer.y))
   const w = Math.max(...members.map((f) => f.layer.x + f.layer.width)) - x
   const h = Math.max(...members.map((f) => f.layer.y + f.layer.height)) - y
+  // Zoals pre-componeren in After Effects: de compositie begint waar de eerste laag begint, en binnen
+  // de compositie begint die laag weer op 0 s. Alles blijft op hetzelfde moment in beeld.
+  const t0 = Math.min(...members.map((f) => f.layer.start ?? 0))
+  const ends = members.map((f) => f.layer.end)
+  const end = ends.every((e) => e != null) ? Math.max(...(ends as number[])) : null
   const children = members.map((f) => {
     const c = f.layer
     c.x = round(c.x - x, 1)
     c.y = round(c.y - y, 1)
     if (c.tracks.x) c.tracks.x = c.tracks.x.map((k) => ({ ...k, v: round(k.v - x, 1) }))
     if (c.tracks.y) c.tracks.y = c.tracks.y.map((k) => ({ ...k, v: round(k.v - y, 1) }))
+    shiftTiming(c, -t0, false)
     return c
   })
   const id = newId('g')
@@ -131,7 +137,8 @@ export function groupLayers(comp: Composition, ids: string[], name = 'Groep'): L
     cta: false,
     tracks: {},
     children,
-    start: 0
+    start: round(t0),
+    ...(end != null ? { end: round(end) } : {})
   }
   const at = members[0].index
   for (const f of [...members].reverse()) list.splice(f.index, 1)

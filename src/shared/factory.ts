@@ -82,7 +82,8 @@ export function createComposition(width: number, height: number, name?: string):
     duration: 8,
     loops: 1,
     background: '#ffffff',
-    border: { color: '#cccccc', width: 1 },
+    // Standaard een zwarte rand van 1 px (wat publishers meestal vragen)
+    border: { color: '#000000', width: 1 },
     layers: []
   }
 }

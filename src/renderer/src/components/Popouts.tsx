@@ -4,6 +4,7 @@ import { PanelLeftClose } from 'lucide-react'
 import { PANEL_TITLE, type PanelId } from '../dock/model'
 import { useDock } from '../dock/store'
 import { trackActiveDoc } from '../lib/windows'
+import { trackThemedDoc } from '../lib/theme'
 
 // Losgekoppelde panelen: een eigen venster (bijv. op een tweede scherm). Het paneel draait gewoon mee in
 // de editor (zelfde project, selectie en tijd); alleen de weergave staat in het andere venster (React-portal).
@@ -61,6 +62,8 @@ function PopoutWindow({ panel, render }: { panel: PanelId; render: (id: PanelId)
       doc.head.appendChild(c)
     }
     for (const a of document.documentElement.attributes) doc.documentElement.setAttribute(a.name, a.value)
+    // Kleuren aanpassen in Instellingen werkt ook in dit venster
+    const untheme = trackThemedDoc(doc)
     doc.body.className = `${document.body.className} popout-window`
     const el = doc.createElement('div')
     el.className = 'popout-root'
@@ -88,6 +91,7 @@ function PopoutWindow({ panel, render }: { panel: PanelId; render: (id: PanelId)
     return () => {
       clearInterval(timer)
       remember()
+      untheme()
       pw.removeEventListener('keydown', onKey)
       pw.close()
       setRoot(null)

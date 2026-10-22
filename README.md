@@ -316,7 +316,8 @@ Met het rasterknopje rechtsonder op het canvas zie je de banner (of een geopende
 
 Groepen werken zoals pre-comps in After Effects.
 
-- **Groeperen:** selecteer lagen (Shift-klik) en kies *Groeperen* of druk Cmd/Ctrl+G. De groep animeer je als geheel: sleep er bijvoorbeeld *Bounce in* op. Daarnaast houden de lagen binnen de groep hun eigen animaties.
+- **Groeperen:** selecteer lagen (Shift-klik) en kies *Nieuwe compositie* of druk Cmd/Ctrl+G. De groep animeer je als geheel: sleep er bijvoorbeeld *Bounce in* op. Daarnaast houden de lagen binnen de groep hun eigen animaties.
+- **Timing zoals in After Effects:** de nieuwe compositie begint waar de eerste laag begint (begint die op 3 s, dan de compositie ook). Open je de compositie, dan begint die eerste laag daarbinnen weer op 0 s. Hebben alle lagen een uitpunt, dan eindigt de compositie bij de laatste. In de banner verandert er niets: alles komt op hetzelfde moment in beeld.
 - **In de groep werken:**
   - Klik op het canvas selecteert de hele groep. Dubbelklik pakt een laag ín de groep.
   - In de tijdlijn klap je de groep open; de lagen erin staan ingesprongen.
@@ -380,7 +381,7 @@ Animeer een laag en kies in de tab *Animatie* **Opslaan als preset**.
 
 ### Rand en polite loading
 
-- **Rand**: per formaat aan/uit, met kleur en dikte (standaard 1px #ccc). Hij wordt als aparte laag bovenop de banner geëxporteerd.
+- **Rand**: per formaat aan/uit, met kleur en dikte (standaard 1px zwart). Hij wordt als aparte laag bovenop de banner geëxporteerd.
 - **Polite loading** (standaard aan):
   - Direct zichtbaar zijn alleen de achtergrond en de rand.
   - Afbeeldingen laden pas na het `load`-event van de pagina. De animatie start pas als alle afbeeldingen en fonts binnen zijn.
@@ -429,6 +430,10 @@ Sluit je het venster, sluit je de app af (Cmd+Q) of open je een ander of nieuw p
 
 - Elke minuut bewaart Bnnr Studio een **herstelkopie** van niet-opgeslagen werk (in de verborgen map `.bnnr` in de projectmap). Crasht de app of valt de stroom uit, dan vraagt hij bij het openen of je dat werk wilt **herstellen**.
 - Elke keer opslaan bewaart een **versie** (de laatste 50). Bestand → *Versiegeschiedenis…* toont ze; *Terugzetten* kun je met Cmd/Ctrl+Z weer ongedaan maken.
+
+### Kleuren van de editor
+
+In **Instellingen → Kleuren van de editor** kies je zelf de accentkleur (knoppen, selectie, grepen), de kleur van de lagen in de tijdlijn en die van de keyframes, met de kleurkiezer of een hexcode. Er zijn ook een paar voorbeelden (Bnnr, Mint, Blauw, Paars, Roze, Grijs). Je ziet het meteen; *Opslaan* bewaart het op deze computer, *Annuleren* zet het terug. Dit gaat alleen over de editor, niet over je banners.
 
 ### Sneltoetsen
 

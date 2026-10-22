@@ -9,10 +9,17 @@
   --muted: #8a8a94;
   --faint: #5c5c66;
   /* Huisstijl Bnnr Studio: oranje = actief/geselecteerd (zoals de actieve laag in het logo), groen = lagen */
+  /* Instelbaar in Instellingen → Kleuren (lib/theme.ts zet deze variabelen) */
   --accent: #ff6a13;
+  --accent-rgb: 255, 106, 19;
   --accent-hover: #ff8742;
   --accent-ink: #1c0c02;
-  --accent-bg: rgba(255, 106, 19, 0.14);
+  --accent-bg: rgba(var(--accent-rgb), 0.14);
+  --bar: #22332d;
+  --bar-active: #1d6a4f;
+  --bar-group: #23383a;
+  --bar-group-active: #2a6563;
+  --row-active: #1c2b26;
   --brand-green: #0a6f4e;
   --brand-mint: #74c394;
   --key: #f2c14e;
@@ -584,7 +591,7 @@ input[type='range'] {
   pointer-events: none;
 }
 .viewer .sel.hover {
-  outline: 1px solid rgba(255, 106, 19, 0.55);
+  outline: 1px solid rgba(var(--accent-rgb), 0.55);
 }
 .viewer .handle {
   position: absolute;
@@ -711,7 +718,7 @@ input[type='range'] {
   transition: box-shadow 0.12s;
 }
 .overview .tile:hover .frame {
-  box-shadow: 0 0 0 2px rgba(255, 106, 19, 0.6), 0 8px 24px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.6), 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 .overview .tile.active .frame {
   box-shadow: 0 0 0 2px var(--accent), 0 8px 24px rgba(0, 0, 0, 0.5);
@@ -829,7 +836,7 @@ input[type='range'] {
   cursor: default;
 }
 .tl-name.active {
-  background: #1c2b26;
+  background: var(--row-active);
 }
 .tl-name .type {
   color: var(--faint);
@@ -875,12 +882,12 @@ input[type='range'] {
   position: absolute;
   top: 8px;
   bottom: 8px;
-  background: #22332d;
+  background: var(--bar);
   border-radius: 4px;
   cursor: grab;
 }
 .tl-bar.active {
-  background: #1d6a4f;
+  background: var(--bar-active);
 }
 .seg-motion {
   position: absolute;
@@ -1301,14 +1308,14 @@ input[type='range'] {
   right: -3px;
 }
 .tl-bar .trim:hover {
-  background: rgba(255, 106, 19, 0.5);
+  background: rgba(var(--accent-rgb), 0.5);
   border-radius: 3px;
 }
 .tl-bar.group {
-  background: #23383a;
+  background: var(--bar-group);
 }
 .tl-bar.group.active {
-  background: #2a6563;
+  background: var(--bar-group-active);
 }
 .tl-track.sub,
 .tl-name.sub {
@@ -1362,7 +1369,7 @@ input[type='range'] {
 }
 .splitter:hover,
 .splitter:active {
-  background: rgba(255, 106, 19, 0.35);
+  background: rgba(var(--accent-rgb), 0.35);
 }
 .clicktag {
   display: flex;
@@ -1577,7 +1584,7 @@ input[type='range'] {
 .draw-preview {
   position: absolute;
   border: 1.5px solid var(--accent);
-  background: rgba(255, 106, 19, 0.15);
+  background: rgba(var(--accent-rgb), 0.15);
   pointer-events: none;
 }
 .draw-preview.ellipse {
@@ -1878,7 +1885,7 @@ input[type='range'] {
 }
 .dock-splitter:hover,
 .dock-splitter:active {
-  background: rgba(255, 106, 19, 0.45);
+  background: rgba(var(--accent-rgb), 0.45);
 }
 .dock-tabs {
   display: flex;
@@ -1955,7 +1962,7 @@ input[type='range'] {
 }
 .dock-drop {
   position: absolute;
-  background: rgba(255, 106, 19, 0.22);
+  background: rgba(var(--accent-rgb), 0.22);
   border: 2px solid var(--accent);
   pointer-events: none;
   z-index: 30;
@@ -2576,7 +2583,7 @@ pre.code.wrap {
   border-radius: 4px;
   font-size: 10px;
   color: var(--accent);
-  background: rgba(255, 106, 19, 0.12);
+  background: rgba(var(--accent-rgb), 0.12);
 }
 
 /* ---------- Sneltoetsen-overzicht ---------- */
@@ -2650,7 +2657,7 @@ kbd {
 }
 .draw-preview.text {
   border: 1px dashed var(--accent);
-  background: rgba(255, 106, 19, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 
 /* ---------- Live KB-teller ---------- */
@@ -2728,7 +2735,7 @@ kbd {
   padding: 8px 10px;
   border-radius: 6px;
   font-size: 12px;
-  background: rgba(255, 106, 19, 0.12);
+  background: rgba(var(--accent-rgb), 0.12);
   color: var(--text);
 }
 .sheet-msg.warning {
@@ -2927,7 +2934,7 @@ kbd {
 }
 .fp-badge.base {
   color: var(--accent);
-  background: rgba(255, 106, 19, 0.14);
+  background: rgba(var(--accent-rgb), 0.14);
 }
 .fp-badge.changed {
   color: var(--warn);
@@ -3062,7 +3069,7 @@ body.popout-window {
   border-radius: 6px;
 }
 .variant-field-wrap.on {
-  background: rgba(255, 106, 19, 0.06);
+  background: rgba(var(--accent-rgb), 0.06);
 }
 .variant-formats {
   display: flex;
@@ -3151,7 +3158,7 @@ body.popout-window {
   position: fixed;
   z-index: 40;
   border: 1px solid var(--accent);
-  background: rgba(255, 106, 19, 0.12);
+  background: rgba(var(--accent-rgb), 0.12);
   pointer-events: none;
 }
 
@@ -3392,4 +3399,46 @@ body.popout-window {
 }
 .asset-tile:hover .show-hover {
   visibility: visible;
+}
+
+/* Instellingen: kopjes en kleurthema's */
+.settings-head {
+  font-weight: 600;
+  margin: 14px 0 8px;
+  color: var(--text);
+}
+.modal .settings-head:first-child {
+  margin-top: 0;
+}
+.theme-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.theme-preset {
+  height: 26px;
+  padding: 0 9px 0 6px;
+  border: 1px solid var(--line-2);
+  font-size: 11px;
+  gap: 4px;
+}
+.theme-preset .sw {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+.theme-preset.on {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+button.link {
+  height: auto;
+  padding: 0;
+  border: 0;
+  color: var(--accent);
+  text-decoration: underline;
+  display: inline;
+  font-size: inherit;
 }

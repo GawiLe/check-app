@@ -400,6 +400,43 @@ describe('groepen (pre-comps) en in/uit-punten', () => {
     expect(g2.end).toBeGreaterThan(3)
   })
 
+  it('nieuwe compositie begint bij de eerste laag; binnen de compositie begint die op 0 s (zoals After Effects)', async () => {
+    const { tree, p, comp, cta, ctaText } = await setup()
+    const { layerStateAt } = await import('../src/shared/anim')
+    tree.shiftTiming(cta, 3)
+    tree.shiftTiming(ctaText, 3.5)
+    ctaText.end = 7
+    const ctaKey = cta.tracks.opacity![0].t
+    const before = [2, 3.2, 4, 6].map((t) => [layerStateAt(cta, t).opacity, layerStateAt(ctaText, t).opacity])
+    const g = tree.groupLayers(comp, [cta.id, ctaText.id])!
+    expect(g.start).toBe(3)
+    expect(cta.start ?? 0).toBe(0)
+    expect(ctaText.start).toBe(0.5)
+    expect(cta.tracks.opacity![0].t).toBeCloseTo(ctaKey - 3)
+    // Niet alle lagen hebben een uit-punt: de compositie loopt door
+    expect(g.end).toBeUndefined()
+    // Op elk moment hetzelfde beeld als vóór het groeperen (tijd binnen de groep = tijd - 3)
+    const after = [2, 3.2, 4, 6].map((t) => [layerStateAt(cta, t - 3).opacity, layerStateAt(ctaText, t - 3).opacity])
+    expect(after.slice(1)).toEqual(before.slice(1))
+    // En weer uit elkaar: alles terug op de oude tijd
+    tree.ungroup(comp, g.id)
+    expect(cta.start).toBe(3)
+    expect(ctaText.start).toBe(3.5)
+    expect(ctaText.end).toBe(7)
+    expect(build(p).html).toContain(`[${ctaKey},`)
+  })
+
+  it('nieuwe compositie: hebben alle lagen een uit-punt, dan eindigt de compositie bij de laatste', async () => {
+    const { tree, comp, cta, ctaText } = await setup()
+    tree.shiftTiming(cta, 2)
+    cta.end = 5
+    tree.shiftTiming(ctaText, 2)
+    ctaText.end = 6
+    const g = tree.groupLayers(comp, [cta.id, ctaText.id])!
+    expect([g.start, g.end]).toEqual([2, 6])
+    expect([cta.end, ctaText.end]).toEqual([3, 4])
+  })
+
   it('dupliceren geeft nieuwe ids, ook binnen de groep', async () => {
     const { tree, comp, cta, ctaText } = await setup()
     const g = tree.groupLayers(comp, [cta.id, ctaText.id])!

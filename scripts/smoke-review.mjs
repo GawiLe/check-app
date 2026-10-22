@@ -102,6 +102,61 @@ const r5 = await S(async (zip) => {
 }, Array.isArray(r4) ? r4[0].zip : '')
 await check('"Toon in map": export wel, andere bestanden niet', async () => r5.ok && !r5.bad)
 
+// 6. Nieuwe compositie begint bij de eerste laag (3 s); geopend begint die laag op 0 s (zoals After Effects)
+const r6ids = await S(() => {
+  const st = window.__bsStore.getState
+  const c = st().project.compositions.find((x) => x.id === st().compId)
+  const [a, b] = c.layers.filter((l) => l.type !== 'group').slice(-2)
+  st().update((p) => {
+    const cc = p.compositions.find((x) => x.id === st().compId)
+    for (const [id, s] of [[a.id, 3], [b.id, 4]]) {
+      const l = cc.layers.find((x) => x.id === id)
+      l.start = s
+      for (const k of Object.keys(l.tracks)) l.tracks[k] = l.tracks[k].map((kf) => ({ ...kf, t: kf.t + s }))
+    }
+  })
+  st().select([a.id, b.id])
+  return [a.id, b.id]
+})
+await page.locator('.dock-tab', { hasText: 'Ontwerp' }).first().click().catch(() => {})
+await page.getByRole('button', { name: 'Nieuwe compositie' }).first().click()
+await page.waitForTimeout(300)
+const r6 = await S((ids) => {
+  const st = window.__bsStore.getState()
+  const c = st.project.compositions.find((x) => x.id === st.compId)
+  const g = c.layers.find((l) => l.type === 'group' && l.children?.some((k) => ids.includes(k.id)))
+  return g && { id: g.id, start: g.start, kids: g.children.map((k) => k.start ?? 0) }
+}, r6ids)
+await check('nieuwe compositie begint op 3 s (bij de eerste laag)', async () => r6?.start === 3 && JSON.stringify(r6.kids.sort()) === JSON.stringify([0, 1]))
+await S((id) => window.__bsStore.getState().openTab(id), r6?.id)
+await page.waitForTimeout(400)
+await check('geopend: eerste laag begint op 0 s, tijd loopt vanaf 0', async () => {
+  const s = await S(() => ({ time: window.__bsStore.getState().time }))
+  // De eerste balk begint precies bij de playhead (die op 0 s van de compositie staat)
+  const bars = await page.locator('.timeline .tl-bar').evaluateAll((els) => els.map((e) => parseFloat(e.style.left) || 0))
+  const head = await page.locator('.timeline .playhead').first().evaluate((e) => parseFloat(e.style.left) || 0)
+  return Math.abs(s.time - 3) < 1e-6 && (await page.locator('.timecode').innerText()).startsWith('00:00') && Math.abs(Math.min(...bars) - head) < 2
+})
+
+// 7. Eigen kleuren in Instellingen: meteen zichtbaar, Annuleren zet terug, Opslaan blijft na herstart
+const accent = () => S(() => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim())
+const exportBg = () => page.locator('.toolbar button.primary').first().evaluate((el) => getComputedStyle(el).backgroundColor)
+await page.locator('button[title="Instellingen"]').click()
+await page.locator('.theme-preset', { hasText: 'Blauw' }).click()
+await check('kleur kiezen: meteen zichtbaar (accent en exportknop)', async () => (await accent()) === '#4c9bff' && (await exportBg()) === 'rgb(76, 155, 255)')
+await page.locator('.modal button', { hasText: 'Annuleren' }).click()
+await check('Annuleren zet de kleuren terug', async () => (await accent()) === '#ff6a13')
+await page.locator('button[title="Instellingen"]').click()
+await page.locator('.theme-preset', { hasText: 'Mint' }).click()
+await page.locator('.modal .color-field .hex').first().fill('#c04cff')
+await page.locator('.modal .color-field .hex').first().press('Enter')
+await page.locator('.modal button', { hasText: 'Opslaan' }).click()
+await S(() => window.__bsStore.getState().markSaved()).catch(() => {})
+await page.reload()
+await page.waitForSelector('.welcome, .app')
+await check('eigen kleur (hexcode) bewaard na herstart', async () => (await accent()) === '#c04cff')
+await S(() => localStorage.removeItem('bs-theme'))
+
 await page.screenshot({ path: join(shots, 'review.png') })
 console.log(fails ? `${fails} controle(s) mislukt` : 'Review-fixes: alles in orde')
 await S(() => window.__bsStore.getState().markSaved()).catch(() => {})
