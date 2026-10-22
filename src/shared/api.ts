@@ -117,6 +117,8 @@ export interface BannerStudioApi {
   importImages(dir: string): Promise<string[]>
   importFonts(dir: string): Promise<FontAsset[]>
   listAssets(dir: string): Promise<string[]>
+  /** Bestandsgrootte (bytes) per afbeelding in assets/. */
+  assetSizes(dir: string): Promise<Record<string, number>>
   /** Asset naar de prullenbak ('trash') of, als dat niet kan, naar .bnnr/prullenbak in het project ('project'). */
   deleteAsset(dir: string, path: string): Promise<'trash' | 'project'>
   generateWriteOn(

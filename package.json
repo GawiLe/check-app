@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "dist": "electron-vite build && electron-builder",
-    "prestart": "node scripts/ensure-electron.mjs"
+    "prestart": "node scripts/ensure-electron.mjs",
+    "dist:mac": "electron-vite build && electron-builder --mac"
   },
   "author": "Connect Create",
   "license": "UNLICENSED",
@@ -20,14 +21,10 @@
     "fflate": "^0.8.3",
     "fontverter": "^2.0.0",
     "gifenc": "^1.0.3",
-    "lucide-react": "^1.52.0",
     "mp4-muxer": "^5.2.2",
     "opentype.js": "^2.0.0",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
     "subset-font": "^2.9.0",
-    "zod": "^4.6.5",
-    "zustand": "^5.0.15"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
@@ -39,21 +36,76 @@
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "jsdom": "^29.1.1",
+    "lucide-react": "^1.52.0",
     "playwright-core": "^1.63.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "typescript": "^7.0.2",
     "vite": "^7.3.6",
-    "vitest": "^3.2.7"
+    "vitest": "^3.2.7",
+    "zustand": "^5.0.15"
   },
   "private": true,
   "build": {
     "appId": "nl.connectcreate.bannerstudio",
     "productName": "Bnnr Studio",
+    "copyright": "© Connect Create",
     "icon": "resources/icon.png",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
     "files": [
-      "out/**/*"
+      "out/**/*",
+      "resources/icon.png"
     ],
+    "electronFuses": {
+      "runAsNode": false,
+      "enableCookieEncryption": true,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true,
+      "grantFileProtocolExtraPrivileges": true
+    },
     "mac": {
-      "target": "dmg"
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.graphics-design",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "minimumSystemVersion": "12.0"
+    },
+    "dmg": {
+      "title": "Bnnr Studio ${version}",
+      "artifactName": "Bnnr-Studio-${version}-${arch}.${ext}",
+      "background": "build/dmg-background.png",
+      "iconSize": 112,
+      "window": {
+        "width": 600,
+        "height": 400
+      },
+      "contents": [
+        {
+          "x": 160,
+          "y": 205
+        },
+        {
+          "x": 440,
+          "y": 205,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
     },
     "win": {
       "target": "nsis"

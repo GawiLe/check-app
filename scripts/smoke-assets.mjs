@@ -111,16 +111,32 @@ await S(() => {
 await page.locator('.dock-tab', { hasText: 'Assets & fonts' }).click()
 await page.waitForTimeout(400)
 const items = page.locator('.asset-item')
-const names = async () => (await items.locator('.grow').allInnerTexts()).join(',')
-await check('gebruik per asset (2×, niet gebruikt)', async () =>
+const names = async () => (await items.locator('.asset-name .ellipsis').allInnerTexts()).join(',')
+await check('gebruik per asset (2×, 0×)', async () =>
   (await page.locator('.asset-item', { hasText: 'aa-dubbel.svg' }).locator('.asset-uses').innerText()) === '2×' &&
-  (await page.locator('.asset-item', { hasText: 'zz-ongebruikt.svg' }).locator('.asset-uses').innerText()) === 'niet gebruikt'
+  (await page.locator('.asset-item', { hasText: 'zz-ongebruikt.svg' }).locator('.asset-uses').innerText()) === '0×'
 )
 await page.locator('.asset-sort button', { hasText: 'Naam' }).click()
 await check('sorteren op naam', async () => (await names()) === 'aa-dubbel.svg,logo.svg,zz-ongebruikt.svg')
 await page.locator('.asset-sort button', { hasText: 'Gebruik' }).click()
 await check('sorteren op gebruik (meest gebruikt bovenaan)', async () => (await names()).startsWith('aa-dubbel.svg') && (await names()).endsWith('zz-ongebruikt.svg'))
 await page.screenshot({ path: `${shots}/a2-assets.png` })
+await check('afmetingen en gewicht per asset', async () => {
+  for (let i = 0; i < 20; i++) {
+    const t = await page.locator('.asset-item', { hasText: 'logo.svg' }).locator('.asset-info').innerText().catch(() => '')
+    if (/\d+×\d+ · [\d.]+ (KB|B)/.test(t)) return true
+    await page.waitForTimeout(150)
+  }
+  return false
+})
+await page.locator('button.asset-view[title="Raster met grote voorbeelden"]').click()
+await check('rasterweergave met grote voorbeelden', async () => {
+  const n = await page.locator('.asset-grid .asset-tile').count()
+  const w = await page.locator('.asset-grid .asset-tile img.thumb').first().evaluate((el) => el.getBoundingClientRect().width)
+  return n === 3 && w >= 60
+})
+await page.screenshot({ path: `${shots}/a3-assets-raster.png` })
+await page.locator('button.asset-view[title="Lijst"]').click()
 
 const gone = async (name) => !existsSync(join(dir, 'assets', name))
 const unused = page.locator('.asset-item', { hasText: 'zz-ongebruikt.svg' })

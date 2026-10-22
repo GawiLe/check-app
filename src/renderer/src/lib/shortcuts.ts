@@ -89,6 +89,7 @@ export const SHORTCUT_GROUPS: { title: string; items: [string, string][] }[] = [
       [`${K.cmd}E`, 'Exporteren'],
       [`${K.cmd}Z / ${K.cmd}${K.shift}Z`, 'Ongedaan maken / opnieuw'],
       ['`', 'Paneel onder de muis maximaliseren'],
+      ['\\', 'Alle formaten naast elkaar (aan/uit)'],
       [`? / ${K.cmd}/`, 'Dit overzicht']
     ]
   }

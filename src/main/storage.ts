@@ -139,6 +139,13 @@ export async function copyIntoProject(dir: string, sub: 'assets' | 'fonts', file
   return out
 }
 
+/** Bestandsgrootte (bytes) van elke afbeelding in assets/ (voor het assetpaneel). */
+export async function assetSizes(dir: string): Promise<Record<string, number>> {
+  const out: Record<string, number> = {}
+  for (const a of await listAssets(dir)) out[a] = await stat(join(dir, a)).then((st) => st.size, () => 0)
+  return out
+}
+
 export async function listAssets(dir: string): Promise<string[]> {
   try {
     const names = await readdir(join(dir, 'assets'))

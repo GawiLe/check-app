@@ -9,7 +9,7 @@ const S = () => useStore.getState()
 const size = (c: Composition) => `${c.width}×${c.height}`
 
 /** Aantal aangepaste en eigen lagen in een afgeleid formaat (t.o.v. de basis). */
-function changes(p: Project, c: Composition) {
+export function formatChanges(p: Project, c: Composition) {
   const base = p.compositions.find((x) => x.id === p.baseCompositionId)
   if (!base || c.id === base.id) return { changed: 0, own: 0 }
   const links = new Set(base.layers.map((l) => l.linkId))
@@ -31,7 +31,7 @@ export function takeLayoutFrom(fromId: string, toId: string) {
   S().setStatus(`Lay-out van ${size(from)} overgenomen in ${size(to)}. Ongedaan maken kan met Cmd/Ctrl+Z.`)
 }
 
-function openFormatMenu(e: React.MouseEvent, c: Composition) {
+export function openFormatMenu(e: React.MouseEvent, c: Composition) {
   e.preventDefault()
   e.stopPropagation()
   const p = S().project!
@@ -47,7 +47,7 @@ function openFormatMenu(e: React.MouseEvent, c: Composition) {
       { separator: true },
       {
         label: 'Alle aanpassingen terug naar de basis',
-        disabled: !changes(p, c).changed,
+        disabled: !formatChanges(p, c).changed,
         onClick: () =>
           S().update((pr) => {
             const comp = pr.compositions.find((x) => x.id === c.id)!
@@ -97,7 +97,7 @@ export function FormatsPanel() {
       <div className="fp-list">
         {project.compositions.map((c) => {
           const isBase = c.id === project.baseCompositionId
-          const ch = changes(project, c)
+          const ch = formatChanges(project, c)
           return (
             <div
               key={c.id}
@@ -143,7 +143,7 @@ export function FormatsPanel() {
               ) : (
                 <>
                   {ch.changed > 0 && (
-                    <span className="fp-badge changed" title={`${ch.changed} laag/lagen aangepast in dit formaat (oranje in de tijdlijn)`}>
+                    <span className="fp-badge changed" title={`${ch.changed} laag/lagen aangepast in dit formaat (geel in de tijdlijn)`}>
                       <span className="dot" />
                       {ch.changed}
                     </span>
@@ -166,7 +166,7 @@ export function FormatsPanel() {
         {project.syncFormats ? (
           <>
             De <b>basis</b> is leidend: wat je daar toevoegt of wijzigt, gaat naar alle formaten. In een ander formaat pas je inhoud, plek en maat
-            aan, verberg je lagen of voeg je eigen lagen toe: dat geldt alleen voor dat formaat (<span className="fp-c-changed">oranje</span> = aangepast,{' '}
+            aan, verberg je lagen of voeg je eigen lagen toe: dat geldt alleen voor dat formaat (<span className="fp-c-changed">geel</span> = aangepast,{' '}
             <span className="fp-c-own">blauwgroen</span> = eigen laag).
           </>
         ) : (

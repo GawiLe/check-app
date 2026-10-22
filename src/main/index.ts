@@ -24,6 +24,7 @@ import {
   DEFAULT_MODEL,
   initProjectDir,
   listAssets,
+  assetSizes,
   listBoilerplates,
   loadApiKey,
   readProject,
@@ -219,6 +220,7 @@ const handlers: Handlers = {
   },
 
   listAssets: (dir) => listAssets(dir),
+  assetSizes: (dir) => assetSizes(dir),
   async deleteAsset(dir, rel) {
     // Alleen bestanden in assets/; naar de prullenbak (terug te halen), anders naar .bnnr/prullenbak in het project
     if (typeof rel !== 'string' || !/^assets\/[^/]+$/.test(rel) || !safeName(basename(rel))) throw new Error('Alleen bestanden in assets/ kunnen weg.')
@@ -392,7 +394,7 @@ const handlers: Handlers = {
 
 // Functies die in een projectmap schrijven of lezen: alleen in het project dat nu open is
 // (de map komt uit het venster en wordt dus niet blind vertrouwd).
-const DIR_ARG = new Set(['importImages', 'importFonts', 'listAssets', 'deleteAsset', 'importPaths', 'generateWriteOn', 'saveBoilerplate', 'installWebFont', 'estimateSize', 'importVariantSheet', 'saveVariantSheet'])
+const DIR_ARG = new Set(['importImages', 'importFonts', 'listAssets', 'assetSizes', 'deleteAsset', 'importPaths', 'generateWriteOn', 'saveBoilerplate', 'installWebFont', 'estimateSize', 'importVariantSheet', 'saveVariantSheet'])
 const DIR_REQ = new Set(['exportBanners', 'exportMedia', 'createVariants'])
 const DIR_ARG_EXPORT = new Set(['getExportDir', 'chooseExportDir'])
 // Mag voor elk geopend tabblad (ook op de achtergrond): opslaan, herstelkopie, versies
@@ -571,7 +573,8 @@ app.on('web-contents-created', (_e, wc) => {
 })
 
 app.whenReady().then(async () => {
-  if (process.platform === 'darwin' && existsSync(APP_ICON)) app.dock?.setIcon(APP_ICON)
+  // Tijdens ontwikkelen het eigen icoon in het Dock (de gebouwde app heeft het al in zijn bundel)
+  if (process.platform === 'darwin' && !app.isPackaged && existsSync(APP_ICON)) app.dock?.setIcon(APP_ICON)
   // Geen camera, microfoon, locatie, meldingen e.d.; alleen tekst naar het klembord (code kopiëren)
   session.defaultSession.setPermissionRequestHandler((_wc, perm, cb) => cb(perm === 'clipboard-sanitized-write'))
   protocol.handle('bsproj', async (req) => {

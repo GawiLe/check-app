@@ -1,7 +1,8 @@
 import { Popouts } from './Popouts'
 import { FormatsPanel } from './FormatsPanel'
 import { useState } from 'react'
-import { Code2, Columns2, PenTool } from 'lucide-react'
+import { Code2, Columns2, LayoutGrid, PenTool } from 'lucide-react'
+import { useStore } from '../store'
 import { Dock } from '../dock/Dock'
 import type { PanelId } from '../dock/model'
 import { CodeView } from './CodeView'
@@ -26,6 +27,7 @@ function loadMode(): ViewMode {
 /** Canvas-paneel met keuze: ontwerp, code of beide naast elkaar. */
 function CanvasPanel() {
   const [mode, setModeState] = useState<ViewMode>(loadMode)
+  const overview = useStore((s) => s.overview)
   const setMode = (m: ViewMode) => {
     setModeState(m)
     try {
@@ -36,16 +38,25 @@ function CanvasPanel() {
   }
   return (
     <div className="canvas-panel">
-      <div className="canvas-modes seg">
-        <button className={mode === 'design' ? 'on' : ''} onClick={() => setMode('design')} title="Alleen het ontwerp">
-          <PenTool size={12} /> Ontwerp
-        </button>
-        <button className={mode === 'code' ? 'on' : ''} onClick={() => setMode('code')} title="Alleen de code">
-          <Code2 size={12} /> Code
-        </button>
-        <button className={mode === 'both' ? 'on' : ''} onClick={() => setMode('both')} title="Ontwerp en code naast elkaar">
-          <Columns2 size={12} /> Beide
-        </button>
+      <div className="canvas-modes">
+        <div className="seg">
+          <button className={mode === 'design' ? 'on' : ''} onClick={() => setMode('design')} title="Alleen het ontwerp">
+            <PenTool size={12} /> Ontwerp
+          </button>
+          <button className={mode === 'code' ? 'on' : ''} onClick={() => setMode('code')} title="Alleen de code">
+            <Code2 size={12} /> Code
+          </button>
+          <button className={mode === 'both' ? 'on' : ''} onClick={() => setMode('both')} title="Ontwerp en code naast elkaar">
+            <Columns2 size={12} /> Beide
+          </button>
+        </div>
+        {mode !== 'code' && (
+          <div className="seg">
+            <button className={overview ? 'on' : ''} onClick={() => useStore.getState().setOverview(!overview)} title={'Alle formaten naast elkaar (\\)'}>
+              <LayoutGrid size={12} /> Alle formaten
+            </button>
+          </div>
+        )}
       </div>
       <div className={`canvas-split ${mode}`}>
         {mode !== 'code' && (

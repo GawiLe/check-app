@@ -236,6 +236,8 @@ export function App() {
       if (!mod && !e.altKey && !e.shiftKey) {
         if (code === 'KeyJ' || code === 'KeyK') return run(() => jumpKeyframe(code === 'KeyJ' ? -1 : 1))
       }
+      // \ : alle formaten naast elkaar (aan/uit)
+      if (!mod && !e.altKey && (e.key === '\\' || code === 'Backslash')) return run(() => s.setOverview(!s.overview))
       // < / > (ook , / . zonder Shift): naar vorig / volgend keyframe
       if (!mod && !e.altKey && ['<', '>', ',', '.'].includes(e.key)) return run(() => jumpKeyframe(e.key === '<' || e.key === ',' ? -1 : 1))
       switch (e.key) {

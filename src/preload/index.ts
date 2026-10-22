@@ -21,6 +21,7 @@ const api: BannerStudioApi = {
   importImages: call('importImages'),
   importFonts: call('importFonts'),
   listAssets: call('listAssets'),
+  assetSizes: call('assetSizes'),
   deleteAsset: call('deleteAsset'),
   generateWriteOn: call('generateWriteOn'),
   exportBanners: call('exportBanners'),

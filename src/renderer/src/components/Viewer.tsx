@@ -1,6 +1,6 @@
 import { exitLayers } from '@shared/build'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Grid2x2, Maximize, Minus, Plus, Star } from 'lucide-react'
+import { AlertTriangle, Grid2x2, Maximize, Minus, PenTool, Plus, Star } from 'lucide-react'
 import { layerStateAt, restStateAt } from '@shared/anim'
 import { resizeFromHandle } from '@shared/geometry'
 import { measuresFor, snapMove, union, type Guide, type Measure, type Rect } from '@shared/snap'
@@ -15,13 +15,17 @@ import { assetUrl, batch, currentComp, setLayerValue, updateLayer, useStore, vie
 import { DRAG_TYPE } from './Library'
 import { SizeMeter } from './SizeMeter'
 import { viewOf } from '../lib/windows'
+import { fitScale } from '@shared/overview'
+import { formatChanges, openFormatMenu } from './FormatsPanel'
 
 /**
  * De echte banner-HTML (zelfde builder als de export) in een iframe. Twee iframes
  * wisselen elkaar af zodat herladen niet flikkert; de tijd gaat via postMessage.
  */
-function BannerFrame(props: { project: Project; comp: Composition; time: number; zoom: number; rev: number }) {
+function BannerFrame(props: { project: Project; comp: Composition; time: number; zoom: number; rev: number; onOverflow?: (ids: string[]) => void }) {
   const { project, comp, time, zoom, rev } = props
+  const onOverflow = useRef(props.onOverflow)
+  onOverflow.current = props.onOverflow
   const frames = [useRef<HTMLIFrameElement>(null), useRef<HTMLIFrameElement>(null)]
   const active = useRef(0)
   const timeRef = useRef(time)
@@ -38,6 +42,8 @@ function BannerFrame(props: { project: Project; comp: Composition; time: number;
       // De runtime meldt dit als hij klaar is (fonts en afbeeldingen geladen): dan het nieuwe frame tonen
       if (loading.current && loading.current.frame.contentWindow === e.source) loading.current.done()
       const ids = d.ids.filter((x): x is string => typeof x === 'string')
+      // In het overzicht houdt elk formaat zijn eigen melding bij
+      if (onOverflow.current) return onOverflow.current(ids)
       const cur = useStore.getState().overflowIds
       if (ids.join() !== cur.join()) useStore.setState({ overflowIds: ids })
     }
@@ -136,38 +142,140 @@ export function Viewer() {
   return overview ? <Overview /> : <SingleViewer />
 }
 
-/** Alle formaten naast elkaar, synchroon afspelend. Klik om dat formaat te bewerken. */
+type OverviewZoom = 'fit' | 0.5 | 1
+const OV_PAD = 28
+// Bovenaan ruimte voor de zwevende knoppen (Ontwerp/Code, Alle formaten, zoom)
+const OV_TOP = 52
+const OV_GAP = 28
+const OV_CAP = 30
+
+function loadOverviewZoom(): OverviewZoom {
+  try {
+    const v = localStorage.getItem('bs-overview-zoom')
+    return v === '0.5' ? 0.5 : v === '1' ? 1 : 'fit'
+  } catch {
+    return 'fit'
+  }
+}
+
+/**
+ * Alle formaten naast elkaar, synchroon afspelend, op één gemeenschappelijke schaal (passend in beeld,
+ * of 50% / 100%). Per formaat: basis, aanpassingen, eigen lagen en tekst die niet past.
+ * Klik = dat formaat bewerken; rechtermuisknop = hetzelfde menu als in het paneel Formaten.
+ */
 function Overview() {
   const project = useStore((s) => s.project)!
   const compId = useStore((s) => s.compId)
-  const time = useStore((s) => s.time)
   const rev = useStore((s) => s.assetsRev)
-  const maxH = 420
+  const [zoom, setZoomState] = useState<OverviewZoom>(loadOverviewZoom)
+  const setZoom = (z: OverviewZoom) => {
+    setZoomState(z)
+    try {
+      localStorage.setItem('bs-overview-zoom', String(z))
+    } catch {
+      /* geen opslag */
+    }
+  }
+  const area = useRef<HTMLDivElement>(null)
+  const [box, setBox] = useState({ w: 0, h: 0 })
+  useEffect(() => {
+    const el = area.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setBox({ w: el.clientWidth, h: el.clientHeight }))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const [overflow, setOverflow] = useState<Record<string, number>>({})
+  const comps = project.compositions.filter((c) => !c.disabled)
+  const off = project.compositions.length - comps.length
+  const fit = fitScale(
+    comps.map((c) => ({ w: c.width, h: c.height })),
+    box.w - 2 * OV_PAD,
+    box.h - OV_TOP - OV_PAD,
+    OV_GAP,
+    OV_CAP
+  )
+  const z = zoom === 'fit' ? fit : zoom
   return (
-    <div className="viewer">
-      <div className="overview">
-        {project.compositions.filter((c) => !c.disabled).map((c) => {
-          const z = Math.min(1, maxH / c.height, 560 / c.width)
-          return (
-            <div
+    <div className="viewer overview-viewer">
+      <div className="overview-tools">
+        <div className="seg">
+          <button className={zoom === 'fit' ? 'on' : ''} onClick={() => setZoom('fit')} title="Alles in beeld, zelfde schaal voor alle formaten">
+            Passend {Math.round(fit * 100)}%
+          </button>
+          <button className={zoom === 0.5 ? 'on' : ''} onClick={() => setZoom(0.5)}>
+            50%
+          </button>
+          <button className={zoom === 1 ? 'on' : ''} onClick={() => setZoom(1)}>
+            100%
+          </button>
+        </div>
+      </div>
+      <div className="overview-note">
+        {comps.length} {comps.length === 1 ? 'formaat' : 'formaten'}
+        {off > 0 && ` · ${off} uitgezet`} · klik op een formaat om het te bewerken
+      </div>
+      <div className="overview-area" ref={area}>
+        <div className="overview" style={{ gap: OV_GAP, padding: `${OV_TOP}px ${OV_PAD}px ${OV_PAD}px` }}>
+          {comps.map((c) => (
+            <OverviewTile
               key={c.id}
-              className={`tile${c.id === compId ? ' active' : ''}`}
-              onClick={() => {
-                useStore.getState().setComp(c.id)
-                useStore.getState().setOverview(false)
-              }}
-            >
-              <div className="cap">
-                {c.id === project.baseCompositionId && <Star size={11} />}
-                {c.width}×{c.height}
-                {z < 1 && <span className="faint">{Math.round(z * 100)}%</span>}
-              </div>
-              <div className="frame" style={{ width: c.width * z, height: c.height * z }}>
-                <BannerFrame project={project} comp={c} time={Math.min(time, c.duration)} zoom={z} rev={rev} />
-              </div>
-            </div>
-          )
-        })}
+              project={project}
+              comp={c}
+              zoom={z}
+              rev={rev}
+              active={c.id === compId}
+              overflow={overflow[c.id] ?? 0}
+              onOverflow={(ids) => setOverflow((o) => (o[c.id] === ids.length ? o : { ...o, [c.id]: ids.length }))}
+            />
+          ))}
+          {!comps.length && <div className="empty">Alle formaten staan uit. Zet ze aan in het paneel Formaten.</div>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function OverviewTile(props: { project: Project; comp: Composition; zoom: number; rev: number; active: boolean; overflow: number; onOverflow: (ids: string[]) => void }) {
+  const { project, comp: c, zoom, rev, active, overflow } = props
+  // Alleen de tegel volgt de tijd (niet het hele overzicht): soepel afspelen met veel formaten
+  const time = useStore((s) => s.time)
+  const isBase = c.id === project.baseCompositionId
+  const ch = formatChanges(project, c)
+  const size = `${c.width}×${c.height}`
+  const open = () => {
+    useStore.getState().setComp(c.id)
+    useStore.getState().setOverview(false)
+  }
+  return (
+    <div className={`tile${active ? ' active' : ''}`} onClick={open} onContextMenu={(e) => openFormatMenu(e, c)} title={`${c.name}: klik om te bewerken`}>
+      <div className="cap" style={{ maxWidth: Math.max(140, c.width * zoom) }}>
+        {isBase && <Star size={11} className="base-star" />}
+        <b>{size}</b>
+        {c.name !== size && <span className="faint ellipsis">{c.name}</span>}
+        {ch.changed > 0 && (
+          <span className="fp-badge changed" title={`${ch.changed} laag/lagen aangepast in dit formaat`}>
+            ● {ch.changed}
+          </span>
+        )}
+        {ch.own > 0 && (
+          <span className="fp-badge own" title={`${ch.own} eigen laag/lagen (alleen in dit formaat)`}>
+            +{ch.own}
+          </span>
+        )}
+        {overflow > 0 && (
+          <span className="ov-warn" title={`${overflow} tekstlaag/-lagen passen niet in hun kader`}>
+            <AlertTriangle size={11} /> tekst
+          </span>
+        )}
+      </div>
+      <div className="frame" style={{ width: c.width * zoom, height: c.height * zoom }}>
+        <BannerFrame project={project} comp={c} time={Math.min(time, c.duration)} zoom={zoom} rev={rev} onOverflow={props.onOverflow} />
+        <div className="tile-hover">
+          <span>
+            <PenTool size={12} /> Bewerken
+          </span>
+        </div>
       </div>
     </div>
   )

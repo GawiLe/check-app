@@ -7,7 +7,7 @@ const kb = (b: number) => (b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1).re
 
 /**
  * Live KB-teller: schat (rustig, na elke wijziging) hoe groot de export van het huidige formaat wordt,
- * voor het strengste platform dat aanstaat. Groen = ruim binnen de grens, oranje = bijna, rood = te groot.
+ * voor het strengste platform dat aanstaat. Groen = ruim binnen de grens, geel = bijna, rood = te groot.
  */
 export function SizeMeter() {
   const project = useStore((s) => s.project)

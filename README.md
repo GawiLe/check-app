@@ -41,8 +41,36 @@ npm install
 npm run dev        # app starten met hot reload
 npm test           # unit tests (builder, runtime, validatie, formaten)
 npm run typecheck
-npm run dist       # installer bouwen (dmg / nsis) via electron-builder
+npm run dist:mac   # Mac-app als DMG (Apple silicon + Intel), ondertekend als de gegevens hieronder er zijn
 ```
+
+## Mac-app als ondertekende DMG
+
+Een **ondertekende en genotariseerde** DMG opent op elke Mac zonder waarschuwing ("kan niet worden geopend omdat de ontwikkelaar niet kan worden geverifieerd"). Daarvoor heb je eenmalig nodig:
+
+1. **Apple Developer Program** (developer.apple.com/programs, € 99 per jaar). Op naam van Connect Create kan ook (dan vraagt Apple een D-U-N-S-nummer).
+2. **Certificaat "Developer ID Application"**: in Xcode → Instellingen → Accounts → *Manage Certificates* → + → *Developer ID Application*. Het komt dan in je sleutelhanger. Voor GitHub: in *Sleutelhangertoegang* rechtsklik op het certificaat → *Exporteer…* als `.p12` met een wachtwoord.
+3. **App-specifiek wachtwoord** voor de notarisatie: account.apple.com → *Inloggen en beveiliging* → *App-specifieke wachtwoorden*.
+4. Je **Team ID** (10 tekens): developer.apple.com/account → *Membership details*.
+
+**Op je eigen Mac** (certificaat staat in je sleutelhanger):
+
+```bash
+cd ~/banner-studio
+export APPLE_ID="jij@connect-create.nl"
+export APPLE_APP_SPECIFIC_PASSWORD="xxxx-xxxx-xxxx-xxxx"
+export APPLE_TEAM_ID="ABCDE12345"
+npm run dist:mac
+```
+
+Na een paar minuten (de notarisatie bij Apple duurt even) staan in `dist/` twee DMG's: `Bnnr-Studio-<versie>-arm64.dmg` (Apple silicon) en `-x64.dmg` (Intel). Controle: `spctl -a -vvv "dist/mac-arm64/Bnnr Studio.app"` moet *Notarized Developer ID* melden.
+
+**Via GitHub** (geen Mac nodig, bijv. voor een collega): zet in de repository onder *Settings → Secrets and variables → Actions* de secrets `MAC_CERT_P12_BASE64` (uitkomst van `base64 -i DeveloperID.p12 | pbcopy`), `MAC_CERT_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` en `APPLE_TEAM_ID`. Daarna: *Actions → Mac-app (DMG) → Run workflow*; de DMG's staan onder *Artifacts*. Een tag pushen (`git tag v0.2.0 && git push --tags`) maakt er meteen een release van.
+
+Zonder Apple-account bouwt `npm run dist:mac` de DMG ook, alleen niet ondertekend: macOS waarschuwt dan bij het eerste openen (rechtsklik → *Open*, of *Systeeminstellingen → Privacy en beveiliging → Toch openen*).
+
+De app is extra afgeschermd met Electron-*fuses*: geen "run as node", geen debugpoort, `NODE_OPTIONS` genegeerd, en alleen de ondertekende `app.asar` wordt geladen (met integriteitscontrole).
+
 
 ## Werken met projecten (bronmappen)
 
@@ -84,11 +112,19 @@ Hoe het koppelen werkt:
 
 - De **basis** (300×600, label *basis*) is leidend. Wat je daarin toevoegt, verwijdert of wijzigt, gaat naar alle formaten: tekst, font, kleuren, afbeeldingen en animaties, en positie en maat (omgerekend naar dat formaat).
 - **In een ander formaat** pas je inhoud, plek en maat aan, verberg je lagen met het oogje of voeg je eigen lagen toe. Dat geldt alleen voor dat formaat en de basis overschrijft het daarna niet meer.
-  - In de tijdlijn: **oranje** = aangepast in dit formaat, **blauwgroen** = eigen laag van dit formaat. Het formatenpaneel telt ze (● 2, +1).
+  - In de tijdlijn: **geel** = aangepast in dit formaat, **blauwgroen** = eigen laag van dit formaat. Het formatenpaneel telt ze (● 2, +1).
   - In het paneel Ontwerp zie je welke eigenschappen afwijken. Met × herstel je één eigenschap naar de basis, met *Alles* de hele laag.
 - Hetzelfde geldt voor de formaatinstellingen (duur, loops, achtergrond, rand).
 - **Een ander formaat als begin:** bij *Formaat toevoegen* kies je *Uitgaan van* (bijv. je uitgewerkte 300×250 voor de 336×280), of je doet later *Lay-out overnemen van …*. Het formaat blijft gekoppeld aan de basis; wat afwijkt wordt een aanpassing van dat formaat.
 - Met het **koppel-icoon** in het paneel zet je het koppelen uit. Dan zijn alle formaten los.
+
+### Alle formaten naast elkaar
+
+Knop **Alle formaten** bovenaan het canvas (of in het paneel Formaten, of de toets `\`): alle aangevinkte formaten tegelijk, synchroon afspelend.
+
+- **Passend** zet ze allemaal in beeld op **dezelfde schaal**, zodat je de echte verhoudingen ziet; met *50%* en *100%* kijk je op vaste grootte.
+- Per formaat zie je of het de basis is (★), hoeveel lagen er zijn aangepast (● 2) of eigen zijn (+1), en een waarschuwing **⚠ tekst** als een tekst niet in zijn kader past.
+- **Klik** op een formaat om het te bewerken; de rechtermuisknop geeft hetzelfde menu als in het paneel Formaten (naam, lay-out overnemen, terugzetten, verwijderen).
 
 ### Animeren met keyframes
 
@@ -212,7 +248,7 @@ Lagen: selecteer en druk **Enter**, dubbelklik op de naam in de tijdlijn, of rec
 
 - **Volgorde:** sleep een laag in de tijdlijn naar boven of onder. Een blauwe lijn laat zien waar hij komt; bij de rand scrolt de tijdlijn mee.
   - Je kunt een laag ook in of uit een opengeklapte compositie slepen. Positie en timing worden dan omgerekend, zodat hij op dezelfde plek en hetzelfde moment blijft.
-- **Assets-paneel:** achter elke asset staat hoe vaak hij gebruikt wordt (in alle formaten), of *niet gebruikt*. Sorteer op *Naam* of *Gebruik*. Verwijderen kan met het prullenbakje (bij aanwijzen) of de rechtermuisknop: het bestand gaat naar de prullenbak. Is de asset in gebruik, dan vraagt Bnnr eerst bevestiging en worden die afbeeldingslagen leeg.
+- **Assets-paneel:** elke asset met een voorbeeldje (op een schaakbord, zodat je transparantie ziet), de afmetingen en het gewicht in KB, en hoe vaak hij gebruikt wordt in alle formaten (*0×* = nergens). Met de knop in de kop wissel je tussen een lijst en een raster met grote voorbeelden. Sorteer op *Naam* of *Gebruik*. Verwijderen kan met het prullenbakje (bij aanwijzen) of de rechtermuisknop: het bestand gaat naar de prullenbak. Is de asset in gebruik, dan vraagt Bnnr eerst bevestiging en worden die afbeeldingslagen leeg.
 - **SVG, PNG, JPG, GIF en WebP:** sleep ze vanuit de Finder op het canvas. Ze komen in `assets/` en worden meteen een laag op de plek waar je loslaat.
   - Sleep je ze op het linkerpaneel, dan komen ze alleen bij de assets.
   - Via *Assets & fonts → importeren* kan het ook.
@@ -355,7 +391,7 @@ Knop *Varianten* in de werkbalk: het project is het template.
 
 ### Meerdere projecten (tabbladen)
 
-Elk geopend project krijgt een tabblad bovenin het venster, zoals in een browser. Per tabblad blijft alles bewaard: ongedaan maken, selectie, tijd en zoom. Een oranje stip betekent niet-opgeslagen wijzigingen.
+Elk geopend project krijgt een tabblad bovenin het venster, zoals in een browser. Per tabblad blijft alles bewaard: ongedaan maken, selectie, tijd en zoom. Een gele stip betekent niet-opgeslagen wijzigingen.
 
 - **Openen** (map-knop in de werkbalk of de **+** naast de tabbladen): *Map kiezen…* of een **recent project**. Staat het al open, dan ga je naar dat tabblad. Ook via menu Bestand → *Recent openen*.
 - **Varianten** die je aanmaakt verschijnen meteen als tabbladen; je blijft in het template.
@@ -428,7 +464,7 @@ Elke geëxporteerde banner begint met `<!-- This banner was proudly created by C
 
 **Dubbele afbeeldingen:** staat dezelfde afbeelding op meerdere lagen, of twee keer in je assets onder een andere naam (byte voor byte gelijk), dan komt hij maar één keer in de export.
 
-**Live KB-teller:** linksonder op het canvas zie je hoe groot de export van het huidige formaat wordt, tegen de strengste grens van de gekozen platforms (ZIP of initial load). Groen is ruim binnen de grens, oranje bijna, rood te groot.
+**Live KB-teller:** linksonder op het canvas zie je hoe groot de export van het huidige formaat wordt, tegen de strengste grens van de gekozen platforms (ZIP of initial load). Groen is ruim binnen de grens, geel bijna, rood te groot.
 
 **DV360:** banners die via DV360 worden ingekocht en via CM360 worden uitgeleverd: kies CM360. Rechtstreeks in DV360 uploaden werkt met dezelfde standaard HTML5-zip. Alleen voor Studio/rich media (Enabler) is iets anders nodig.
 
@@ -524,6 +560,7 @@ Sleutels worden versleuteld opgeslagen via de sleutelhanger van het OS.
 - Extra platforms: Flashtalking, Xandr.
 - Video-laag en sprite-sheets.
 - Mockups in de app en *Publiceren naar klantportaal*.
-- Installeerbare, ondertekende app (.dmg, notarized) met automatische updates.
+- Automatische updates voor de ondertekende app (via GitHub-releases).
+- De editor via een eigen protocol laden in plaats van `file://`, zodat ook die laatste Electron-fuse dicht kan.
 - Overzicht "Alle formaten" naast elkaar met één klik naar het formaat; asset-miniaturen in het paneel.
 - AI-effecten als herbruikbare presets opslaan.

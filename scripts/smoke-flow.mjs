@@ -139,7 +139,7 @@ await page.keyboard.press('KeyQ')
 await drag(vb.x + vb.width / 2 + 40, vb.y + vb.height / 2 - 20, 40, 40)
 await page.keyboard.press('Escape')
 await page.waitForTimeout(200)
-await check('300×250: aangepaste laag oranje, eigen laag blauwgroen', async () =>
+await check('300×250: aangepaste laag geel, eigen laag blauwgroen', async () =>
   (await page.locator('.tl-name.overridden', { hasText: 'Knop' }).count()) === 1 &&
   (await page.locator('.tl-name.overridden', { hasText: 'Headline' }).count()) === 1 &&
   (await page.locator('.tl-name.own').count()) === 1
@@ -178,7 +178,7 @@ await check('336×280 neemt de lay-out van 300×250 over (verborgen, eigen laag,
 
 // 7. Formaat uitzetten; overzicht toont per formaat zijn eigen banner
 await page.locator('.fp-item', { hasText: '336×280' }).locator('input[type=checkbox]').uncheck()
-await page.getByRole('button', { name: /Alle formaten/ }).click()
+await page.locator('.fp-head').getByRole('button', { name: /Alle formaten/ }).click()
 await check('overzicht: alleen de aangevinkte formaten', async () => waitFor(async () => (await page.locator('.overview .tile').count()) === 2))
 await check('overzicht: elk formaat toont zijn eigen banner (niet allemaal dezelfde)', async () =>
   waitFor(async () => {
@@ -191,7 +191,7 @@ await check('overzicht: elk formaat toont zijn eigen banner (niet allemaal dezel
   })
 )
 await shot('f3-overzicht')
-await page.getByRole('button', { name: /Alle formaten/ }).click()
+await page.locator('.fp-head').getByRole('button', { name: /Alle formaten/ }).click()
 await goFormat('300×600')
 
 // 8. Blokken in het paneel Ontwerp zelf schikken

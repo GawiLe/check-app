@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { ImagePlus, Trash2, Type, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ImagePlus, LayoutGrid, List, Trash2, Type, X } from 'lucide-react'
 import { addAsset, assetUsage, deleteAsset, importDroppedFiles, importFonts, importImages, replaceImage } from '../lib/actions'
 import { assetUrl, currentComp, useStore } from '../store'
 import { allLayers } from '@shared/tree'
@@ -35,8 +35,101 @@ export function AssetsPanel() {
       /* niet erg */
     }
   }
+  const [view, setViewState] = useState<'list' | 'grid'>(() => {
+    try {
+      return localStorage.getItem('bs-asset-view') === 'grid' ? 'grid' : 'list'
+    } catch {
+      return 'list'
+    }
+  })
+  const setView = (v: 'list' | 'grid') => {
+    setViewState(v)
+    try {
+      localStorage.setItem('bs-asset-view', v)
+    } catch {
+      /* niet erg */
+    }
+  }
+  // Gewicht per bestand (uit het hoofdproces) en afmetingen (zodra het voorbeeldje geladen is)
+  const dir = useStore((st) => st.dir)
+  const [sizes, setSizes] = useState<Record<string, number>>({})
+  const [dims, setDims] = useState<Record<string, string>>({})
+  useEffect(() => {
+    if (!dir) return
+    let live = true
+    void window.bs
+      .assetSizes(dir)
+      .then((r) => live && setSizes(r))
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [dir, assets, rev])
+  // Fontnamen in hun eigen font laten zien
+  useEffect(() => {
+    for (const f of project.fonts) {
+      const name = `bsfont-${f.id}`
+      if ([...document.fonts].some((x) => x.family === name)) continue
+      const face = new FontFace(name, `url("${assetUrl(f.file, rev)}")`, { weight: String(f.weight), style: f.style })
+      face
+        .load()
+        .then((ff) => document.fonts.add(ff))
+        .catch(() => {})
+    }
+  }, [project.fonts, rev])
   const usage = assetUsage(project)
   const label = (a: string) => a.replace(/^assets\//, '')
+  const kb = (b?: number) => (b == null ? '' : b < 1024 ? `${b} B` : `${(b / 1024).toFixed(b < 10240 ? 1 : 0)} KB`)
+  const info = (a: string) => [dims[a], kb(sizes[a])].filter(Boolean).join(' · ')
+  const tip = (a: string) =>
+    `${label(a)}${info(a) ? `\n${info(a)}` : ''}\n${usage.get(a) ? `In ${usage.get(a)} laag/lagen gebruikt` : 'Nergens gebruikt'}\n\nKlik = als laag toevoegen · sleep op een afbeeldingslaag of rechtermuisknop = vervangen`
+  const menu = (e: React.MouseEvent, a: string) => {
+    e.preventDefault()
+    const imgs = selectedImages()
+    s().openMenu(e.clientX, e.clientY, [
+      { label: 'Toevoegen als nieuwe laag', onClick: () => void addAsset(a) },
+      {
+        label: imgs.length > 1 ? `Vervang ${imgs.length} geselecteerde afbeeldingen` : 'Vervang geselecteerde afbeelding',
+        disabled: !imgs.length,
+        onClick: () => imgs.forEach((l) => void replaceImage(l.id, a))
+      },
+      { label: 'Verwijderen…', onClick: () => void deleteAsset(a) }
+    ])
+  }
+  const common = (a: string) => ({
+    title: tip(a),
+    draggable: true,
+    onDragStart: (e: React.DragEvent) => {
+      e.dataTransfer.setData(ASSET_DRAG, a)
+      e.dataTransfer.effectAllowed = 'copy'
+    },
+    onClick: () => void addAsset(a),
+    onContextMenu: (e: React.MouseEvent) => menu(e, a)
+  })
+  const thumb = (a: string) => (
+    <img
+      className="thumb"
+      src={assetUrl(a, rev)}
+      alt=""
+      draggable={false}
+      onLoad={(e) => {
+        const d = `${e.currentTarget.naturalWidth}×${e.currentTarget.naturalHeight}`
+        if (dims[a] !== d) setDims((x) => ({ ...x, [a]: d }))
+      }}
+    />
+  )
+  const remove = (a: string) => (
+    <button
+      className="icon sm show-hover"
+      title="Verwijderen (naar de prullenbak)"
+      onClick={(e) => {
+        e.stopPropagation()
+        void deleteAsset(a)
+      }}
+    >
+      <Trash2 size={12} />
+    </button>
+  )
   const sorted = [...assets].sort((a, b) =>
     sort === 'usage' ? (usage.get(b) ?? 0) - (usage.get(a) ?? 0) || label(a).localeCompare(label(b), 'nl', { numeric: true }) : label(a).localeCompare(label(b), 'nl', { numeric: true })
   )
@@ -55,9 +148,23 @@ export function AssetsPanel() {
       <Section
         title="Assets"
         actions={
-          <button className="icon sm" title="Afbeeldingen importeren" onClick={importImages}>
-            <ImagePlus size={14} />
-          </button>
+          <>
+            {assets.length > 0 && (
+              <button
+                className="icon sm asset-view"
+                title={view === 'list' ? 'Raster met grote voorbeelden' : 'Lijst'}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setView(view === 'list' ? 'grid' : 'list')
+                }}
+              >
+                {view === 'list' ? <LayoutGrid size={14} /> : <List size={14} />}
+              </button>
+            )}
+            <button className="icon sm" title="Afbeeldingen importeren" onClick={importImages}>
+              <ImagePlus size={14} />
+            </button>
+          </>
         }
       >
         {assets.length > 1 && (
@@ -73,53 +180,38 @@ export function AssetsPanel() {
             </div>
           </div>
         )}
-        <div className="list">
-          {assets.length === 0 && (
-            <div className="empty">Sleep afbeeldingen in de map assets/ of klik op + om te importeren.</div>
-          )}
-          {sorted.map((a) => (
-            <div
-              key={a}
-              className={`list-item asset-item${usage.get(a) ? '' : ' unused'}`}
-              title="Klik om als laag toe te voegen · sleep op een afbeeldingslaag in de tijdlijn of rechtermuisknop om te vervangen"
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.setData(ASSET_DRAG, a)
-                e.dataTransfer.effectAllowed = 'copy'
-              }}
-              onClick={() => addAsset(a)}
-              onContextMenu={(e) => {
-                e.preventDefault()
-                const imgs = selectedImages()
-                s().openMenu(e.clientX, e.clientY, [
-                  { label: 'Toevoegen als nieuwe laag', onClick: () => void addAsset(a) },
-                  {
-                    label: imgs.length > 1 ? `Vervang ${imgs.length} geselecteerde afbeeldingen` : 'Vervang geselecteerde afbeelding',
-                    disabled: !imgs.length,
-                    onClick: () => imgs.forEach((l) => void replaceImage(l.id, a))
-                  },
-                  { label: 'Verwijderen…', onClick: () => void deleteAsset(a) }
-                ])
-              }}
-            >
-              <img className="thumb" src={assetUrl(a, rev)} alt="" />
-              <span className="grow">{label(a)}</span>
-              <span className="meta asset-uses" title={usage.get(a) ? `In ${usage.get(a)} laag/lagen gebruikt (alle formaten)` : 'Nergens gebruikt'}>
-                {usage.get(a) ? `${usage.get(a)}×` : 'niet gebruikt'}
-              </span>
-              <button
-                className="icon sm show-hover"
-                title="Verwijderen (naar de prullenbak)"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  void deleteAsset(a)
-                }}
-              >
-                <Trash2 size={12} />
-              </button>
-            </div>
-          ))}
-        </div>
+        {assets.length === 0 && <div className="empty">Sleep afbeeldingen in de map assets/ of klik op + om te importeren.</div>}
+        {view === 'list' ? (
+          <div className="list">
+            {sorted.map((a) => (
+              <div key={a} className={`list-item asset-item${usage.get(a) ? '' : ' unused'}`} {...common(a)}>
+                {thumb(a)}
+                <span className="grow asset-name">
+                  <span className="ellipsis">{label(a)}</span>
+                  {info(a) && <span className="asset-info">{info(a)}</span>}
+                </span>
+                <span className="meta asset-uses" title={usage.get(a) ? `In ${usage.get(a)} laag/lagen gebruikt (alle formaten)` : 'Nergens gebruikt'}>
+                  {usage.get(a) ? `${usage.get(a)}×` : '0×'}
+                </span>
+                {remove(a)}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="asset-grid">
+            {sorted.map((a) => (
+              <div key={a} className={`asset-tile asset-item${usage.get(a) ? '' : ' unused'}`} {...common(a)}>
+                <div className="asset-tile-img">
+                  {thumb(a)}
+                  <span className="asset-uses">{usage.get(a) ? `${usage.get(a)}×` : '0×'}</span>
+                  {remove(a)}
+                </div>
+                <div className="asset-tile-name ellipsis">{label(a)}</div>
+                <div className="asset-info">{info(a) || '\u00a0'}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </Section>
 
       <Section
@@ -136,7 +228,9 @@ export function AssetsPanel() {
           )}
           {project.fonts.map((f) => (
             <div key={f.id} className="list-item" title={f.file}>
-              <span className="grow">{f.family}</span>
+              <span className="grow font-sample" style={{ fontFamily: `"bsfont-${f.id}", inherit`, fontWeight: f.weight, fontStyle: f.style }}>
+                {f.family}
+              </span>
               <span className="meta">
                 {f.weight}
                 {f.style === 'italic' ? ' i' : ''}
