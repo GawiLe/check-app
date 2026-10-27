@@ -1,6 +1,6 @@
 {
   "name": "banner-studio",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Desktop app voor lichte, gevalideerde HTML5/IAB display banners",
   "main": "./out/main/index.js",
   "scripts": {

@@ -62,11 +62,10 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npm run dist:mac -- --publish never
 
-      - name: DMG bouwen (niet ondertekend)
+      # Zonder certificaat: ad-hoc ondertekend (zonder handtekening start macOS de app niet: "beschadigd")
+      - name: DMG bouwen (niet ondertekend, ad-hoc)
         if: steps.sign.outputs.signed != 'true'
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-        run: npm run dist:mac -- --publish never
+        run: npm run dist:mac -- --publish never -c.mac.identity=- -c.mac.hardenedRuntime=false -c.mac.notarize=false
 
       - name: Handtekening en notarisatie controleren
         if: steps.sign.outputs.signed == 'true'

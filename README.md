@@ -32,9 +32,7 @@ Eenmalig per Mac, in Terminal:
 
 Daarna is bijwerken altijd: `cd ~/banner-studio`, `git pull`, `npm install`, `npm run dev`.
 
-### Als gewone app installeren (DMG)
-
-Wil je Bnnr Studio als gewone app in je map Programma's (starten vanuit Launchpad of het Dock, zonder Terminal):
+### Als gewone app installeren (DMG), ook voor collega's
 
 ```bash
 cd ~/banner-studio
@@ -43,9 +41,25 @@ npm install
 npm run dmg
 ```
 
-De eerste keer duurt dit een paar minuten. Daarna gaat de DMG vanzelf open: sleep **Bnnr Studio** naar **Programma's**, werp de DMG uit en start de app vanuit Launchpad of de map Programma's. Bijwerken naar een nieuwe versie: dezelfde vier regels nog eens, en de app in Programma's vervangen.
+De eerste keer duurt dit een paar minuten. Daarna staan er twee DMG's in `dist/` (de map gaat vanzelf open):
 
-Deze DMG is bedoeld voor je eigen Mac (zonder Apple-account, "ad-hoc" ondertekend). Op een andere Mac waarschuwt macOS bij het openen; voor een DMG die je kunt delen, zie *Mac-app als ondertekende DMG* hieronder. De app en `npm run dev` gebruiken dezelfde instellingen (recente projecten, presets, boilerplates). Alleen een AI-sleutel moet je in de app één keer opnieuw invullen (de sleutelhanger hoort per app).
+- `Bnnr-Studio-<versie>-arm64.dmg` voor Macs met een **Apple-chip** (M1, M2, M3, M4 …)
+- `Bnnr-Studio-<versie>-x64.dmg` voor Macs met een **Intel**-processor
+
+Welke je nodig hebt: Apple-menu → *Over deze Mac* → bij *Chip* staat "Apple M…" (arm64), bij *Processor* staat "Intel" (x64). De DMG voor je eigen Mac gaat ook meteen open: sleep **Bnnr Studio** naar **Programma's**. Alleen je eigen versie maken gaat sneller: `npm run dmg -- --deze-mac`.
+
+**Delen met collega's** (via WeTransfer, Drive, Slack, AirDrop …). De app is niet ondertekend met een Apple-certificaat, dus macOS vraagt de eerste keer om bevestiging:
+
+1. DMG openen, **Bnnr Studio** naar **Programma's** slepen.
+2. Bnnr Studio openen. macOS meldt dat het niet kan controleren of de app vrij is van malware: klik op *Gereed* (of *OK*).
+3. *Systeeminstellingen → Privacy en beveiliging*, helemaal naar beneden: bij "Bnnr Studio is geblokkeerd" op **Open toch** klikken en bevestigen met je wachtwoord of Touch ID.
+4. Daarna opent de app gewoon, ook alle volgende keren.
+
+Lukt dat niet (of zegt macOS dat de app "beschadigd" is), dan in Terminal: `xattr -dr com.apple.quarantine "/Applications/Bnnr Studio.app"` en de app opnieuw openen.
+
+Een nieuwe versie: opnieuw `npm run dmg` en de nieuwe DMG delen; collega's slepen hem over de oude heen (hun projecten en instellingen blijven staan). Wil je dat collega's helemaal geen melding krijgen, dan heb je een Apple Developer-account nodig: zie *Mac-app als ondertekende DMG* hieronder.
+
+De app en `npm run dev` gebruiken dezelfde instellingen (recente projecten, presets, boilerplates). Alleen een AI-sleutel moet je in de app één keer opnieuw invullen (de sleutelhanger hoort per app).
 
 Instellingen (recente projecten, API-sleutel, eigen presets, boilerplates) staan per Mac en gaan niet mee. Projectmappen kun je gewoon kopiëren of via een gedeelde map openen.
 
@@ -56,7 +70,7 @@ npm install
 npm run dev        # app starten met hot reload
 npm test           # unit tests (builder, runtime, validatie, formaten)
 npm run typecheck
-npm run dmg        # Mac-app als DMG voor deze Mac (zonder Apple-account), opent hem meteen
+npm run dmg        # Mac-app als DMG's (Apple-chip + Intel) om te installeren en te delen, zonder Apple-account
 npm run dist:mac   # Mac-app als DMG (Apple silicon + Intel), ondertekend als de gegevens hieronder er zijn
 ```
 
