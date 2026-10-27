@@ -371,6 +371,7 @@ Bij een tekstlaag kies je een font met de font-kiezer:
 - Het font wordt per formaat verkleind tot alleen de tekens die in dát formaat voorkomen (subset, woff2). Een font van 700 KB wordt zo vaak een paar KB. Het exportvenster meldt per font hoeveel tekens en hoeveel KB.
 - Standaard wordt het als **Base64** in de HTML gezet, zonder losse `.woff`/`.woff2`-bestanden in de zip. Uitzetten kan bij *Ontwerp → Export → Fonts* (dan losse `.woff2`). Voor Google Ads en Azerion is inbedden altijd aan.
 - **Wat je ziet is het fontbestand uit het project**, ook tijdens het typen op het canvas (niet een font met dezelfde naam dat op je Mac staat). Let op bij "Alternates"-versies van een font: daarin zijn letters soms anders getekend. In *MANIC Alternates 3* is de hoofdletter U bijvoorbeeld als kleine u getekend; wil je de gewone hoofdletters, kies dan de gewone versie van het font.
+- **Fontbestand vervangen:** in *Assets & fonts → Fonts* het pijltjes-icoon bij een font (verschijnt bij aanwijzen). Alle teksten en write-on lagen met dat font, in alle formaten, gaan in één keer mee. Handig als de versie op je Mac anders is dan die in het project: zoek hem in *Lettertypecatalogus* (Font Book), rechtsklik → *Toon in Finder*, en kies dat bestand.
 
 ### Eigen presets
 

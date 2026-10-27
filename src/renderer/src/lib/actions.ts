@@ -319,6 +319,28 @@ export async function importImages() {
   }
 }
 
+/**
+ * Ander bestand voor een font in het project (bijv. de versie die op je Mac staat). Het font houdt zijn
+ * plek: alle teksten en write-on lagen met dit font, in alle formaten, gaan in één keer mee.
+ */
+export async function replaceFontFile(fontId: string) {
+  const { dir } = S()
+  if (!dir) return
+  try {
+    const [nf] = await window.bs.importFonts(dir)
+    if (!nf) return
+    S().update((p) => {
+      const f = p.fonts.find((x) => x.id === fontId)
+      if (!f) return
+      Object.assign(f, { file: nf.file, family: nf.family, weight: nf.weight, style: nf.style })
+      delete f.system
+    })
+    S().setStatus(`Fontbestand vervangen: ${nf.family} ${nf.weight} (alle teksten met dit font zijn mee veranderd)`)
+  } catch (e) {
+    fail(e)
+  }
+}
+
 export async function importFonts() {
   const { dir } = S()
   if (!dir) return

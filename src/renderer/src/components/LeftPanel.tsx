@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { ImagePlus, LayoutGrid, List, Trash2, Type, X } from 'lucide-react'
-import { addAsset, assetUsage, deleteAsset, importDroppedFiles, importFonts, importImages, replaceImage } from '../lib/actions'
+import { ImagePlus, LayoutGrid, List, RefreshCw, Trash2, Type, X } from 'lucide-react'
+import { addAsset, assetUsage, deleteAsset, importDroppedFiles, importFonts, importImages, replaceFontFile, replaceImage } from '../lib/actions'
 import { assetUrl, currentComp, useStore } from '../store'
 import { ensureProjectFont, projectFontFamily } from '../lib/projectFonts'
 import { allLayers } from '@shared/tree'
@@ -231,14 +231,20 @@ export function AssetsPanel() {
                 {f.weight}
                 {f.style === 'italic' ? ' i' : ''}
               </span>
+              {!f.system && (
+                <button className="icon sm show-hover font-replace" title="Ander fontbestand kiezen (alle teksten met dit font gaan mee)" onClick={() => void replaceFontFile(f.id)}>
+                  <RefreshCw size={12} />
+                </button>
+              )}
               <button
                 className="icon sm show-hover"
                 title="Uit project halen"
                 onClick={() =>
                   s().update((p) => {
                     p.fonts = p.fonts.filter((x) => x.id !== f.id)
+                    // Ook lagen binnen composities
                     for (const c of p.compositions)
-                      for (const l of c.layers) {
+                      for (const l of allLayers(c.layers)) {
                         if (l.text?.fontId === f.id) l.text.fontId = null
                         if (l.writeon?.fontId === f.id) l.writeon.fontId = null
                       }

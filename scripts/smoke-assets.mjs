@@ -158,6 +158,30 @@ await check('verwijderde bestanden terug te halen (prullenbak of .bnnr/prullenba
   return true
 })
 
+// Fontbestand vervangen: zelfde font in het project (zelfde id), dus alle teksten gaan mee
+const before = await S(() => {
+  const p = window.__bsStore.getState().project
+  const f = p.fonts[0]
+  const users = p.compositions.flatMap((c) => c.layers).filter((l) => l.text?.fontId === f.id).length
+  return { id: f.id, file: f.file, users }
+})
+await app.evaluate(({ dialog }, file) => void (dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] })), '/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf')
+const fontRow = page.locator('.panel-scroll .list-item', { has: page.locator('.font-sample') }).first()
+await fontRow.hover()
+await fontRow.locator('button.font-replace').click()
+await check('fontbestand vervangen: alle teksten gaan mee (zelfde font, ander bestand)', async () => {
+  for (let i = 0; i < 20; i++) {
+    const r = await S((id) => {
+      const p = window.__bsStore.getState().project
+      const f = p.fonts.find((x) => x.id === id)
+      return { file: f?.file, family: f?.family, users: p.compositions.flatMap((c) => c.layers).filter((l) => l.text?.fontId === id).length }
+    }, before.id)
+    if (r.file && r.file !== before.file && /serif/i.test(r.family) && r.users === before.users && before.users > 0) return true
+    await page.waitForTimeout(150)
+  }
+  return false
+})
+
 console.log(fails ? `${fails} controle(s) mislukt` : 'Kleuren, hoofdletters en assets: alles in orde')
 await S(() => window.__bsStore.getState().markSaved()).catch(() => {})
 await page.waitForTimeout(200)
