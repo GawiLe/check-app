@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ImagePlus, LayoutGrid, List, Trash2, Type, X } from 'lucide-react'
 import { addAsset, assetUsage, deleteAsset, importDroppedFiles, importFonts, importImages, replaceImage } from '../lib/actions'
 import { assetUrl, currentComp, useStore } from '../store'
+import { ensureProjectFont, projectFontFamily } from '../lib/projectFonts'
 import { allLayers } from '@shared/tree'
 
 /** Asset slepen naar een afbeeldingslaag in de tijdlijn = afbeelding vervangen. */
@@ -66,16 +67,10 @@ export function AssetsPanel() {
     }
   }, [dir, assets, rev])
   // Fontnamen in hun eigen font laten zien
+  const fontsRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    for (const f of project.fonts) {
-      const name = `bsfont-${f.id}`
-      if ([...document.fonts].some((x) => x.family === name)) continue
-      const face = new FontFace(name, `url("${assetUrl(f.file, rev)}")`, { weight: String(f.weight), style: f.style })
-      face
-        .load()
-        .then((ff) => document.fonts.add(ff))
-        .catch(() => {})
-    }
+    const doc = fontsRef.current?.ownerDocument ?? document
+    for (const f of project.fonts) ensureProjectFont(doc, f, rev)
   }, [project.fonts, rev])
   const usage = assetUsage(project)
   const label = (a: string) => a.replace(/^assets\//, '')
@@ -136,6 +131,7 @@ export function AssetsPanel() {
 
   return (
     <div
+      ref={fontsRef}
       className="panel-scroll"
       onDragOver={(e) => e.dataTransfer.types.includes('Files') && e.preventDefault()}
       onDrop={(e) => {
@@ -228,7 +224,7 @@ export function AssetsPanel() {
           )}
           {project.fonts.map((f) => (
             <div key={f.id} className="list-item" title={f.file}>
-              <span className="grow font-sample" style={{ fontFamily: `"bsfont-${f.id}", inherit`, fontWeight: f.weight, fontStyle: f.style }}>
+              <span className="grow font-sample" style={{ fontFamily: f.system ? `"${f.family}", inherit` : `"${projectFontFamily(f)}", inherit`, fontWeight: f.weight, fontStyle: f.style }}>
                 {f.family}
               </span>
               <span className="meta">

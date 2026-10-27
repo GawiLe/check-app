@@ -370,6 +370,7 @@ Bij een tekstlaag kies je een font met de font-kiezer:
 
 - Het font wordt per formaat verkleind tot alleen de tekens die in dát formaat voorkomen (subset, woff2). Een font van 700 KB wordt zo vaak een paar KB. Het exportvenster meldt per font hoeveel tekens en hoeveel KB.
 - Standaard wordt het als **Base64** in de HTML gezet, zonder losse `.woff`/`.woff2`-bestanden in de zip. Uitzetten kan bij *Ontwerp → Export → Fonts* (dan losse `.woff2`). Voor Google Ads en Azerion is inbedden altijd aan.
+- **Wat je ziet is het fontbestand uit het project**, ook tijdens het typen op het canvas (niet een font met dezelfde naam dat op je Mac staat). Let op bij "Alternates"-versies van een font: daarin zijn letters soms anders getekend. In *MANIC Alternates 3* is de hoofdletter U bijvoorbeeld als kleine u getekend; wil je de gewone hoofdletters, kies dan de gewone versie van het font.
 
 ### Eigen presets
 
@@ -433,7 +434,7 @@ Sluit je het venster, sluit je de app af (Cmd+Q) of open je een ander of nieuw p
 
 ### Kleuren van de editor
 
-In **Instellingen → Kleuren van de editor** kies je zelf de accentkleur (knoppen, selectie, grepen), de kleur van de lagen in de tijdlijn en die van de keyframes, met de kleurkiezer of een hexcode. Er zijn ook een paar voorbeelden (Bnnr, Mint, Blauw, Paars, Roze, Grijs). Je ziet het meteen; *Opslaan* bewaart het op deze computer, *Annuleren* zet het terug. Dit gaat alleen over de editor, niet over je banners.
+In **Instellingen** (tandwiel rechtsboven in de werkbalk, ⌘, of de knop op het startscherm) → **Kleuren van de editor** kies je zelf de accentkleur (knoppen, selectie, grepen), de kleur van de lagen in de tijdlijn en die van de keyframes, met de kleurkiezer of een hexcode. Er zijn ook een paar voorbeelden (Bnnr, Mint, Blauw, Paars, Roze, Grijs). Je ziet het meteen; *Opslaan* bewaart het op deze computer, *Annuleren* zet het terug. Dit gaat alleen over de editor, niet over je banners.
 
 ### Sneltoetsen
 

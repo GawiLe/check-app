@@ -157,6 +157,37 @@ await page.waitForSelector('.welcome, .app')
 await check('eigen kleur (hexcode) bewaard na herstart', async () => (await accent()) === '#c04cff')
 await S(() => localStorage.removeItem('bs-theme'))
 
+// 8. Tekst bewerken op het canvas gebruikt het fontbestand uit het project (zelfde letters als de banner)
+if (await page.locator('.welcome').count()) {
+  // Instellingen ook vanaf het startscherm
+  await page.locator('.welcome button', { hasText: 'Instellingen' }).click()
+  await check('Instellingen te openen vanaf het startscherm (met de kleuren)', async () => (await page.locator('.modal .settings-head', { hasText: 'Kleuren van de editor' }).count()) === 1)
+  await page.locator('.modal button', { hasText: 'Annuleren' }).click()
+  await page.locator('.welcome .list-item').first().click()
+}
+await page.waitForSelector('.app')
+const tid = await S(() => {
+  const s = window.__bsStore.getState()
+  const c = s.project.compositions.find((x) => x.id === s.compId)
+  const t = c.layers.find((l) => l.type === 'text' && l.text.fontId)
+  return t?.id
+})
+await S((i) => window.__bsStore.getState().setEditingText(i), tid)
+await check('bewerkvak gebruikt het projectfont (niet een geïnstalleerd font met dezelfde naam)', async () => {
+  for (let i = 0; i < 20; i++) {
+    const r = await S(() => {
+      const ta = document.querySelector('textarea.text-editor')
+      const fam = ta ? getComputedStyle(ta).fontFamily : ''
+      const name = fam.split(',')[0].replace(/"/g, '').trim()
+      return name.startsWith('bsfont-') && [...document.fonts].some((f) => f.family === name && f.status === 'loaded')
+    })
+    if (r) return true
+    await page.waitForTimeout(150)
+  }
+  return false
+})
+await page.keyboard.press('Escape')
+
 await page.screenshot({ path: join(shots, 'review.png') })
 console.log(fails ? `${fails} controle(s) mislukt` : 'Review-fixes: alles in orde')
 await S(() => window.__bsStore.getState().markSaved()).catch(() => {})

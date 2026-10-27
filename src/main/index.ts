@@ -423,7 +423,27 @@ async function buildMenu() {
   const recent = (await readSettings().catch(() => ({ recent: [] as string[] }))).recent ?? []
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
-      ...(isMac ? [{ role: 'appMenu' as const }] : []),
+      // Mac: het app-menu met Instellingen… (⌘,), zoals in elke Mac-app
+      ...(isMac
+        ? [
+            {
+              label: 'Bnnr Studio',
+              submenu: [
+                { role: 'about' as const, label: 'Over Bnnr Studio' },
+                { type: 'separator' as const },
+                { label: 'Instellingen…', accelerator: 'CmdOrCtrl+,', click: send('settings') },
+                { type: 'separator' as const },
+                { role: 'services' as const, label: 'Voorzieningen' },
+                { type: 'separator' as const },
+                { role: 'hide' as const, label: 'Verberg Bnnr Studio' },
+                { role: 'hideOthers' as const, label: 'Verberg andere' },
+                { role: 'unhide' as const, label: 'Toon alles' },
+                { type: 'separator' as const },
+                { role: 'quit' as const, label: 'Stop Bnnr Studio' }
+              ]
+            }
+          ]
+        : []),
       {
         label: 'Bestand',
         submenu: [
@@ -443,7 +463,7 @@ async function buildMenu() {
           { label: 'Exporteren…', accelerator: 'CmdOrCtrl+E', click: send('export') },
           { type: 'separator' },
           { label: 'Tabblad sluiten', accelerator: 'CmdOrCtrl+W', click: send('closeTab') },
-          ...(isMac ? [] : [{ role: 'quit' as const, label: 'Afsluiten' }])
+          ...(isMac ? [] : [{ type: 'separator' as const }, { label: 'Instellingen…', accelerator: 'CmdOrCtrl+,', click: send('settings') }, { role: 'quit' as const, label: 'Afsluiten' }])
         ]
       },
       {

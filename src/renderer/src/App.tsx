@@ -32,7 +32,7 @@ import { contextOf, currentComp, layerLocalTime, setLayerValue, useStore, viewRa
 import { allLayers, findDeep } from '@shared/tree'
 import { restStateAt } from '@shared/anim'
 import { endFrameTime } from '@shared/motion'
-import { FilePlus2, FolderOpen } from 'lucide-react'
+import { FilePlus2, FolderOpen, Settings } from 'lucide-react'
 import { useDock } from './dock/store'
 import type { AlignMode } from '@shared/align'
 import { toggleShownProps, type PropFilter, type PropGroupId } from '@shared/propgroups'
@@ -80,6 +80,7 @@ export function App() {
         }
         if (action.startsWith('panel:')) useDock.getState().show(action.slice(6) as PanelId)
         if (action === 'resetLayout') useDock.getState().reset()
+        if (action === 'settings') s.setDialog('settings')
         if (action === 'saveAndClose') void saveAndClose()
         if (!s.project) return
         if (action === 'save') void save()
@@ -352,6 +353,10 @@ function Welcome() {
           </button>
           <button className="ghost" onClick={() => openProject()}>
             <FolderOpen size={15} /> Open map
+          </button>
+          <span className="grow" />
+          <button className="ghost" title="Instellingen: kleuren van de editor, AI (⌘,)" onClick={() => useStore.getState().setDialog('settings')}>
+            <Settings size={15} /> Instellingen
           </button>
         </div>
         {recent.length > 0 && (

@@ -426,6 +426,30 @@ describe('groepen (pre-comps) en in/uit-punten', () => {
     expect(build(p).html).toContain(`[${ctaKey},`)
   })
 
+  it('nieuwe compositie van afbeelding (2,23 s), tekst en een bestaande compositie: begint op 2,23 s', async () => {
+    const { tree, comp, cta, ctaText } = await setup()
+    const { layerStateAt } = await import('../src/shared/anim')
+    // De starter heeft geen afbeelding; een andere laag speelt de rol van "chatgpt-afbeelding"
+    const img = comp.layers.find((l) => l.id !== cta.id && l.id !== ctaText.id && l.type !== 'group')!
+    // "Plus": een bestaande compositie die op 2,4 s begint
+    tree.shiftTiming(cta, 2.4)
+    const plus = tree.groupLayers(comp, [cta.id], 'Plus')!
+    expect(plus.start).toBe(2.4)
+    tree.shiftTiming(ctaText, 2.6)
+    img.start = 2.233
+    img.tracks.opacity = [
+      { t: 2.25, v: 0, e: 'linear' },
+      { t: 2.9, v: 1, e: 'linear' }
+    ]
+    const g = tree.groupLayers(comp, [plus.id, ctaText.id, img.id], 'Comp')!
+    expect(g.start).toBe(2.233)
+    expect(img.start ?? 0).toBe(0)
+    expect(plus.start).toBeCloseTo(0.167, 3)
+    expect(img.tracks.opacity![0].t).toBeCloseTo(0.017, 3)
+    // Zelfde beeld op 2,5 s (binnen de compositie 0,267 s)
+    expect(layerStateAt(img, 2.5 - 2.233).opacity).toBeCloseTo((2.5 - 2.25) / 0.65, 2)
+  })
+
   it('nieuwe compositie: hebben alle lagen een uit-punt, dan eindigt de compositie bij de laatste', async () => {
     const { tree, comp, cta, ctaText } = await setup()
     tree.shiftTiming(cta, 2)

@@ -15,6 +15,7 @@ import { assetUrl, batch, currentComp, setLayerValue, updateLayer, useStore, vie
 import { DRAG_TYPE } from './Library'
 import { SizeMeter } from './SizeMeter'
 import { viewOf } from '../lib/windows'
+import { ensureProjectFont, projectFontFamily } from '../lib/projectFonts'
 import { fitScale } from '@shared/overview'
 import { formatChanges, openFormatMenu } from './FormatsPanel'
 
@@ -943,6 +944,11 @@ function TextEditor({ box, zoom, project }: { box: Box; zoom: number; project: P
     ref.current?.select()
   }, [])
   const font = project.fonts.find((f) => f.id === t.fontId)
+  // Hetzelfde fontbestand als de banner (niet een geïnstalleerd font met dezelfde naam)
+  const rev = useStore((s) => s.assetsRev)
+  useEffect(() => {
+    if (font) ensureProjectFont(ref.current?.ownerDocument ?? document, font, rev)
+  }, [font, rev])
   const commit = () => {
     if (value !== t.content) updateLayer(l.id, (x) => void (x.text!.content = value))
     useStore.getState().setEditingText(null)
@@ -967,7 +973,7 @@ function TextEditor({ box, zoom, project }: { box: Box; zoom: number; project: P
         height: l.height * zoom,
         transformOrigin: `${box.ax * 100}% ${box.ay * 100}%`,
         transform: `translate(${(box.wx - box.ax * l.width) * zoom}px,${(box.wy - box.ay * l.height) * zoom}px) rotate(${box.rotation}deg) scale(${box.scale},${box.scaleY})`,
-        fontFamily: font?.system ? font.family : font ? `${font.family}, Arial` : 'Arial, Helvetica, sans-serif',
+        fontFamily: font?.system ? font.family : font ? `"${projectFontFamily(font)}", Arial` : 'Arial, Helvetica, sans-serif',
         fontSize: t.size * zoom,
         fontWeight: t.weight,
         lineHeight: t.leading != null ? `${t.leading * zoom}px` : t.lineHeight,
