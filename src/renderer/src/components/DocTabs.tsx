@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { FolderOpen, Plus, X } from 'lucide-react'
+import { ChevronDown, FolderOpen, Plus, X } from 'lucide-react'
 import { openProject } from '../lib/actions'
 import { closeDocument, docInfo, switchDocument, useDocs } from '../lib/documents'
 import { useStore } from '../store'
@@ -37,8 +37,12 @@ export function DocTabs() {
           </div>
         )
       })}
-      <OpenMenu title="Project openen (ook recente)">
+      {/* + = meteen een project kiezen (zoals een nieuw tabblad); het pijltje toont recente projecten */}
+      <button className="icon doc-add" title="Project openen in een nieuw tabblad (Cmd/Ctrl+O)" onClick={() => void openProject()}>
         <Plus size={14} />
+      </button>
+      <OpenMenu className="icon doc-recent" title="Recente projecten">
+        <ChevronDown size={12} />
       </OpenMenu>
     </div>
   )
@@ -48,6 +52,7 @@ export function DocTabs() {
 export function OpenMenu(props: { children: ReactNode; title: string; className?: string }) {
   const [open, setOpen] = useState(false)
   const [recent, setRecent] = useState<string[]>([])
+  const [at, setAt] = useState<{ left: number; top: number } | null>(null)
   const ref = useRef<HTMLDivElement>(null)
   const docs = useDocs((s) => s.docs)
   const openDirs = docs.map((d) => d.dir)
@@ -64,11 +69,20 @@ export function OpenMenu(props: { children: ReactNode; title: string; className?
   }
   return (
     <div className="menu-wrap" ref={ref}>
-      <button className={props.className ?? 'icon'} title={props.title} onClick={() => setOpen(!open)}>
+      <button
+        className={props.className ?? 'icon'}
+        title={props.title}
+        onClick={(e) => {
+          // Vaste positie onder de knop: ook zichtbaar als de balk eromheen weinig ruimte heeft
+          const r = e.currentTarget.getBoundingClientRect()
+          setAt({ left: Math.max(4, Math.min(r.left, window.innerWidth - 270)), top: r.bottom + 4 })
+          setOpen(!open)
+        }}
+      >
         {props.children}
       </button>
       {open && (
-        <div className="menu open-menu">
+        <div className="menu open-menu" style={at ? { position: 'fixed', left: at.left, top: at.top, marginTop: 0 } : undefined}>
           <button onClick={() => pick()}>
             <FolderOpen size={14} /> Map kiezen…
           </button>

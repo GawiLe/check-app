@@ -2,7 +2,7 @@
 // keyframes wissen = één undo-stap, export met een ontbrekende afbeelding, veilige "Toon in map".
 // Gebruik: npm run build && xvfb-run node scripts/smoke-review.mjs <projectmap> <screenshotmap>
 import { _electron as electron } from 'playwright-core'
-import { mkdir, rm } from 'node:fs/promises'
+import { cp, mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { pickFolder } from './lib/export.mjs'
 
@@ -187,6 +187,32 @@ await check('bewerkvak gebruikt het projectfont (niet een geïnstalleerd font me
   return false
 })
 await page.keyboard.press('Escape')
+
+// 9. Plusknop bij de tabbladen: meteen het venster om een project te kiezen; pijltje = recente projecten
+const second = join(shots, 'tweede-project')
+await cp(dir, second, { recursive: true })
+await app.evaluate(({ dialog }, d) => void (dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [d] })), second)
+await S(() => window.__bsStore.getState().markSaved()).catch(() => {})
+await page.locator('.doc-tabs .doc-add').click()
+await check('plusknop opent meteen een project kiezen (nieuw tabblad)', async () => {
+  for (let i = 0; i < 30; i++) {
+    if ((await page.locator('.doc-tabs .doc-tab').count()) === 2) return true
+    await page.waitForTimeout(150)
+  }
+  return false
+})
+await page.locator('.doc-tabs .doc-recent').click()
+await check('pijltje: menu met recente projecten is zichtbaar (niet weggeknipt)', async () =>
+  page.evaluate(() => {
+    const m = document.querySelector('.open-menu')
+    if (!m) return false
+    const r = m.getBoundingClientRect()
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + Math.min(r.height - 4, 30))
+    return r.height > 40 && !!hit && m.contains(hit)
+  })
+)
+await page.keyboard.press('Escape')
+await page.mouse.click(5, 300)
 
 await page.screenshot({ path: join(shots, 'review.png') })
 console.log(fails ? `${fails} controle(s) mislukt` : 'Review-fixes: alles in orde')

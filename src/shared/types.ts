@@ -319,7 +319,8 @@ export type ExportTarget = 'cm360' | 'google-ads' | 'gam' | 'adform' | 'azerion'
 export interface MediaOptions {
   mp4?: { fps: number; scale: 1 | 2 } | null
   /** maxKb: GIF zo nodig kleiner maken (minder kleuren, lagere fps, kleiner formaat) tot hij hieronder blijft. */
-  gif?: { fps: number; maxKb?: number | null } | null
+  /** quality 'high': eigen palet per beeldje en dithering (vloeiende verlopen en foto's, iets groter). */
+  gif?: { fps: number; maxKb?: number | null; quality?: 'normal' | 'high' } | null
 }
 
 export interface Project {

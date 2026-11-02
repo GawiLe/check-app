@@ -219,16 +219,26 @@ function ExportDialog({ onClose }: { onClose: () => void }) {
           </div>
           <div className="media-row">
             <label className="check">
-              <input type="checkbox" checked={!!media.gif} onChange={(e) => setMedia((m) => void (m.gif = e.target.checked ? { fps: 15, maxKb: null } : null))} />
+              <input type="checkbox" checked={!!media.gif} onChange={(e) => setMedia((m) => void (m.gif = e.target.checked ? { fps: 25, maxKb: null, quality: 'normal' } : null))} />
               GIF
             </label>
             {media.gif && (
               <>
-                <select value={media.gif.fps} onChange={(e) => setMedia((m) => void (m.gif!.fps = Number(e.target.value)))}>
-                  <option value={8}>8 fps</option>
+                <select value={media.gif.fps} title="Beeldjes per seconde: hoger is vloeiender, maar groter" onChange={(e) => setMedia((m) => void (m.gif!.fps = Number(e.target.value)))}>
                   <option value={10}>10 fps</option>
                   <option value={15}>15 fps</option>
                   <option value={20}>20 fps</option>
+                  <option value={25}>25 fps</option>
+                  <option value={30}>30 fps</option>
+                  <option value={50}>50 fps (vloeiendst)</option>
+                </select>
+                <select
+                  value={media.gif.quality ?? 'normal'}
+                  title="Hoog: eigen kleurenpalet per beeldje en dithering, voor vloeiende verlopen en foto's (iets groter)"
+                  onChange={(e) => setMedia((m) => void (m.gif!.quality = e.target.value === 'high' ? 'high' : 'normal'))}
+                >
+                  <option value="normal">Kwaliteit normaal</option>
+                  <option value="high">Kwaliteit hoog</option>
                 </select>
                 <input
                   type="number"

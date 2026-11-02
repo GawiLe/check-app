@@ -433,7 +433,7 @@ Knop *Varianten* in de werkbalk: het project is het template.
 
 Elk geopend project krijgt een tabblad bovenin het venster, zoals in een browser. Per tabblad blijft alles bewaard: ongedaan maken, selectie, tijd en zoom. Een gele stip betekent niet-opgeslagen wijzigingen.
 
-- **Openen** (map-knop in de werkbalk of de **+** naast de tabbladen): *Map kiezen…* of een **recent project**. Staat het al open, dan ga je naar dat tabblad. Ook via menu Bestand → *Recent openen*.
+- **Openen:** de **+** naast de tabbladen opent meteen het venster om een projectmap te kiezen. Het pijltje ernaast (en de map-knop in de werkbalk) toont ook de **recente projecten**. Staat een project al open, dan ga je naar dat tabblad. Ook via menu Bestand → *Recent openen*.
 - **Varianten** die je aanmaakt verschijnen meteen als tabbladen; je blijft in het template.
 - **Sluiten:** × op het tabblad, middelklik of Cmd/Ctrl+W. Wisselen: klik of Ctrl+Tab / Ctrl+Shift+Tab.
 - Bij afsluiten met wijzigingen in meerdere tabbladen slaat *Opslaan* ze allemaal op.
@@ -548,7 +548,9 @@ Kies je meer dan één platform, dan komt er per platform een submap tussen (`Ba
 ```
 
 - **MP4:** H.264 (speelt overal af, ook in PowerPoint, Keynote en op social), 25/30/60 fps, standaard 2× zo scherp (bijv. 600×1200 voor een 300×600).
-- **GIF:** ware grootte, 8–20 fps. Vul bij *max. KB* een maximum in, dan maakt Bnnr de GIF zo nodig lichter (minder kleuren, lagere fps) en waarschuwt als dat niet genoeg is.
+- **GIF:** ware grootte, 10–50 fps (50 fps is het vloeiendst dat browsers afspelen), 256 kleuren met een palet uit de hele animatie. Per beeldje wordt alleen opgeslagen wat verandert, dus ook hoge fps blijft licht.
+  - **Kwaliteit hoog:** een eigen kleurenpalet per beeldje en fijne dithering, voor vloeiende verlopen en foto's zonder strepen (iets groter).
+  - Vul bij *max. KB* een maximum in, dan maakt Bnnr de GIF zo nodig lichter (minder kleuren, lagere fps) en waarschuwt als dat niet genoeg is.
 - Beide bevatten alle loops achter elkaar en eindigen op het eindbeeld, precies zoals de banner afspeelt (ook code-elementen en tekenende lijnen). In het exportvenster klik je op een platform om te zien wat het is en welke eisen gelden. *Azerion* is een Europees advertentieplatform (o.a. Improve Digital) dat banners op websites en in games plaatst; kies het alleen als de campagne daar loopt.
 
 ## Architectuur

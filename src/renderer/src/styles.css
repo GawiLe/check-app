@@ -3442,3 +3442,19 @@ button.link {
   display: inline;
   font-size: inherit;
 }
+
+/* Tabbladen: + opent meteen een project, het pijltje toont recente projecten */
+.doc-tabs .doc-add,
+.doc-tabs .doc-recent {
+  height: 26px;
+  margin-bottom: 1px;
+  color: var(--muted);
+}
+.doc-tabs .doc-recent {
+  width: 18px;
+  margin-left: -2px;
+}
+.doc-tabs .doc-add:hover,
+.doc-tabs .doc-recent:hover {
+  color: var(--text);
+}

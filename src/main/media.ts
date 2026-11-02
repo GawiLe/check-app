@@ -7,7 +7,7 @@ import { renderWindow, serveDir } from './render'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { applyPalette, GIFEncoder, quantize } from 'gifenc'
+import { buildPalette, createGifWriter, type GifQuality } from './gif'
 import type { MediaRequest, MediaResult } from '@shared/api'
 import { endFrameTime } from '@shared/motion'
 import type { Composition } from '@shared/types'
@@ -71,39 +71,6 @@ function toRgba(bgra: Buffer): Uint8Array {
   return out
 }
 
-/**
- * GIF van de beeldjes. Gelijke opeenvolgende beeldjes worden samengevoegd (langere vertraging), één
- * palet voor de hele GIF (geen flikkerende kleuren). Speelt één keer af: de loops zitten er al in.
- */
-export function encodeGif(frames: Uint8Array[], width: number, height: number, fps: number, colors: number): Uint8Array {
-  // Palet uit een handvol beeldjes verspreid over de animatie
-  const pick = [...new Set([0, 0.2, 0.4, 0.6, 0.8, 1].map((f) => Math.round(f * (frames.length - 1))))]
-  const sample = new Uint8Array(pick.length * frames[0].length)
-  pick.forEach((idx, k) => sample.set(frames[idx], k * frames[0].length))
-  const palette = quantize(sample, colors)
-  const gif = GIFEncoder()
-  const ms = 1000 / fps
-  let i = 0
-  let first = true
-  // GIF-vertragingen zijn hele honderdsten: het afrondingsverschil schuift door naar het volgende beeldje,
-  // zodat de GIF in totaal precies even lang duurt als de banner (geen drift bij bijv. 15 of 30 fps)
-  let exact = 0
-  let written = 0
-  while (i < frames.length) {
-    let j = i + 1
-    while (j < frames.length && sameFrame(frames[j], frames[i])) j++
-    exact += ms * (j - i)
-    const delay = Math.max(20, Math.round((exact - written) / 10) * 10)
-    written += delay
-    gif.writeFrame(applyPalette(frames[i], palette), width, height, { palette: first ? palette : undefined, delay, repeat: first ? -1 : undefined, first })
-    first = false
-    i = j
-  }
-  gif.finish()
-  return gif.bytes()
-}
-
-const sameFrame = (a: Uint8Array, b: Uint8Array) => a === b || Buffer.compare(Buffer.from(a.buffer, a.byteOffset, a.byteLength), Buffer.from(b.buffer, b.byteOffset, b.byteLength)) === 0
 
 /** Onzichtbaar venster dat MP4 codeert (WebCodecs, H.264). */
 async function openEncoder(tmp: string) {
@@ -205,35 +172,60 @@ export async function exportMedia(req: MediaRequest, onProgress?: (msg: string) 
 
       if (gif) {
         onProgress?.(`GIF ${comp.width}×${comp.height}…`)
-        const fps0 = Math.min(30, Math.max(4, Math.round(gif.fps || 15)))
+        // GIF-vertragingen zijn honderdsten; 50 fps (20 ms) is het snelste dat browsers goed afspelen
+        const fps0 = Math.min(50, Math.max(5, Math.round(gif.fps || 25)))
+        const quality: GifQuality = gif.quality === 'high' ? 'high' : 'normal'
         let banner: Awaited<ReturnType<typeof openBanner>> | null = null
         try {
           banner = await openBanner(index, comp, 1, false)
           const b = banner
-          // Elk uniek tijdstip één keer vastleggen (loops herhalen dezelfde beeldjes)
+          // Elk uniek tijdstip één keer vastleggen (loops herhalen dezelfde beeldjes), zolang het geheugen
+          // het toelaat; daarboven wordt een beeldje bij een volgende poging opnieuw vastgelegd
           const cache = new Map<number, Uint8Array>()
-          const framesAt = async (fps: number) => {
-            const out: Uint8Array[] = []
-            for (const t of frameTimes(comp, fps)) {
-              let f = cache.get(t)
-              if (!f) cache.set(t, (f = toRgba(await b.grab(t))))
-              out.push(f)
+          let cached = 0
+          const frameAt = async (t: number) => {
+            let f = cache.get(t)
+            if (!f) {
+              f = toRgba(await b.grab(t))
+              if (cached + f.byteLength <= 384 * 1024 * 1024) {
+                cache.set(t, f)
+                cached += f.byteLength
+              }
             }
-            return out
+            return f
+          }
+          const encode = async (fps: number, colors: number, q: GifQuality) => {
+            const times = frameTimes(comp, fps)
+            let palette: number[][] | undefined
+            if (q === 'normal') {
+              // Eén palet uit beeldjes verspreid over de hele animatie
+              const uniq = [...new Set(times)]
+              const n = Math.min(24, uniq.length)
+              const samples: Uint8Array[] = []
+              for (let k = 0; k < n; k++) samples.push(await frameAt(uniq[Math.round((k * (uniq.length - 1)) / Math.max(1, n - 1))]))
+              palette = buildPalette(samples, colors)
+            }
+            const w = createGifWriter({ width: b.width, height: b.height, fps, colors, quality: q }, palette)
+            for (const t of times) w.add(await frameAt(t))
+            return w.finish()
           }
           const max = gif.maxKb && gif.maxKb > 0 ? gif.maxKb * 1024 : Infinity
-          // Steeds iets lichter tot hij onder de maximale grootte blijft
-          const tries: [number, number][] = [
-            [fps0, 128],
-            [fps0, 64],
-            [Math.min(fps0, 10), 64],
-            [Math.min(fps0, 10), 32],
-            [Math.min(fps0, 8), 16]
+          // Steeds iets lichter tot hij onder de maximale grootte blijft (nooit meer fps dan gekozen)
+          const ladder: [number, number, GifQuality][] = [
+            ...(quality === 'high' ? ([[fps0, 256, 'high'], [fps0, 128, 'high']] as [number, number, GifQuality][]) : []),
+            [fps0, 256, 'normal'],
+            [fps0, 128, 'normal'],
+            [Math.min(fps0, 25), 128, 'normal'],
+            [Math.min(fps0, 20), 96, 'normal'],
+            [Math.min(fps0, 15), 64, 'normal'],
+            [Math.min(fps0, 10), 64, 'normal'],
+            [Math.min(fps0, 8), 32, 'normal']
           ]
-          let best: { bytes: Uint8Array; fps: number; colors: number } | null = null
-          for (const [fps, colors] of tries) {
-            const bytes = encodeGif(await framesAt(fps), b.width, b.height, fps, colors)
-            best = { bytes, fps, colors }
+          const tries = ladder.filter((t, i) => ladder.findIndex((u) => u.join() === t.join()) === i)
+          let best: { bytes: Uint8Array; fps: number; colors: number; quality: GifQuality } | null = null
+          for (const [fps, colors, q] of tries) {
+            const bytes = await encode(fps, colors, q)
+            best = { bytes, fps, colors, quality: q }
             if (bytes.byteLength <= max) break
           }
           const file = join(base, 'GIF', `${name}.gif`)
@@ -245,7 +237,7 @@ export async function exportMedia(req: MediaRequest, onProgress?: (msg: string) 
             composition: comp.name,
             file,
             bytes: best!.bytes.byteLength,
-            note: `${b.width}×${b.height}, ${best!.fps} fps, ${best!.colors} kleuren`,
+            note: `${b.width}×${b.height}, ${best!.fps} fps, ${best!.colors} kleuren${best!.quality === 'high' ? ', hoge kwaliteit' : ''}`,
             ...(over ? { warning: `Groter dan ${gif.maxKb} KB, ook met minder kleuren en een lagere fps. Maak de animatie korter of rustiger.` } : {})
           })
         } catch (err) {

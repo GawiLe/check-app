@@ -103,6 +103,20 @@ await check('GIF lichter gemaakt (minder kleuren/fps) of waarschuwing', async ()
   return (r.bytes <= 20 * 1024 && !r.warning) || (!!r.warning && !/128 kleuren/.test(r.note))
 })
 
+// 3. Vloeiender en mooier: 50 fps met kwaliteit hoog
+await mediaRow('GIF').locator('.media-max').fill('')
+await mediaRow('GIF').locator('select').first().selectOption('50')
+await mediaRow('GIF').locator('select').nth(1).selectOption('high')
+await page.locator('.modal .actions .primary').click()
+await page.waitForFunction(() => window.__bsStore.getState().mediaResults?.[0]?.note?.includes('50 fps'), null, { timeout: 240000 })
+await check('GIF 50 fps, kwaliteit hoog: juiste snelheid en duur', async () => {
+  const r = (await S(() => window.__bsStore.getState().mediaResults))[0]
+  const p = probe(gif)
+  const v = p.streams[0]
+  console.log(`   (${r.note}, ${(r.bytes / 1024).toFixed(0)} KB, ${v.r_frame_rate}, ${Number(p.format.duration).toFixed(2)} s)`)
+  return /hoge kwaliteit/.test(r.note) && v.r_frame_rate === '50/1' && Math.abs(Number(p.format.duration) - 5.5) < 0.3
+})
+
 console.log(fails ? `${fails} controle(s) mislukt` : 'MP4/GIF: alles in orde')
 await S(() => window.__bsStore.getState().markSaved()).catch(() => {})
 await page.waitForTimeout(200)
