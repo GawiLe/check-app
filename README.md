@@ -577,7 +577,7 @@ Een project is een gewone map die je kunt delen of krijgen. De app gaat er daaro
 
 - **Preview:** eigen document via `bsproj://` met een strenge CSP (geen netwerk; alleen de scripts die de app zelf in de banner zet, op sha256-vingerafdruk). Alleen bestanden uit `assets/` en `fonts/` zijn bereikbaar.
 - **Export, backup-JPG, MP4 en GIF** renderen in een aparte, afgeschermde sessie (`src/main/render.ts`): geen netwerk, geen permissies, alleen de tijdelijke exportmap.
-- **Code-elementen** gaan door een allowlist-opschoner (`src/shared/code.ts`): alleen opmaak- en SVG-elementen, geen scripts, event-handlers, externe url's of CSS-escapes.
+- **Code-elementen** gaan door een allowlist-opschoner (`src/shared/code.ts`): alleen opmaak- en SVG-elementen, geen scripts, event-handlers, externe url's of CSS-escapes. Id's die de banner zelf gebruikt (`a3`, `ad`, `API_URL` …) worden hernoemd (`a3_`, met alle verwijzingen), zodat een code-element geen laag of globale naam kan kapen. De rooktest `scripts/smoke-sanitizer.mjs` laadt ~120 bekende aanvalspatronen als echte banner in Chromium en controleert dat er nooit code draait of iets van buiten geladen wordt.
 - **Bestanden schrijven** gaat via `src/main/paths.ts`: nooit buiten de projectmap (ook niet via `..` of symlinks), via een tijdelijk bestand + hernoemen (nooit een half geschreven project).
 - **Vensters** draaien met `contextIsolation` en `sandbox`; geen camera/microfoon/locatie, geen `<webview>`, geen pop-ups behalve de losgemaakte panelen. Het hoofdproces accepteert IPC alleen van het hoofdvenster, en alleen voor het geopende project.
 - **Spreadsheets:** grenzen aan grootte en kolommen (geen zip-bom), en formules krijgen bij CSV-export een `'` (geen formule-injectie in Excel).

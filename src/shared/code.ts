@@ -51,6 +51,18 @@ function decodeEntities(v: string): string {
 const escAttr = (v: string) => v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 const DANGEROUS = /javascript:|vbscript:|data:|expression\s*\(|url\s*\(\s*['"]?\s*(?!#)|image-set|@import|\\/i
 
+/**
+ * Id's die de banner zelf (of de ad-server) gebruikt, mogen niet in een code-element: anders "kaapt" het
+ * element een laag (a3), het klikvlak (ad), de rand (bd) of een globale naam (DOM clobbering, bijv. API_URL).
+ */
+const RESERVED_ID =
+  /^(a\d+|ad|bd|bs|api_url|dhtml|adform|enabler|studio|mraid|clicktag\d*|top|parent|self|window|document|location|frames|opener|name|length|closed|status|origin|external|navigator|history|screen|event)$/i
+const okId = (v: string) => /^[A-Za-z][\w-]{0,63}$/.test(v)
+/** Gereserveerde id's krijgen een _ erachter (a1 → a1_), ook in alle verwijzingen ernaar: blijft werken, kaapt niets. */
+const safeId = (v: string) => (RESERVED_ID.test(v) ? `${v}_` : v)
+/** Verwijzingen url(#id) in een waarde (vulling, masker, filter, style) meehernoemen. */
+const renameUrlRefs = (s: string) => s.replace(/url\(\s*(['"]?)#([A-Za-z][\w-]*)\1\s*\)/gi, (_, q, id) => `url(${q}#${safeId(id)}${q})`)
+
 /** Eén style-attribuut: zelfde regels als de CSS van het element (geen externe bestanden, geen escapes). */
 function cleanStyleAttr(v: string): string {
   return cleanCodeCss(v).replace(/[{}]/g, '')
@@ -60,13 +72,14 @@ function cleanAttr(tag: string, name: string, raw: string): string | null {
   const n = name.toLowerCase()
   if (!ATTRS.has(n) || n.startsWith('on')) return null
   const v = decodeEntities(raw)
-  if (n === 'style') return cleanStyleAttr(v)
+  if (n === 'style') return renameUrlRefs(cleanStyleAttr(v))
+  if (n === 'id') return okId(v.trim()) ? safeId(v.trim()) : null
   // Verwijzingen alleen naar iets in het element zelf (#id)
-  if (n === 'href' || n === 'xlink:href') return /^#[\w-]+$/.test(v.trim()) ? v.trim() : null
+  if (n === 'href' || n === 'xlink:href') return /^#[A-Za-z][\w-]*$/.test(v.trim()) ? `#${safeId(v.trim().slice(1))}` : null
   if (n === 'attributename') return ANIMATABLE.has(v.trim().toLowerCase()) ? v.trim() : null
   if ((n === 'values' || n === 'from' || n === 'to' || n === 'by') && /^(animate|animatetransform|animatemotion)$/.test(tag) && /[:(]/.test(v) && !/^[\d\s.,;()a-z#%-]*$/i.test(v)) return null
   if (DANGEROUS.test(v)) return null
-  return v
+  return renameUrlRefs(v)
 }
 
 /**
@@ -161,6 +174,8 @@ export function cleanCodeCss(css: string): string {
       // '<' komt in CSS niet voor; zonder '<' kan de code niet uit de <style> breken
       .replace(/</g, '')
       .replace(/url\s*\(\s*(['"]?)\s*(?!#)[^)]*\)/gi, 'none')
+      // Een url( zonder sluithaakje (of wat er na het opschonen van over is) ook niet
+      .replace(/url\s*\((?!\s*['"]?#)/gi, '(')
       .replace(/(?:-webkit-)?image-set\s*\(/gi, '(')
       .replace(/expression\s*\(|-moz-binding|behavior\s*:/gi, '')
   )
@@ -171,7 +186,7 @@ export function cleanCodeCss(css: string): string {
  * komen daaronder te hangen, en keyframe-namen krijgen een eigen voorvoegsel.
  */
 export function scopeCodeCss(css: string, scope: string, prefix: string): string {
-  const src = cleanCodeCss(css).replace(/\bkf-/g, `${prefix}-`)
+  const src = renameUrlRefs(cleanCodeCss(css).replace(/\bkf-/g, `${prefix}-`))
   let i = 0
   const block = (): string => {
     // Leest tot en met de bijbehorende '}' (i staat net na '{')
@@ -210,7 +225,8 @@ export function scopeCodeCss(css: string, scope: string, prefix: string): string
           .map((s) => s.trim())
           .filter(Boolean)
           .map((s) => {
-            const scoped = s.replace(/\.root(?![\w-])/g, scope)
+            // #id in de selector: gereserveerde id's hernoemd zoals in de HTML (a1 → a1_)
+            const scoped = s.replace(/#([A-Za-z][\w-]*)/g, (_m, id: string) => `#${safeId(id)}`).replace(/\.root(?![\w-])/g, scope)
             return scoped.startsWith(scope) ? scoped : `${scope} ${scoped}`
           })
           .join(',')

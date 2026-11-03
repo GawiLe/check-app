@@ -1645,6 +1645,31 @@ describe('code-element: sanitizer (allowlist)', () => {
   })
 })
 
+describe('code-element: id\'s van de banner niet te kapen', () => {
+  it('gereserveerde id\'s krijgen een _ (met alle verwijzingen), gewone id\'s en kleuren blijven', async () => {
+    const { cleanCodeHtml, scopeCodeCss } = await import('../src/shared/code')
+    const out = cleanCodeHtml(
+      '<svg><defs><linearGradient id="a1"><stop stop-color="#a12345"/></linearGradient></defs><rect fill="url(#a1)" style="fill:url(#a1)"/><use href="#ad"/><circle id="API_URL"/><circle id="dhtml"/><circle id="gloed"/></svg>'
+    )
+    expect(out).toContain('id="a1_"')
+    expect(out).toContain('fill="url(#a1_)"')
+    expect(out).toContain('style="fill:url(#a1_)"')
+    expect(out).toContain('href="#ad_"')
+    expect(out).toContain('id="API_URL_"')
+    expect(out).toContain('id="dhtml_"')
+    expect(out).toContain('id="gloed"')
+    expect(out).toContain('stop-color="#a12345"')
+    const css = scopeCodeCss('#a1, .root #bd{fill:url(#a1);color:#a12345}', '#a9>.K', 'a9')
+    expect(css).toBe('#a9>.K #a1_,#a9>.K #bd_{fill:url(#a1_);color:#a12345}')
+  })
+
+  it('een url( zonder sluithaakje blijft niet staan', async () => {
+    const { cleanCodeCss } = await import('../src/shared/code')
+    expect(cleanCodeCss('.x{background:url(https://evil.example/a.png}')).not.toMatch(/url\(/i)
+    expect(cleanCodeCss('.x{fill:url(#g)}')).toContain('url(#g)')
+  })
+})
+
 describe('basisformaat kiezen', () => {
   it('nieuw project met een ander basisformaat (leeg en met voorbeeld)', async () => {
     const { createEmptyProject, createStarterProject } = await import('../src/shared/factory')
