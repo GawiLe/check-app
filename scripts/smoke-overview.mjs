@@ -91,6 +91,32 @@ await check('knop "Alle formaten" bovenaan het canvas', async () => waitFor(asyn
 await page.locator('.canvas-modes button', { hasText: 'Alle formaten' }).click()
 await check('en weer terug naar één formaat', async () => waitFor(async () => (await page.locator('.overview').count()) === 0))
 
+// 6. Een ander formaat als basis via het menu in het paneel Formaten
+await page.locator('.fp-item', { hasText: '320×50' }).click({ button: 'right' })
+await page.getByText('Maak dit de basis').click()
+await check('formaat via het menu tot basis gemaakt (ster verhuist mee)', async () =>
+  waitFor(async () => (await S(() => window.__bsStore.getState().project.baseCompositionId)) === 'ov-320' && (await page.locator('.fp-item', { hasText: '320×50' }).locator('.fp-badge', { hasText: 'basis' }).count()) === 1)
+)
+
+// 7. Nieuw project met een gekozen basisformaat (300×250)
+const parent = join(shots, 'nieuwe-projecten')
+await mkdir(parent, { recursive: true })
+await app.evaluate(({ dialog }, d) => void (dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [d] })), parent)
+await S(() => window.__bsStore.getState().markSaved())
+await S(() => window.__bsStore.getState().setDialog('new'))
+await page.locator('.modal select').first().selectOption('300x250')
+await page.locator('.modal .actions .primary').click()
+await check('nieuw project met basis 300×250', async () =>
+  waitFor(async () => {
+    const r = await S(() => {
+      const p = window.__bsStore.getState().project
+      const b = p?.compositions.find((c) => c.id === p.baseCompositionId)
+      return b ? `${b.width}x${b.height}:${p.compositions.length}` : ''
+    })
+    return r === '300x250:1'
+  }, 40)
+)
+
 console.log(fails ? `${fails} controle(s) mislukt` : 'Overzicht alle formaten: alles in orde')
 await S(() => window.__bsStore.getState().markSaved()).catch(() => {})
 await page.waitForTimeout(200)

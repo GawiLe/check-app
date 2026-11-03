@@ -285,3 +285,49 @@ export function copyFormat(p: Project, fromId: string, toId: string): void {
   if (compOv.length) to.overrides = compOv
   else delete to.overrides
 }
+
+/**
+ * Een ander formaat als basis (bijv. 300×250 in plaats van 300×600). Aan de ontwerpen verandert niets:
+ * wat in een formaat afwijkt van de nieuwe basis wordt een override van dat formaat, zodat latere
+ * wijzigingen in de nieuwe basis het niet overschrijven. De nieuwe basis zelf heeft geen overrides.
+ * Posities en maten die (op een pixel na) gelijk zijn aan wat de nieuwe basis zou geven, blijven gekoppeld.
+ */
+export function setBaseComposition(p: Project, compId: string): void {
+  const base = p.compositions.find((c) => c.id === compId)
+  if (!base || p.baseCompositionId === compId) return
+  // Standaardnamen meeverhuizen ("Basis 300x600" → "300x600", "300x250" → "Basis 300x250")
+  const old = p.compositions.find((c) => c.id === p.baseCompositionId)
+  if (old && /^basis \d+x\d+$/i.test(old.name)) old.name = `${old.width}x${old.height}`
+  if (/^\d+x\d+$/.test(base.name)) base.name = `Basis ${base.width}x${base.height}`
+  p.baseCompositionId = compId
+  delete base.overrides
+  for (const l of base.layers) delete l.overrides
+  // Groepsinhoud vergelijken zonder ids (die zijn per formaat anders); geometrie met 1 px speling
+  const val = (l: Layer, k: string) => (k === 'children' ? JSON.parse(JSON.stringify(getKey(l, k) ?? null, (key, v) => (key === 'id' || key === 'overrides' ? undefined : v))) : getKey(l, k))
+  const near = (a: unknown, b: unknown): boolean => {
+    if (typeof a === 'number' && typeof b === 'number') return Math.abs(a - b) <= 1
+    if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((x, i) => near(x, b[i]))
+    if (a && b && typeof a === 'object' && typeof b === 'object') {
+      const ka = Object.keys(a as object)
+      return ka.length === Object.keys(b as object).length && ka.every((k) => near((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]))
+    }
+    return same(a, b)
+  }
+  for (const dst of p.compositions) {
+    if (dst === base) continue
+    for (const dl of dst.layers) {
+      const bl = base.layers.find((b) => b.linkId === dl.linkId)
+      if (!bl) {
+        delete dl.overrides
+        continue
+      }
+      const fromBase = mapLayerToFormat(bl, base, dst.width, dst.height)
+      const ov = layerKeys(dl, fromBase).filter((k) => (GEOMETRY.includes(k) ? !near(getKey(dl, k), getKey(fromBase, k)) : !same(val(dl, k), val(fromBase, k))))
+      if (ov.length) dl.overrides = ov
+      else delete dl.overrides
+    }
+    const compOv = COMP_KEYS.filter((k) => !same(dst[k], base[k]))
+    if (compOv.length) dst.overrides = [...compOv]
+    else delete dst.overrides
+  }
+}

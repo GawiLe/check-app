@@ -122,7 +122,7 @@ function setProjectDir(dir: string) {
 type Handlers = { [K in keyof BannerStudioApi]?: (...a: Parameters<BannerStudioApi[K]>) => ReturnType<BannerStudioApi[K]> | Awaited<ReturnType<BannerStudioApi[K]>> }
 
 const handlers: Handlers = {
-  async newProject(boilerplateId, name) {
+  async newProject(boilerplateId, name, base) {
     // Je kiest waar het project komt; de app maakt daarin zelf een map met de projectnaam
     const s = await readSettings()
     const res = await dialog.showOpenDialog(win!, {
@@ -138,7 +138,12 @@ const handlers: Handlers = {
     const folder = projectFolder(name || 'Nieuwe campagne')
     let dir = join(parent, folder)
     for (let i = 2; existsSync(dir); i++) dir = join(parent, `${folder} ${i}`)
-    const { project, dir: src } = await boilerplateSource(boilerplateId)
+    // Basisformaat: alleen hele, redelijke maten
+    const size =
+      base && Number.isInteger(base.width) && Number.isInteger(base.height) && base.width >= 10 && base.height >= 10 && base.width <= 3000 && base.height <= 3000
+        ? { width: base.width, height: base.height }
+        : undefined
+    const { project, dir: src } = await boilerplateSource(boilerplateId, size)
     project.name = name || project.name
     await initProjectDir(dir, project, src)
     setProjectDir(dir)

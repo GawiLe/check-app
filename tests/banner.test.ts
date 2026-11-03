@@ -1644,3 +1644,50 @@ describe('code-element: sanitizer (allowlist)', () => {
       expect(out, part).toContain(part)
   })
 })
+
+describe('basisformaat kiezen', () => {
+  it('nieuw project met een ander basisformaat (leeg en met voorbeeld)', async () => {
+    const { createEmptyProject, createStarterProject } = await import('../src/shared/factory')
+    const e = createEmptyProject('X', { width: 300, height: 250 })
+    expect([e.compositions.length, e.compositions[0].width, e.compositions[0].height, e.baseCompositionId]).toEqual([1, 300, 250, e.compositions[0].id])
+    expect(e.compositions[0].name).toBe('Basis 300x250')
+    const s = createStarterProject('X', { width: 300, height: 250 })
+    const c = s.compositions[0]
+    expect([c.width, c.height, s.baseCompositionId]).toEqual([300, 250, c.id])
+    // Lagen passen binnen het formaat
+    expect(c.layers.every((l) => l.y + l.height <= 251)).toBe(true)
+  })
+
+  it('ander formaat als basis: ontwerpen blijven gelijk, wijzigingen gaan voortaan vanuit de nieuwe basis', async () => {
+    const { syncFormats, setBaseComposition } = await import('../src/shared/sync')
+    const p = createStarterProject()
+    const big = p.compositions[0]
+    const small = deriveComposition(big, 300, 250, '300x250')
+    small.layers.forEach((l, i) => (l.linkId = big.layers[i].linkId))
+    // In 300×250 de headline zelf verplaatst (een override van dat formaat)
+    const head = small.layers.find((l) => l.name === 'Headline')!
+    head.y = 12
+    head.overrides = ['y']
+    p.compositions.push(small)
+    const before = structuredClone(p.compositions.map((c) => c.layers.map(({ overrides, ...rest }) => rest)))
+
+    setBaseComposition(p, small.id)
+    expect(p.baseCompositionId).toBe(small.id)
+    expect(small.name).toBe('Basis 300x250')
+    expect(big.name).toBe('300x600')
+    // Niets aan de ontwerpen veranderd; de nieuwe basis heeft geen overrides meer
+    expect(p.compositions.map((c) => c.layers.map(({ overrides, ...rest }) => rest))).toEqual(before)
+    expect(small.layers.some((l) => l.overrides?.length)).toBe(false)
+    // In de 300×600 is de headline nu anders dan wat de basis zou geven: dat is een override
+    const bigHead = big.layers.find((l) => l.name === 'Headline')!
+    expect(bigHead.overrides).toContain('y')
+
+    // Tekst wijzigen in de nieuwe basis gaat naar de 300×600; de eigen plek van de headline blijft
+    const prev = structuredClone(p)
+    small.layers.find((l) => l.name === 'Headline')!.text!.content = 'Nieuwe kop'
+    small.layers.find((l) => l.name === 'Headline')!.y = 20
+    syncFormats(prev, p, small.id)
+    expect(bigHead.text!.content).toBe('Nieuwe kop')
+    expect(bigHead.y).toBe(before[0].find((l) => l.name === 'Headline')!.y)
+  })
+})

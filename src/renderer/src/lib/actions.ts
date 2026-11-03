@@ -81,9 +81,9 @@ export async function openInBackground(dirs: string[]) {
   if (active) await window.bs.activateProject(active)
 }
 
-export async function newProject(boilerplateId: string | null, name: string) {
+export async function newProject(boilerplateId: string | null, name: string, base?: { width: number; height: number }) {
   try {
-    const opened = await window.bs.newProject(boilerplateId, name)
+    const opened = await window.bs.newProject(boilerplateId, name, base ?? null)
     if (!opened) return
     // Nieuw project in een eigen tabblad
     await openDocument(opened.dir, opened.project)

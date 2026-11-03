@@ -154,6 +154,8 @@ Hoe het koppelen werkt:
 - Hetzelfde geldt voor de formaatinstellingen (duur, loops, achtergrond, rand).
 - **Een ander formaat als begin:** bij *Formaat toevoegen* kies je *Uitgaan van* (bijv. je uitgewerkte 300×250 voor de 336×280), of je doet later *Lay-out overnemen van …*. Het formaat blijft gekoppeld aan de basis; wat afwijkt wordt een aanpassing van dat formaat.
 - Met het **koppel-icoon** in het paneel zet je het koppelen uit. Dan zijn alle formaten los.
+- **Ander formaat als basis:** in het paneel Formaten rechtsklik (of ⋯) op een formaat → *Maak dit de basis*, bijvoorbeeld de 300×250 in plaats van de 300×600. Aan je ontwerpen verandert niets: wat in een formaat afwijkt van de nieuwe basis wordt een aanpassing van dat formaat. Vanaf dan gaan wijzigingen vanuit de nieuwe basis naar de andere formaten. Ongedaan maken kan met Cmd/Ctrl+Z.
+- **Nieuw project:** bij *Nieuw project* kies je het **basisformaat** (standaard 300×600; je laatste keuze wordt onthouden).
 
 ### Alle formaten naast elkaar
 

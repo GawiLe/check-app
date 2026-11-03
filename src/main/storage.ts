@@ -4,8 +4,8 @@ import { cp, lstat, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:f
 import { existsSync } from 'node:fs'
 import { basename, extname, join } from 'node:path'
 import type { Boilerplate, OpenedProject } from '@shared/api'
-import { createEmptyProject, createStarterProject, newId } from '@shared/factory'
-import { normalizeProject } from '@shared/sync'
+import { createEmptyProject, createStarterProject, newId, type BaseSize } from '@shared/factory'
+import { normalizeProject, setBaseComposition } from '@shared/sync'
 import type { Project } from '@shared/types'
 import type { UserPreset } from '@shared/library'
 import { PROJECT_FILE, PROJECT_VERSION } from '@shared/types'
@@ -184,12 +184,16 @@ export async function listBoilerplates(): Promise<Boilerplate[]> {
   return list
 }
 
-export async function boilerplateSource(id: string | null): Promise<{ project: Project; dir?: string }> {
-  if (!id || id === BUILTIN_EMPTY) return { project: createEmptyProject() }
-  if (id === BUILTIN_STARTER) return { project: createStarterProject() }
+export async function boilerplateSource(id: string | null, size?: BaseSize): Promise<{ project: Project; dir?: string }> {
+  if (!id || id === BUILTIN_EMPTY) return { project: createEmptyProject(undefined, size) }
+  if (id === BUILTIN_STARTER) return { project: createStarterProject(undefined, size) }
   if (!safeName(id)) throw new Error('Ongeldige boilerplate.')
   const dir = join(bpRoot(), id)
-  return { project: (await readProject(dir)).project, dir }
+  const project = (await readProject(dir)).project
+  // Eigen boilerplate: zit het gekozen basisformaat erin, dan wordt dat de basis
+  const match = size && project.compositions.find((c) => c.width === size.width && c.height === size.height)
+  if (match) setBaseComposition(project, match.id)
+  return { project, dir }
 }
 
 export async function saveBoilerplate(dir: string, project: Project, name: string): Promise<Boilerplate> {

@@ -80,17 +80,46 @@ export function BoilerplatePicker(props: { value: string | null; onChange: (id: 
 function NewProjectDialog({ onClose }: { onClose: () => void }) {
   const [bp, setBp] = useState<string | null>(null)
   const [name, setName] = useState('Nieuwe campagne')
+  // Basisformaat: de vorige keuze onthouden
+  const [base, setBaseState] = useState(() => {
+    try {
+      const v = localStorage.getItem('bs-base-size') ?? ''
+      return IAB_SIZES.some((s) => `${s.width}x${s.height}` === v) ? v : '300x600'
+    } catch {
+      return '300x600'
+    }
+  })
+  const setBase = (v: string) => {
+    setBaseState(v)
+    try {
+      localStorage.setItem('bs-base-size', v)
+    } catch {
+      /* niet erg */
+    }
+  }
+  const [bw, bh] = base.split('x').map(Number)
   return (
     <Modal title="Nieuw project" onClose={onClose}>
       <Row label="Projectnaam">
         <input value={name} onChange={(e) => setName(e.target.value)} />
       </Row>
-      <div className="hint-text">Kies een boilerplate als startpunt. De basis is 300×600; andere formaten leid je daarvan af.</div>
+      <Row label="Basisformaat">
+        <select value={base} onChange={(e) => setBase(e.target.value)}>
+          {IAB_SIZES.map((s) => (
+            <option key={`${s.width}x${s.height}`} value={`${s.width}x${s.height}`}>
+              {s.width}×{s.height} · {s.name}
+            </option>
+          ))}
+        </select>
+      </Row>
+      <div className="hint-text">
+        Het basisformaat is leidend: andere formaten leid je ervan af en wat je in de basis doet gaat naar alle formaten. Later wisselen kan in het paneel Formaten (⋯ → <i>Maak dit de basis</i>).
+      </div>
       <BoilerplatePicker value={bp} onChange={setBp} />
       <div className="hint-text">Je kiest hierna waar het project komt; daar maken we een eigen map met de projectnaam (met project.bsproj, assets/ en fonts/). Waar je exporteert kies je bij het exporteren.</div>
       <div className="actions">
         <button onClick={onClose}>Annuleren</button>
-        <button className="primary" onClick={() => newProject(bp, name)}>
+        <button className="primary" onClick={() => newProject(bp, name, { width: bw, height: bh })}>
           Kies locatie en maak aan…
         </button>
       </div>

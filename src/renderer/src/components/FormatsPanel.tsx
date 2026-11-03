@@ -1,5 +1,5 @@
 import { LayoutGrid, Link2, Link2Off, MoreHorizontal, Plus, Star } from 'lucide-react'
-import { copyFormat, resetCompOverrides, resetOverrides } from '@shared/sync'
+import { copyFormat, resetCompOverrides, resetOverrides, setBaseComposition } from '@shared/sync'
 import type { Composition, Project } from '@shared/types'
 import { deleteComposition, renameComposition } from '../lib/actions'
 import { useStore, type MenuItem } from '../store'
@@ -17,6 +17,17 @@ export function formatChanges(p: Project, c: Composition) {
     changed: c.layers.filter((l) => l.overrides?.length).length + (c.overrides?.length ? 1 : 0),
     own: c.layers.filter((l) => !links.has(l.linkId)).length
   }
+}
+
+/**
+ * Dit formaat wordt de basis (bijv. 300×250 in plaats van 300×600). De ontwerpen blijven zoals ze zijn;
+ * vanaf nu gaan wijzigingen vanuit dit formaat naar de andere. Ongedaan te maken.
+ */
+export function makeBase(compId: string) {
+  const c = S().project?.compositions.find((x) => x.id === compId)
+  if (!c) return
+  S().update((p) => setBaseComposition(p, compId), undefined, true)
+  S().setStatus(`${size(c)} is nu de basis: wijzigingen hierin gaan naar alle formaten (aanpassingen per formaat blijven staan). Ongedaan maken kan met Cmd/Ctrl+Z.`)
 }
 
 /** Lay-out van een ander formaat overnemen in dit formaat (ongedaan te maken). */
@@ -38,6 +49,7 @@ export function openFormatMenu(e: React.MouseEvent, c: Composition) {
   const isBase = c.id === p.baseCompositionId
   const others = p.compositions.filter((x) => x.id !== c.id)
   const items: MenuItem[] = [{ label: 'Naam wijzigen', onClick: () => S().setRenaming(c.id) }]
+  if (!isBase) items.push({ label: 'Maak dit de basis', onClick: () => makeBase(c.id) })
   if (!isBase && others.length) {
     items.push({ separator: true })
     for (const o of others) items.push({ label: `Lay-out overnemen van ${size(o)}${o.id === p.baseCompositionId ? ' (basis)' : ''}`, onClick: () => takeLayoutFrom(o.id, c.id) })

@@ -101,9 +101,15 @@ const motion = (start: number, duration: number, spec: Partial<Motion>): Motion 
   ...spec
 })
 
-/** Leeg project: alleen een 300×600-basis, zonder lagen. Standaard bij "Nieuw". */
-export function createEmptyProject(name = 'Nieuwe campagne'): Project {
-  const comp = createComposition(BASE_SIZE.width, BASE_SIZE.height, 'Basis 300x600')
+/** Maat van het basisformaat voor een nieuw project (standaard 300×600). */
+export interface BaseSize {
+  width: number
+  height: number
+}
+
+/** Leeg project: alleen een basisformaat (standaard 300×600), zonder lagen. Standaard bij "Nieuw". */
+export function createEmptyProject(name = 'Nieuwe campagne', size: BaseSize = BASE_SIZE): Project {
+  const comp = createComposition(size.width, size.height, `Basis ${size.width}x${size.height}`)
   return {
     version: PROJECT_VERSION,
     name,
@@ -118,8 +124,8 @@ export function createEmptyProject(name = 'Nieuwe campagne'): Project {
   }
 }
 
-/** Voorbeeld-boilerplate: 300×600 met achtergrond, headline, subline, packshot-plek en CTA. */
-export function createStarterProject(name = 'Nieuwe campagne'): Project {
+/** Voorbeeld-boilerplate met achtergrond, headline, subline, packshot-plek en CTA (ontworpen op 300×600). */
+export function createStarterProject(name = 'Nieuwe campagne', size: BaseSize = BASE_SIZE): Project {
   const comp = createComposition(BASE_SIZE.width, BASE_SIZE.height, 'Basis 300x600')
   const W = comp.width
 
@@ -160,6 +166,8 @@ export function createStarterProject(name = 'Nieuwe campagne'): Project {
   comp.layers = [ctaText, ctaBg, pack, sub, headline, bg]
   // Alles als gewone keyframes (zoals een animator werkt)
   comp.layers.forEach(bakeMotion)
+  // Ander basisformaat: de lay-out omrekenen naar die maat
+  const base = size.width === comp.width && size.height === comp.height ? comp : deriveComposition(comp, size.width, size.height, `Basis ${size.width}x${size.height}`)
 
   return {
     version: PROJECT_VERSION,
@@ -170,8 +178,8 @@ export function createStarterProject(name = 'Nieuwe campagne'): Project {
     politeLoad: true,
     embedFonts: true,
     fonts: [],
-    baseCompositionId: comp.id,
-    compositions: [comp]
+    baseCompositionId: base.id,
+    compositions: [base]
   }
 }
 
